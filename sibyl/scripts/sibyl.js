@@ -11,7 +11,12 @@ const { fetchHupuSignals } = require('./adapters/hupu-adapter');
 const { clusterSignals, buildNextState } = require('./lib/clusterer');
 const { generateReport, selectReportClusters, hasBroadcastSeed } = require('./lib/report-generator');
 const { classifySignal } = require('./lib/category-classifier');
-const { applyAISuggestions } = require('./lib/ai-suggestions');
+const {
+  applySemanticEventMerge,
+  selectPreSummaryCandidates
+} = require('./lib/event-threader');
+const { applyEventRelevanceFilter } = require('./lib/event-relevance');
+const { applyEventSummaries } = require('./lib/event-summary');
 const { normalizeForCompare } = require('./lib/signals');
 const {
   loadLatestSnapshot,
@@ -36,19 +41,40 @@ const DEFAULT_CONFIG = {
     }
   },
   filters: {
-    allowedCategories: ['游戏', '电竞', '体育'],
+    allowedCategories: ['游戏', '电竞', '体育', 'AI'],
     minTitleLength: 4
   },
   cluster: {
     similarityThreshold: 0.42
+  },
+  eventMerge: {
+    enabled: true,
+    candidateLimit: 36,
+    preSummaryCandidateLimit: 12,
+    preSummaryRetrievalLimit: 4,
+    preSummaryTimeBudgetSeconds: 90,
+    maxMergeBatchSize: 8,
+    minConfidence: 0.8
+  },
+  eventSummary: {
+    enabled: true,
+    cacheTtlHours: 6,
+    retrievalLimit: 10,
+    concurrency: 2,
+    timeBudgetSeconds: 180,
+    failureCacheTtlMinutes: 30,
+    weiboWisEnabled: true,
+    weiboWisQueryLimit: 3
+  },
+  eventFilter: {
+    enabled: true,
+    minConfidence: 0.75
   },
   report: {
     topN: 10,
     minScore: 20,
     requireSeedPlatforms: true,
     seedPlatforms: ['weibo', 'douyin'],
-    aiSuggestions: true,
-    aiSuggestionLimit: 8,
     pushWeCom: false,
     webhook: ''
   }
@@ -123,7 +149,7 @@ function enrichSignals(signals) {
 
 function filterSignals(signals, config) {
   const filters = config.filters || {};
-  const allowedCategories = filters.allowedCategories || ['游戏', '电竞', '体育'];
+  const allowedCategories = filters.allowedCategories || ['游戏', '电竞', '体育', 'AI'];
   return signals.filter(signal => {
     if (!signal.title || signal.title.length < (filters.minTitleLength || 4)) return false;
     return signal.category && allowedCategories.includes(signal.category);
@@ -158,6 +184,14 @@ function compactCluster(cluster, reportConfig = {}) {
   return {
     topicId: cluster.topicId,
     title: cluster.mainSignal.title,
+    canonicalTitle: cluster.canonicalTitle || cluster.mainSignal.title,
+    aliases: cluster.aliases || [],
+    eventMerge: cluster.eventMerge || null,
+    eventSummary: cluster.eventSummary || null,
+    eventSummarySource: cluster.eventSummarySource || null,
+    relevance: cluster.relevance || null,
+    broadcastFiltered: Boolean(cluster.broadcastFiltered),
+    broadcastFilterReason: cluster.broadcastFilterReason || null,
     status: cluster.status,
     statusLabel: cluster.statusLabel,
     score: cluster.score,
@@ -166,8 +200,6 @@ function compactCluster(cluster, reportConfig = {}) {
     hourlyTrend: cluster.hourlyTrend || null,
     category: cluster.category,
     hasBroadcastSeed: hasBroadcastSeed(cluster, reportConfig),
-    aiSuggestion: cluster.aiSuggestion || null,
-    suggestionSource: cluster.suggestionSource || null,
     broadcastReasons: cluster.broadcastReasons || [],
     platformCount: cluster.platformCount,
     platformSummary: cluster.platformSummary,
@@ -247,17 +279,6 @@ function splitForWeCom(report, maxBytes = 3200) {
   return chunks;
 }
 
-function logSuggestionSources(clusters, config = {}) {
-  const selected = selectReportClusters(clusters, config);
-  if (!selected.length) return;
-
-  console.log('   处理建议来源:');
-  selected.forEach((cluster, index) => {
-    const source = cluster.suggestionSource || (cluster.aiSuggestion ? 'AI生成' : '规则生成');
-    console.log(`     ${index + 1}. ${source} - ${cluster.mainSignal.title}`);
-  });
-}
-
 function snapshotPlatforms(snapshot) {
   return snapshot?.platforms?.length
     ? snapshot.platforms
@@ -284,7 +305,10 @@ function attachSnapshotTrends(clusters, snapshots) {
   const records = snapshots.flatMap(snapshot => snapshot.records || []);
 
   clusters.forEach(cluster => {
-    const keys = new Set((cluster.signals || []).map(signalKey));
+    const keys = new Set([
+      ...(cluster.signals || []).map(signalKey),
+      ...(cluster.previousSignalKeys || [])
+    ]);
     const samples = records
       .filter(record => keys.has(recordKey(record)))
       .sort((a, b) => new Date(a.capturedAt) - new Date(b.capturedAt));
@@ -384,12 +408,62 @@ async function main() {
   }
 
   const signals = filterSignals(enrichSignals(rawSignals), config);
-  const clusters = clusterSignals(signals, previousState, config.cluster || {});
-  attachSnapshotTrends(clusters, recentSnapshots);
-  await applyAISuggestions(clusters, {
-    ...reportConfig,
-    aiSuggestions: !args.includes('--no-ai') && (reportConfig.aiSuggestions !== false)
+  let clusters = clusterSignals(signals, previousState, config.cluster || {});
+  const eventMergeEnabled = !args.includes('--no-ai') &&
+    !args.includes('--no-event-merge') &&
+    config.eventMerge?.enabled !== false;
+  const preSummaryConfig = {
+    ...config,
+    eventSummary: {
+      ...(config.eventSummary || {}),
+      retrievalLimit: config.eventMerge?.preSummaryRetrievalLimit ?? 4,
+      timeBudgetSeconds: config.eventMerge?.preSummaryTimeBudgetSeconds ?? 90,
+      weiboWisQueryLimit: 1
+    }
+  };
+  if (eventMergeEnabled && !args.includes('--no-summary') && config.eventSummary?.enabled !== false) {
+    const mergeCandidates = selectPreSummaryCandidates(clusters, {
+      ...(config.eventMerge || {}),
+      seedPlatforms: reportConfig.seedPlatforms || ['weibo', 'douyin']
+    });
+    await applyEventSummaries(mergeCandidates, preSummaryConfig);
+  }
+  clusters = await applySemanticEventMerge(clusters, previousState, {
+    ...(config.eventMerge || {}),
+    enabled: eventMergeEnabled,
+    seedPlatforms: reportConfig.seedPlatforms || ['weibo', 'douyin'],
+    ai: config.ai
   });
+  if (eventMergeEnabled && !args.includes('--no-summary') && config.eventSummary?.enabled !== false) {
+    const relatedCandidates = selectPreSummaryCandidates(clusters, {
+      ...(config.eventMerge || {}),
+      seedPlatforms: reportConfig.seedPlatforms || ['weibo', 'douyin']
+    });
+    const reportCandidates = selectReportClusters(clusters, {
+      ...reportConfig,
+      topN: Math.max(Number(reportConfig.topN) || 10, 10)
+    });
+    const convergenceCandidates = [...new Map(
+      [...relatedCandidates, ...reportCandidates].map(cluster => [cluster.topicId, cluster])
+    ).values()];
+    await applyEventSummaries(convergenceCandidates, preSummaryConfig);
+    clusters = await applySemanticEventMerge(clusters, previousState, {
+      ...(config.eventMerge || {}),
+      enabled: true,
+      seedPlatforms: reportConfig.seedPlatforms || ['weibo', 'douyin'],
+      ai: config.ai
+    });
+  }
+  clusters = await applyEventRelevanceFilter(clusters, {
+    ...(config.eventFilter || {}),
+    useAI: !args.includes('--no-ai'),
+    ai: config.ai
+  });
+  attachSnapshotTrends(clusters, recentSnapshots);
+  const selectedForSummary = selectReportClusters(clusters, reportConfig);
+  if (!args.includes('--no-summary')) {
+    await applyEventSummaries(selectedForSummary, config);
+  }
   const generatedAt = new Date().toISOString();
   const report = generateReport(clusters, {
     generatedAt,
@@ -413,12 +487,11 @@ async function main() {
   console.log('✅ Sibyl 生成热点综合播报完成');
   console.log(`   原始信号: ${rawSignals.length} 条`);
   console.log(`   入池信号: ${signals.length} 条`);
-  console.log(`   聚合话题: ${clusters.length} 个`);
+  console.log(`   热点事件: ${clusters.length} 个`);
   console.log(`   数据来源: ${source === 'snapshot' ? 'Sibyl快照' : '现场采集'}`);
   console.log(`   报告文件: ${REPORT_FILE}`);
   console.log(`   企业微信推送: ${pushed ? '已发送' : '未发送'}`);
   errors.forEach(error => console.warn(`⚠️ ${error.name} 采集异常: ${error.error}`));
-  logSuggestionSources(clusters, reportConfig);
 }
 
 main().catch(error => {

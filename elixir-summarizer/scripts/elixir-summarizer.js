@@ -1,10 +1,10 @@
 /**
- * Elixir 摘要生成模块 v3.4
+ * Elixir 摘要生成模块 v3.7.0
  * 提供统一的 AI 语义分析摘要生成能力
  * 
  * v3.4 更新：新增商业广告过滤功能
  * - 在生成摘要前检测是否为商业推广内容
- * - 支持游戏/电竞/体育相关内容判断
+ * - 支持游戏/电竞/体育/AI相关内容判断
  * - 过滤手机发布会、汽车广告、纯电商广告等
  *
  * 版本历史:
@@ -19,16 +19,23 @@
  *        - 清理 history.json 中过长的原始内容记录
  * v3.4 - 新增商业广告检测功能
  *        - 在摘要生成前检测内容类型
- *        - 过滤非游戏/电竞/体育的商业推广
+ *        - 过滤非游戏/电竞/体育/AI的商业推广
  *        - 返回结构改为 { summary, isCommercial, category, reason }
+ * v3.5 - 支持微博智搜或Agent Reach多来源核验材料
+ *        - 只使用来源直接支持的事实，冲突信息不进入摘要
+ *        - 摘要聚焦事件与升温原因，不输出市场建议
+ * v3.6 - 支持事件线摘要与可配置模型输出长度
+ *        - 为综合播报事件合并和摘要生成提供统一模型接口
+ * v3.6.1 - 修复模型请求参数与摘要选项重名导致的运行错误
+ * v3.7.0 - 将AI行业内容纳入目标范围，扩展摘要和商业过滤判断
  */
 
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
 
-// AI生成摘要提示词模板 - v3.4 优化版
-const AI_SUMMARY_PROMPT = `请根据以下微博智搜内容，生成一个简洁流畅的摘要。
+// AI生成摘要提示词模板 - v3.5 多来源核验版
+const AI_SUMMARY_PROMPT = `请根据以下已核验热点材料，生成一个简洁流畅的摘要。材料可能来自微博智搜，也可能来自Agent Reach检索的多个公开来源。
 
 【字数要求】
 - 目标字数：60-100字（含标点）
@@ -37,12 +44,15 @@ const AI_SUMMARY_PROMPT = `请根据以下微博智搜内容，生成一个简�
 
 分析要求：
 1. 提取最新时间点的关键事件（今天/昨日/最新）
-2. 判断内容类型：比赛结果 / 游戏更新 / 选手动态 / 争议事件 / 其他
+2. 判断内容类型：比赛结果 / 游戏更新 / 选手动态 / AI模型与产品动态 / 争议事件 / 其他
 3. 提取关键要素：
    - 时间（用"今日"/"昨日"等自然表达）
-   - 主体（游戏名/赛事名/人名）
-   - 核心事件（更新/比赛/争议/动态）
-   - 关键亮点（新内容/结果/玩家反应）
+   - 主体（游戏名/赛事名/机构名/模型名/人名）
+   - 核心事件（更新/发布/比赛/争议/动态）
+   - 关键亮点（新内容/结果/用户或行业反应）
+4. 只使用材料中由来源直接支持的事实；不同来源存在冲突时，删除冲突细节
+5. 来源名称、链接和检索过程不写进摘要
+6. 说明事件为何形成热点，但不输出市场工作建议或内容承接建议
 
 输出要求：
 - 用流畅短句，避免堆砌名词（如"更新新增"→"更新带来"）
@@ -60,7 +70,7 @@ const AI_SUMMARY_PROMPT = `请根据以下微博智搜内容，生成一个简�
 ❌ 差："2026年5月29日，恋与深空更新新增男主互动剧情，玩家社区反响热烈，同时推出限时登录活动。"
 ✅ 好："恋与深空今日更新，新增男主亲密互动剧情引玩家热议，同步上线限时登录送专属礼物活动。"
 
-智搜内容：
+已核验材料：
 {content}
 
 请直接输出摘要，不要解释，不要加引号。`;
@@ -97,7 +107,7 @@ const AI_TRUNCATE_PROMPT = `请对以下摘要进行大幅精简。
 请输出精简后的摘要，严格控制在80-100字。直接输出，不要解释。`;
 
 // 商业广告检测提示词模板 - v3.4 新增
-const COMMERCIAL_DETECTION_PROMPT = `请分析以下微博热搜话题的内容，判断是否为商业推广或非目标内容。
+const COMMERCIAL_DETECTION_PROMPT = `请分析以下热点话题的已核验材料，判断是否为商业推广或非目标内容。
 
 话题标题：{title}
 话题内容：
@@ -109,12 +119,13 @@ const COMMERCIAL_DETECTION_PROMPT = `请分析以下微博热搜话题的内容�
 3. 玩家社区 - 玩家讨论、攻略分享、吐槽、二创内容、社区活动等
 4. 跨界联动 - 游戏与其他领域的联动（如主播带货游戏皮肤、明星代言游戏、游戏联名活动等）
 5. 体育内容 - 足球、篮球、乒乓球等体育赛事、运动员动态、体育新闻等
-6. 商业推广 - 与游戏/电竞/体育无关的产品推广（如手机发布会、汽车广告、电商平台纯广告等）
-7. 非目标内容 - 虽然包含游戏/电竞相关词汇，但实际内容是其他领域
+6. AI内容 - 人工智能模型、产品、公司、算力芯片、生成式内容、具身智能等动态
+7. 商业推广 - 与游戏/电竞/体育/AI无关的产品推广（如普通手机发布会、汽车广告、电商平台纯广告等）
+8. 非目标内容 - 虽然包含目标领域相关词汇，但实际内容是其他领域
 
 判断标准：
-- 如果话题主体是游戏内容、电竞赛事、玩家社区讨论、体育内容，或游戏相关的跨界联动 → 标记为"正常内容"
-- 如果话题是纯产品广告，与游戏/电竞/体育内容无关 → 标记为"商业推广"
+- 如果话题主体是游戏内容、电竞赛事、玩家社区讨论、体育内容、AI行业动态，或目标领域相关的跨界联动 → 标记为"正常内容"
+- 如果话题是纯产品广告，与游戏/电竞/体育/AI内容无关 → 标记为"商业推广"
 - 如果话题虽然包含游戏相关词汇（如"荣耀""王者"），但实际内容是手机/汽车等其他产品 → 标记为"非目标内容"
 
 重要提示：
@@ -122,13 +133,14 @@ const COMMERCIAL_DETECTION_PROMPT = `请分析以下微博热搜话题的内容�
 - "王者"单独出现可能是指王者荣耀，也可能是泛指第一名，需要结合上下文判断
 - "原神""DOTA2""LOL""王者荣耀"等明确游戏词汇 → 正常内容
 - "梅西""C罗""NBA""樊振东""孙颖莎"等明确体育词汇 → 正常内容
+- "OpenAI""DeepSeek""Claude""大模型""具身智能"等明确AI领域词汇 → 正常内容
 - 手机发布会、新车上市、电商平台促销等 → 商业推广
 
 请严格按以下JSON格式返回，不要添加其他内容：
 {
   "isCommercial": true/false,
   "category": "正常内容/商业推广/非目标内容",
-  "subCategory": "游戏内容/电竞赛事/玩家社区/跨界联动/体育内容/手机产品/汽车产品/其他产品",
+  "subCategory": "游戏内容/电竞赛事/玩家社区/跨界联动/体育内容/AI内容/手机产品/汽车产品/其他产品",
   "reason": "判断理由（简要说明）",
   "confidence": 0.95
 }`;
@@ -136,14 +148,14 @@ const COMMERCIAL_DETECTION_PROMPT = `请分析以下微博热搜话题的内容�
 /**
  * 调用AI模型（带重试机制）
  */
-async function callAIModel(prompt, config, maxRetries = 2) {
+async function callAIModel(prompt, config, maxRetries = 2, options = {}) {
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     const result = await new Promise((resolve) => {
       const data = JSON.stringify({
         model: config.models?.[0]?.id || 'kimi-k2.5',
         messages: [{ role: 'user', content: prompt }],
-        max_tokens: 500,
-        temperature: 0.3
+        max_tokens: options.maxTokens || 500,
+        temperature: options.temperature ?? 0.3
       });
 
       const baseUrl = config.baseUrl || 'https://api.openai.com/v1';
@@ -151,7 +163,7 @@ async function callAIModel(prompt, config, maxRetries = 2) {
       const url = new URL(baseUrl);
       const client = isHttps ? https : http;
 
-      const options = {
+      const requestOptions = {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 80),
         path: '/v1/chat/completions',
@@ -163,7 +175,7 @@ async function callAIModel(prompt, config, maxRetries = 2) {
         }
       };
 
-      const req = client.request(options, (res) => {
+      const req = client.request(requestOptions, (res) => {
         let responseData = '';
         res.on('data', chunk => responseData += chunk);
         res.on('end', () => {

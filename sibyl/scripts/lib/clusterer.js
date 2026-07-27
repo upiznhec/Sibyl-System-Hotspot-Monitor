@@ -28,7 +28,8 @@ const STOP_WORDS = new Set([
 
 const GENERIC_KEYWORDS = new Set([
   '游戏', '电竞', '体育', '足球', '篮球', 'nba', 'cba', 'lpl', 'lck', 'kpl',
-  '英雄联盟', '王者荣耀', '世界杯', '欧冠', '英超', 'msi', '热搜', '热榜'
+  '英雄联盟', '王者荣耀', '世界杯', '欧冠', '英超', 'msi',
+  'ai', '人工智能', '生成式ai', 'aigc', '大模型', '智能体', '热搜', '热榜'
 ]);
 
 const EVENT_CONCEPT_PATTERNS = [
@@ -38,7 +39,7 @@ const EVENT_CONCEPT_PATTERNS = [
   { concept: 'fan_support', pattern: /球迷|双向奔赴|加油|应援/ },
   { concept: 'win_loss', pattern: /击败|战胜|不敌|淘汰|锁定|晋级|出线|夺冠|夺金|取胜|输给|获胜|翻盘/ },
   { concept: 'award', pattern: /当选|最佳|mvp|MVP|全场最佳/ },
-  { concept: 'record', pattern: /射手王|纪录|记录|队史|历史|加冕/ },
+  { concept: 'record', pattern: /射手王|打破.{0,6}纪录|刷新.{0,6}纪录|创下.{0,6}纪录|队史|加冕|登顶.{0,8}榜/ },
   { concept: 'response', pattern: /回应|道歉|辟谣|否认|声明|发文|怒喷|吐槽|炮轰/ },
   { concept: 'mechanism', pattern: /机制|elo|ELO|排位|匹配/ },
   { concept: 'lineup_schedule', pattern: /训练赛|参赛|名单|阵容|赛程|开赛|首发|分组|抽签/ },
@@ -173,9 +174,15 @@ function similarity(signal, cluster) {
     signalHasConcept &&
     clusterHasConcept &&
     conceptScore === 0;
+  const hasAsymmetricConcept = hasEntityOverlap &&
+    signalHasConcept !== clusterHasConcept;
 
   if (hasConceptConflict && titleScore < 0.55) {
     return Math.min(baseScore, 0.25);
+  }
+
+  if (hasAsymmetricConcept && titleScore < 0.45 && tokenScore < 0.25) {
+    return Math.min(baseScore, 0.3);
   }
 
   if (hasEntityOverlap && conceptScore > 0 && (titleScore >= 0.08 || tokenScore >= 0.05)) {
@@ -287,13 +294,78 @@ function buildTopicKey(cluster) {
     .sort()
     .slice(0, 4)
     .join('|');
-  const titlePart = cluster.mainSignal.normalizedTitle.slice(0, 40);
+  const titlePart = normalizeForCompare(
+    cluster.canonicalTitle || cluster.mainSignal.title || ''
+  ).slice(0, 48);
   return stableHash(`${entityPart || keywordPart}:${conceptPart}:${titlePart}`);
 }
 
-function finalizeCluster(cluster, previousByKey) {
+function scoreClusterSignals(signals) {
+  const byPlatform = new Map();
+  signals.forEach(signal => {
+    if (!byPlatform.has(signal.platform)) byPlatform.set(signal.platform, []);
+    byPlatform.get(signal.platform).push(scoreSignal(signal));
+  });
+
+  let total = 0;
+  for (const scores of byPlatform.values()) {
+    scores.sort((a, b) => b - a);
+    const strongest = scores[0] || 0;
+    const aliasBonus = Math.min(
+      strongest * 0.3,
+      scores.slice(1).reduce((sum, score) => sum + score * 0.15, 0)
+    );
+    total += strongest + aliasBonus;
+  }
+  return Math.round(total);
+}
+
+function normalizedAliases(cluster) {
+  return new Set((cluster.aliases || cluster.signals.map(signal => signal.title))
+    .map(normalizeForCompare)
+    .filter(Boolean));
+}
+
+function findPreviousCluster(cluster, previousByKey, candidateKey) {
+  if (previousByKey[candidateKey]) {
+    return { key: candidateKey, value: previousByKey[candidateKey] };
+  }
+
+  const currentAliases = normalizedAliases(cluster);
+  const currentTitle = normalizeForCompare(cluster.canonicalTitle || cluster.mainSignal.title);
+  let best = null;
+
+  for (const [key, previous] of Object.entries(previousByKey)) {
+    const previousAliases = new Set([
+      previous.title,
+      previous.canonicalTitle,
+      ...(previous.aliases || [])
+    ].map(normalizeForCompare).filter(Boolean));
+    if (currentAliases.size === 1 && previousAliases.size > 1) {
+      continue;
+    }
+    let overlap = 0;
+    currentAliases.forEach(alias => {
+      if (previousAliases.has(alias)) overlap++;
+    });
+    const sameCanonicalTitle = currentTitle &&
+      currentTitle === normalizeForCompare(previous.canonicalTitle || previous.title);
+    const score = overlap * 10 + (sameCanonicalTitle ? 5 : 0);
+    if (score > 0 && (!best || score > best.score)) {
+      best = { key, value: previous, score };
+    }
+  }
+
+  return best;
+}
+
+function finalizeCluster(cluster, previousByKey, options = {}) {
   cluster.signals.sort((a, b) => scoreSignal(b) - scoreSignal(a));
   cluster.mainSignal = cluster.signals[0];
+  cluster.canonicalTitle = options.canonicalTitle ||
+    cluster.canonicalTitle ||
+    cluster.mainSignal.title;
+  cluster.aliases = [...new Set(cluster.signals.map(signal => signal.title).filter(Boolean))];
   cluster.keywords = [...new Set(cluster.signals.flatMap(signal => signal.matchedKeywords || []))];
   cluster.entityTokens = [...new Set(cluster.signals.flatMap(signal => signal.entityTokens || []))];
   cluster.eventConcepts = [...new Set(cluster.signals.flatMap(signal => signal.eventConcepts || []))];
@@ -304,14 +376,16 @@ function finalizeCluster(cluster, previousByKey) {
   cluster.bestRank = Math.min(...cluster.signals.map(signal => signal.rank || 999));
   cluster.totalHeat = cluster.signals.reduce((sum, signal) => sum + (signal.heat || 0), 0);
 
-  const signalScore = cluster.signals.reduce((sum, signal) => sum + scoreSignal(signal), 0);
+  const signalScore = scoreClusterSignals(cluster.signals);
   const crossPlatformBonus = Math.max(0, cluster.platformCount - 1) * 22;
   const strongSourceBonus = cluster.signals.some(signal => signal.rank && signal.rank <= 3) ? 12 : 0;
   cluster.score = Math.round(signalScore + crossPlatformBonus + strongSourceBonus);
-  cluster.topicKey = buildTopicKey(cluster);
+  const candidateKey = buildTopicKey(cluster);
+  const previousMatch = findPreviousCluster(cluster, previousByKey, candidateKey);
+  cluster.topicKey = previousMatch?.key || candidateKey;
   cluster.topicId = cluster.topicKey;
 
-  const prev = previousByKey[cluster.topicKey];
+  const prev = previousMatch?.value || previousByKey[cluster.topicKey];
   const earliestSignalTime = cluster.signals
     .map(signal => signal.capturedAt)
     .sort()[0];
@@ -322,8 +396,29 @@ function finalizeCluster(cluster, previousByKey) {
   cluster.status = statusFrom(prev, cluster.score, cluster.firstSeenAt);
   cluster.statusLabel = statusLabel(cluster.status);
   cluster.broadcastReasons = buildBroadcastReasons(cluster, prev);
+  cluster.previousSignalKeys = prev?.signalKeys || [];
+  cluster.eventMerge = options.eventMerge || cluster.eventMerge || null;
 
   return cluster;
+}
+
+function rebuildClusterFromSignals(signals, previousState = {}, options = {}) {
+  const preparedSignals = signals.map(signal => ({
+    ...signal,
+    tokens: signal.tokens || extractTokens(signal),
+    entityTokens: signal.entityTokens || extractEntityTokens(signal),
+    eventConcepts: signal.eventConcepts || extractEventConcepts(signal.title)
+  }));
+  const cluster = {
+    signals: preparedSignals,
+    tokens: [...new Set(preparedSignals.flatMap(signal => signal.tokens || []))].slice(0, 60),
+    keywords: [...new Set(preparedSignals.flatMap(signal => signal.matchedKeywords || []))],
+    entityTokens: [...new Set(preparedSignals.flatMap(signal => signal.entityTokens || []))].slice(0, 40),
+    eventConcepts: [...new Set(preparedSignals.flatMap(signal => signal.eventConcepts || []))].slice(0, 20),
+    canonicalTitle: options.canonicalTitle || null,
+    eventMerge: options.eventMerge || null
+  };
+  return finalizeCluster(cluster, previousState.clustersByKey || {}, options);
 }
 
 function clusterSignals(signals, previousState = {}, config = {}) {
@@ -376,6 +471,11 @@ function buildNextState(clusters) {
   clusters.forEach(cluster => {
     clustersByKey[cluster.topicKey] = {
       title: cluster.mainSignal.title,
+      canonicalTitle: cluster.canonicalTitle || cluster.mainSignal.title,
+      aliases: cluster.aliases || [],
+      signalKeys: (cluster.signals || []).map(signal =>
+        `${signal.platform}:${signal.normalizedTitle || normalizeForCompare(signal.title || '')}`
+      ),
       score: cluster.score,
       bestRank: cluster.bestRank,
       firstSeenAt: cluster.firstSeenAt,
@@ -393,6 +493,8 @@ function buildNextState(clusters) {
 module.exports = {
   clusterSignals,
   buildNextState,
+  rebuildClusterFromSignals,
   scoreSignal,
+  scoreClusterSignals,
   statusLabel
 };

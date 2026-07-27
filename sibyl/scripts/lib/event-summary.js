@@ -1,0 +1,351 @@
+const crypto = require('crypto');
+const path = require('path');
+
+const { summarizeContent } = require('../../../elixir-summarizer/scripts/elixir-summarizer');
+const { retrieveAgentReachEvidence } = require('./agent-reach-retriever');
+const { getWeiboToken, searchWeiboAI } = require('./weibo-wis');
+const {
+  getDataDir,
+  readJson,
+  writeJsonAtomic
+} = require('./snapshot-store');
+const { normalizeForCompare } = require('./signals');
+
+const DEFAULT_CONFIG = {
+  enabled: true,
+  cacheTtlHours: 6,
+  retrievalLimit: 10,
+  concurrency: 2,
+  timeBudgetSeconds: 180,
+  failureCacheTtlMinutes: 30,
+  weiboWisEnabled: true,
+  weiboWisQueryLimit: 3
+};
+
+function cacheFile() {
+  return path.join(getDataDir(), 'report-summaries.json');
+}
+
+function failureCacheFile() {
+  return path.join(getDataDir(), 'report-retrieval-failures.json');
+}
+
+function loadCache() {
+  const cache = readJson(cacheFile(), {});
+  return cache && typeof cache === 'object' ? cache : {};
+}
+
+function loadFailureCache() {
+  const cache = readJson(failureCacheFile(), {});
+  return cache && typeof cache === 'object' ? cache : {};
+}
+
+function loadAlertSummaries() {
+  const cache = readJson(path.join(getDataDir(), 'alert-summaries.json'), {});
+  const summaries = new Map();
+  Object.values(cache || {}).forEach(item => {
+    const title = normalizeForCompare(item?.title || '');
+    const summary = normalizeSummary(item?.summary);
+    if (title && summary) summaries.set(title, summary);
+  });
+  return summaries;
+}
+
+function normalizeSummary(summary) {
+  const text = String(summary || '').replace(/\s+/g, ' ').trim();
+  if (!text || text === '暂无摘要' || /^\[?来源\]?/.test(text)) return '';
+  return text.length > 140 ? `${text.slice(0, 137)}...` : text;
+}
+
+function sourceHash(cluster) {
+  const source = [
+    cluster.canonicalTitle,
+    ...(cluster.aliases || []),
+    ...(cluster.eventMerge?.memberSummaries || [])
+      .map(item => `${item?.topicId || ''}:${normalizeSummary(item?.summary)}`),
+    ...(cluster.signals || []).map(signal => `${signal.platform}:${signal.title}`)
+  ].filter(Boolean).sort().join('|');
+  return crypto.createHash('sha1').update(source).digest('hex');
+}
+
+function cacheValid(entry, hash, ttlHours) {
+  if (!entry?.summary || entry.sourceHash !== hash || !entry.updatedAt) return false;
+  const age = Date.now() - new Date(entry.updatedAt).getTime();
+  return Number.isFinite(age) && age >= 0 && age <= ttlHours * 60 * 60 * 1000;
+}
+
+function failureCacheValid(entry, hash, ttlMinutes) {
+  if (!entry?.failureReason || entry.sourceHash !== hash || !entry.updatedAt) return false;
+  const age = Date.now() - new Date(entry.updatedAt).getTime();
+  return Number.isFinite(age) && age >= 0 && age <= ttlMinutes * 60 * 1000;
+}
+
+function knownSummariesForCluster(cluster, summaries) {
+  return [...new Set((cluster.aliases || [])
+    .map(title => summaries.get(normalizeForCompare(title)))
+    .filter(Boolean))];
+}
+
+function knownEvidence(cluster, summaries) {
+  const lines = [];
+  (cluster.signals || []).forEach(signal => {
+    lines.push(`[平台话题] ${signal.platformLabel || signal.platform}：${signal.title}`);
+  });
+  summaries.forEach(summary => lines.push(`[已有摘要] ${summary}`));
+  return lines.join('\n');
+}
+
+function memberSummariesForCluster(cluster) {
+  return [...new Set((cluster.eventMerge?.memberSummaries || [])
+    .map(item => normalizeSummary(item?.summary))
+    .filter(Boolean))];
+}
+
+async function summarizeEvidence(content, title, dependencies = {}) {
+  const summarizer = dependencies.summarize || summarizeContent;
+  const result = await summarizer(content, title);
+  if (result?.isCommercial) {
+    return { filtered: true, reason: result.reason || 'Elixir判定为非目标内容' };
+  }
+  return {
+    summary: normalizeSummary(result?.summary),
+    reason: result?.reason || null
+  };
+}
+
+async function retrieveWeiboWis(cluster, fullConfig, context, dependencies = {}) {
+  if (context.options.weiboWisEnabled === false) return '';
+  if (Date.now() >= context.deadlineAt) return '';
+  const tokenGetter = dependencies.getWeiboToken || getWeiboToken;
+  const searcher = dependencies.searchWeiboAI || searchWeiboAI;
+  if (!context.weiboTokenPromise) {
+    context.weiboTokenPromise = Promise.resolve(tokenGetter(fullConfig));
+  }
+  const token = await context.weiboTokenPromise;
+  if (!token) return '';
+
+  const queries = [...new Set([
+    cluster.canonicalTitle || cluster.mainSignal.title,
+    ...(cluster.aliases || []),
+    ...(cluster.signals || []).map(signal => signal.title)
+  ].filter(Boolean))].slice(0, Math.max(1, Number(context.options.weiboWisQueryLimit) || 3));
+
+  const contents = [];
+  for (const query of queries) {
+    if (Date.now() >= context.deadlineAt) break;
+    const content = String(await searcher(query, token, fullConfig) || '').trim();
+    if (content && !contents.includes(content)) {
+      contents.push(content);
+      break;
+    }
+  }
+  return contents.join('\n\n');
+}
+
+async function buildEventSummary(cluster, fullConfig, context, dependencies = {}) {
+  const title = cluster.canonicalTitle || cluster.mainSignal.title;
+  const hash = sourceHash(cluster);
+  const cached = context.cache[cluster.topicId];
+  if (cacheValid(cached, hash, context.options.cacheTtlHours)) {
+    return { ...cached, cached: true };
+  }
+  if (Date.now() >= context.deadlineAt) {
+    return { summary: '', sourceHash: hash, timeBudgetExceeded: true };
+  }
+  const memberSummaries = memberSummariesForCluster(cluster);
+  const memberCount = Number(cluster.eventMerge?.memberCount) || 0;
+  if (memberSummaries.length > 1 && memberSummaries.length >= memberCount) {
+    const result = await summarizeEvidence(
+      knownEvidence(cluster, memberSummaries),
+      title,
+      dependencies
+    );
+    if (result.filtered) return result;
+    if (result.summary) {
+      return {
+        summary: result.summary,
+        source: 'member-summaries-elixir',
+        sourceHash: hash,
+        updatedAt: new Date().toISOString()
+      };
+    }
+  }
+  const knownSummaries = knownSummariesForCluster(cluster, context.alertSummaries);
+  if (knownSummaries.length === 1 && !cluster.eventMerge) {
+    return {
+      summary: knownSummaries[0],
+      source: 'instant-alert-cache',
+      sourceHash: hash,
+      updatedAt: new Date().toISOString()
+    };
+  }
+
+  const weiboWisContent = await retrieveWeiboWis(
+    cluster,
+    fullConfig,
+    context,
+    dependencies
+  );
+  if (weiboWisContent) {
+    const result = await summarizeEvidence(weiboWisContent, title, dependencies);
+    if (result.filtered) return result;
+    if (result.summary) {
+      return {
+        summary: result.summary,
+        source: 'weibo-wis-elixir',
+        sourceHash: hash,
+        confidence: 'medium',
+        confidenceBasis: 'weibo_wis',
+        updatedAt: new Date().toISOString()
+      };
+    }
+  }
+
+  const failed = context.failureCache[cluster.topicId];
+  if (failureCacheValid(
+    failed,
+    hash,
+    context.options.failureCacheTtlMinutes
+  ) && knownSummaries.length === 0) {
+    return {
+      summary: '',
+      sourceHash: hash,
+      retrievalFailure: failed.failureReason,
+      retrievalFailureCached: true
+    };
+  }
+
+  let retrievalFailure = null;
+  const shouldRetrieve = context.retrievalCount < context.options.retrievalLimit &&
+    Date.now() < context.deadlineAt &&
+    (cluster.eventMerge?.memberCount > 1 || knownSummaries.length === 0);
+
+  if (shouldRetrieve) {
+    context.retrievalCount++;
+    const retrieve = dependencies.retrieveEvidence || retrieveAgentReachEvidence;
+    const retrieval = await retrieve({
+      title,
+      relatedTitles: cluster.aliases || [],
+      platform: 'multi',
+      platformLabel: '多平台',
+      category: cluster.category,
+      url: cluster.mainSignal?.url || ''
+    }, fullConfig);
+    if (!retrieval.success) {
+      retrievalFailure = retrieval.retryable
+        ? null
+        : (retrieval.failureReason || 'unknown');
+      console.warn(`事件取材未采用「${title}」: ${retrieval.failureReason || 'unknown'}`);
+    }
+    if (retrieval.success && retrieval.evidenceText) {
+      const result = await summarizeEvidence(retrieval.evidenceText, title, dependencies);
+      if (result.filtered) return result;
+      if (result.summary) {
+        return {
+          summary: result.summary,
+          source: 'browser-elixir',
+          sourceHash: hash,
+          retrievalRoute: retrieval.routeUsed,
+          confidence: retrieval.confidence,
+          claimStatus: retrieval.claimStatus || 'supported',
+          confidenceBasis: retrieval.confidenceBasis || null,
+          sources: retrieval.sources || [],
+          updatedAt: new Date().toISOString()
+        };
+      }
+    }
+  }
+
+  if (knownSummaries.length > 0) {
+    const result = await summarizeEvidence(
+      knownEvidence(cluster, knownSummaries),
+      title,
+      dependencies
+    );
+    if (result.filtered) return result;
+    if (result.summary) {
+      return {
+        summary: result.summary,
+        source: 'alert-cache-elixir',
+        sourceHash: hash,
+        updatedAt: new Date().toISOString()
+      };
+    }
+  }
+
+  return {
+    summary: '',
+    sourceHash: hash,
+    retrievalFailure,
+    updatedAt: retrievalFailure ? new Date().toISOString() : null
+  };
+}
+
+async function applyEventSummaries(clusters, fullConfig = {}, dependencies = {}) {
+  const options = { ...DEFAULT_CONFIG, ...(fullConfig.eventSummary || {}) };
+  if (options.enabled === false) return clusters;
+
+  const context = {
+    options,
+    cache: loadCache(),
+    failureCache: loadFailureCache(),
+    alertSummaries: loadAlertSummaries(),
+    weiboTokenPromise: null,
+    retrievalCount: 0,
+    deadlineAt: Date.now() + Math.max(1, Number(options.timeBudgetSeconds) || 180) * 1000
+  };
+
+  let cursor = 0;
+  async function worker() {
+    while (cursor < clusters.length) {
+      const cluster = clusters[cursor++];
+      let result;
+      try {
+        result = await buildEventSummary(cluster, fullConfig, context, dependencies);
+      } catch (error) {
+        cluster.eventSummary = '';
+        cluster.eventSummarySource = null;
+        cluster.summaryError = error.message;
+        console.error(`事件摘要生成失败「${cluster.canonicalTitle || cluster.mainSignal?.title || cluster.topicId}」:`, error.message);
+        continue;
+      }
+      if (result.filtered) {
+        cluster.eventSummary = '';
+        cluster.summaryFiltered = true;
+        cluster.summaryFilterReason = result.reason;
+        continue;
+      }
+      cluster.eventSummary = result.summary || '';
+      cluster.eventSummarySource = result.source || null;
+      if (result.summary) {
+        context.cache[cluster.topicId] = result;
+        delete context.failureCache[cluster.topicId];
+        writeJsonAtomic(cacheFile(), context.cache);
+        writeJsonAtomic(failureCacheFile(), context.failureCache);
+      } else if (result.retrievalFailure && !result.retrievalFailureCached) {
+        context.failureCache[cluster.topicId] = {
+          sourceHash: result.sourceHash,
+          failureReason: result.retrievalFailure,
+          updatedAt: result.updatedAt || new Date().toISOString()
+        };
+        writeJsonAtomic(failureCacheFile(), context.failureCache);
+      }
+    }
+  }
+
+  const workerCount = Math.min(
+    clusters.length,
+    Math.max(1, Math.floor(Number(options.concurrency) || 2))
+  );
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  writeJsonAtomic(cacheFile(), context.cache);
+  writeJsonAtomic(failureCacheFile(), context.failureCache);
+  return clusters;
+}
+
+module.exports = {
+  applyEventSummaries,
+  buildEventSummary,
+  normalizeSummary,
+  sourceHash
+};

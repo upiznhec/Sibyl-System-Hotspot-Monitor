@@ -1,6 +1,6 @@
 # Sibyl System 产品文档
 
-版本：1.2.5
+版本：1.3.17
 日期：2026-06-22
 作者：Misaka Studio
 适用对象：部门内部分享、OpenClaw 技能复用、热点监控方案评审
@@ -21,7 +21,7 @@ Sibyl System 是一个多平台热点信号聚合与趋势研判系统。它每 
 
 - 重复抓取：微博、抖音各自抓取，Sibyl 综合播报再抓一次，容易增加失败率和风控风险。
 - 口径不一致：单平台预警和综合播报可能基于不同时间点的数据，趋势判断不稳定。
-- 阅读负担高：平台热榜信息密集，缺少跨平台合并、趋势说明和处理建议。
+- 阅读负担高：同一事件可能被不同话题词重复播报，平台与趋势字段分散，缺少事实摘要。
 - 社区信号价值分散：虎扑、贴吧单独作为主榜价值有限，但作为补充信号能帮助判断垂类热度。
 - AI 使用边界不清：摘要、建议和搜索兜底如果没有明确约束，容易出现不相关或臆测内容。
 
@@ -80,15 +80,16 @@ mindmap
       企业微信推送
     综合播报
       每小时
-      跨平台聚合
+      语义事件线聚合
       综合分
-      趋势变化
-      处理建议
+      热度表现
+      事件摘要
     AI能力
       Elixir摘要
       商业过滤
-      AI搜索摘要兜底
-      用增市场建议
+      Agent Reach联网取材
+      双来源事实校验
+      具体事件标题
     复用
       换关键词
       换品类
@@ -127,11 +128,11 @@ flowchart TB
   subgraph Intelligence["研判与AI层"]
     Category["游戏/电竞/体育分类"]
     Keywords["关键词库"]
-    Cluster["事件聚合"]
+    Cluster["语义事件线聚合"]
     Score["综合分"]
     Trend["趋势判断"]
     Summary["摘要生成"]
-    Suggestion["处理建议"]
+    EventSummary["事件摘要"]
   end
 
   subgraph Output["输出"]
@@ -156,7 +157,7 @@ flowchart TB
   Report --> Cluster
   Cluster --> Score
   Cluster --> Trend
-  Cluster --> Suggestion
+  Cluster --> EventSummary
   Alerts --> WeComAlert
   Report --> WeComReport
   Report --> Files
@@ -228,6 +229,8 @@ sequenceDiagram
 ├── signals-latest.json
 ├── clusters-latest.json
 ├── report-latest.md
+├── report-summaries.json
+├── retrieval-health.json
 └── state.json
 ```
 
@@ -284,7 +287,7 @@ Sibyl System 的监控范围是游戏、电竞、体育。筛选逻辑分两层�
 
 - 同一话题词当天只触发一次，避免企业微信群刷屏。
 - 第二天如果话题仍然高热，可以重新视为新一日信号。
-- 小时综合播报仍可重复出现，但必须通过趋势变化说明复播价值。
+- 小时综合播报仍可重复出现，但必须在热度表现中说明复播价值。
 
 ### 7.5 为什么小时报允许重复播报
 
@@ -326,22 +329,26 @@ flowchart TB
   Elixir --> Commercial{"是否商业/非目标内容"}
   Commercial -- 是 --> Drop["过滤，不推送"]
   Commercial -- 否 --> UseElixir["使用 Elixir 摘要"]
-  WeiboAI -- 否 --> AISearch{"AI搜索摘要是否可用"}
-  AISearch -- 是 --> UseAISearch["使用AI搜索摘要"]
-  AISearch -- 否 --> Empty["摘要：暂无摘要"]
+  WeiboAI -- 否 --> AgentReach{"Agent Reach是否取得可靠材料"}
+  AgentReach -- 是 --> Validate{"至少两个独立来源且可信度达标"}
+  Validate -- 是 --> RetrievedElixir["Elixir整理多来源材料"]
+  Validate -- 否 --> Empty["摘要：暂无摘要"]
+  AgentReach -- 否 --> Empty
   UseCache --> Message["企业微信即时预警"]
   UseLegacy --> Message
   UseElixir --> Message
-  UseAISearch --> Message
+  RetrievedElixir --> Message
   Empty --> Message
 ```
 
-AI 搜索摘要兜底的约束：
+Agent Reach联网取材的约束：
 
-- 必须基于可检索公开信息。
-- 如果没有搜索能力、搜索结果不足、信息不明确或与话题无关，返回“暂无摘要”。
+- 通过 `openclaw agent --json` 启动独立取材任务，并实际使用Agent Reach支持的联网能力。
+- 至少需要两个不同来源，可信度不得低于`medium`。
+- 如果没有健康检索能力、来源不足、信息不明确或与话题无关，返回“暂无摘要”。
 - 不允许仅凭标题编造比赛结果、人物表态、数据和时间。
-- 如果搜索结果显示话题不是游戏、电竞、体育内容，返回“暂无摘要”。
+- Agent只返回来源与核验事实，最终摘要仍由Elixir生成。
+- 如果Elixir判断话题不是游戏、电竞、体育内容，则过滤预警。
 
 ### 8.3 即时预警示例
 
@@ -395,9 +402,9 @@ flowchart LR
 | 60-84 | 关注后续 |
 | 85-100 | 强热点 |
 
-### 9.3 趋势变化
+### 9.3 热度表现
 
-趋势来自两个来源：
+`热度表现`合并原入选依据、平台表现和趋势变化，信息来自：
 
 - 上一轮聚合状态：判断新上榜、热度上升、稳定观察、持续在榜、热度回落。
 - 近 70 分钟快照：判断小时内最高点和当前回落幅度。
@@ -405,22 +412,14 @@ flowchart LR
 示例：
 
 ```text
-趋势变化：热度回落 ｜ 较小时最高点低 20% ｜ 微博最高 #2 150万（17:33） ｜ 覆盖 1 个平台
+热度表现：微博#2 150万、抖音#8 820万；2个平台共同出现；同一事件覆盖3个话题词；较小时最高点低20%。
 ```
 
-### 9.4 处理建议
+### 9.4 事件摘要
 
-处理建议面向用增市场阅读者，目标是辅助判断热点是否适合作为当日首消内容入口。
+事件摘要用于说明热点事件发生了什么，以及不同平台话题词之间的关系。
 
-它不回答标题里的争议问题，也不对事件当事人、球队、选手或产品方提出建议。
-
-好的建议应该围绕：
-
-- 是否适合作为当日首消入口。
-- 是否需要准备话题素材。
-- 是否要观察评论情绪。
-- 是否要等跨平台扩散。
-- 是否存在风险或不适合放大。
+摘要优先复用即时预警结果；合并事件或摘要缺失时，使用Agent Reach取得双来源材料，再交给Elixir生成。摘要只陈述可靠事实，不输出市场工作建议。
 
 ---
 
@@ -446,8 +445,9 @@ skills/
 │           ├── snapshot-store.js
 │           ├── category-classifier.js
 │           ├── clusterer.js
+│           ├── event-threader.js
+│           ├── event-summary.js
 │           ├── report-generator.js
-│           ├── ai-suggestions.js
 │           ├── signals.js
 │           └── http.js
 ├── weibo-monitor/
@@ -470,8 +470,9 @@ skills/
 | `snapshot-store.js` | 负责快照、历史快照、摘要缓存、状态文件读写 |
 | `category-classifier.js` | 识别游戏、电竞、体育大类 |
 | `clusterer.js` | 将相似平台信号聚合为同一事件 |
+| `event-threader.js` | 以语义事件线合并不同话题词并生成具体标题 |
+| `event-summary.js` | 复用摘要缓存或调用Agent Reach与Elixir生成事件摘要 |
 | `report-generator.js` | 生成企业微信 Markdown 播报 |
-| `ai-suggestions.js` | 生成面向用增市场的处理建议 |
 
 ### 10.3 兼容入口
 
@@ -562,8 +563,8 @@ node scripts/sibyl.js --print --no-push
 # 不生成摘要
 node scripts/instant-alerts.js --no-summary --no-push
 
-# 不启用AI搜索摘要兜底
-node scripts/instant-alerts.js --no-ai-search-summary --no-push
+# 不启用Agent Reach联网摘要
+node scripts/instant-alerts.js --no-agent-reach-summary --no-push
 
 # 只测试抖音即时预警
 node scripts/instant-alerts.js --platform=douyin --no-push
@@ -646,14 +647,31 @@ tail -f /var/log/sibyl.log
 {
   "alerts": {
     "summaries": true,
-    "aiSearchSummary": {
+    "agentReachSummary": {
       "enabled": true,
+      "command": "openclaw",
+      "agent": "main",
+      "timeoutSeconds": 90,
+      "minSources": 2,
+      "minConfidence": "medium"
+    },
+    "aiSearchSummary": {
+      "enabled": false,
       "maxChars": 110
     }
   },
+  "eventMerge": {
+    "enabled": true,
+    "candidateLimit": 36,
+    "minConfidence": 0.8
+  },
+  "eventSummary": {
+    "enabled": true,
+    "cacheTtlHours": 6,
+    "retrievalLimit": 10
+  },
   "report": {
-    "aiSuggestions": true,
-    "aiSuggestionLimit": 8
+    "topN": 10
   }
 }
 ```
@@ -669,9 +687,13 @@ tail -f /var/log/sibyl.log
 | 即时预警发送失败 | 撤销去重记录，下次可重试 |
 | 无摘要缓存 | 尝试旧历史摘要 |
 | 旧历史无摘要 | 尝试微博智搜 + Elixir |
-| 微博智搜无内容 | 尝试 AI 搜索摘要 |
-| AI 搜索不可用 | 返回 `摘要：暂无摘要` |
+| 微博智搜无内容 | 启动OpenClaw Agent并由Agent Reach联网取材 |
+| Agent Reach来源不足 | 返回 `摘要：暂无摘要` |
+| OpenClaw Agent CLI不可用 | 记录能力故障并返回 `摘要：暂无摘要` |
 | AI 判定商业/非目标 | 过滤，不推送 |
+| 联网检索连续失败 | 首次确认后熔断48小时，恢复失败后熔断96小时 |
+| 联网检索未配置 | 标记停用，配置变化后再重置检测 |
+| 搜索无相关结果 | 只记录话题无结果，不熔断后端 |
 | 小时报无候选 | 输出空播报或仅保留社区观察 |
 
 ---
@@ -687,8 +709,8 @@ tail -f /var/log/sibyl.log
 ### 14.2 AI 风险
 
 - 摘要可能受搜索材料质量影响。
-- AI 搜索摘要必须保守，不允许仅凭标题生成事实。
-- 处理建议必须面向用增市场，不应变成对事件当事人的建议。
+- Agent Reach材料必须经过双来源校验，不允许仅凭标题生成事实。
+- 事件线判断存在误合并风险；仅主体相同不能合并，低于置信度门槛时保持拆分。
 
 ### 14.3 运营风险
 
@@ -702,8 +724,8 @@ tail -f /var/log/sibyl.log
 
 建议后续分四个方向迭代：
 
-1. 更稳定的通用搜索摘要源  
-   将 AI 搜索摘要从“模型搜索能力兜底”升级为明确的搜索服务输入。
+1. 更稳定的检索后端
+   在现有Agent Reach与`web_fetch`基础上按需增加稳定搜索服务，并持续用能力状态表管理。
 
 2. 更细的跨平台事件合并  
    增强同一事件不同表述的聚合能力，同时避免把同人物不同事件误合并。
@@ -714,12 +736,35 @@ tail -f /var/log/sibyl.log
 4. 可视化看板  
    展示近 24 小时热点趋势、平台分布、品类占比和预警记录。
 
+联网检索能力状态保存在 `data/sibyl/retrieval-health.json`。OpenClaw/Agent Reach 在取材前选择健康能力，取材后回写成功或故障；Sibyl负责路由、熔断和恢复状态，Elixir只接收可靠材料并生成摘要。
+
 ---
 
 ## 16. 版本记录
 
 | 版本 | 日期 | 说明 |
 |------|------|------|
+| 1.3.17 | 2026-07-03 | 精简播报头部统计与社区观察冗余平台提示 |
+| 1.3.16 | 2026-07-03 | 抖音即时摘要优先使用同轮热榜关联话题上下文 |
+| 1.3.15 | 2026-07-03 | 增加结构化事件指纹、确定性同场合并与项目冲突保护 |
+| 1.3.14 | 2026-07-03 | 按实体和摘要锚点分组判断，修复同场比赛的碎片化合并 |
+| 1.3.13 | 2026-07-03 | 限制前置摘要资源，增加二轮收敛合并和微博智搜失败诊断 |
+| 1.3.12 | 2026-07-03 | 初始事件先生成事实摘要再语义合并，合并后复用成员摘要归纳最终摘要 |
+| 1.3.0 | 2026-07-01 | 综合播报升级为语义热点事件线；整合热度字段，以事件摘要替代处理建议 |
+| 1.3.1 | 2026-07-01 | 修复事件摘要生成、检索健康状态与缓存落盘问题，兼容OpenClaw会话参数 |
+| 1.3.2 | 2026-07-01 | 修复Agent Reach路径别名校验，区分Agent调用、路径校验与证据采用状态 |
+| 1.3.3 | 2026-07-01 | 修复解析失败误触发Agent熔断，增强混合日志和嵌套JSON提取 |
+| 1.3.4 | 2026-07-01 | 增加权威单源例外、有限并发、整轮时间预算和快速部署检查 |
+| 1.3.5 | 2026-07-01 | 串行化OpenClaw Agent调用，增加退出码1重试和suspect确认机制 |
+| 1.3.6 | 2026-07-01 | 增强查询规划、时间线核验和部分证实摘要，增加失败取材短缓存 |
+| 1.3.7 | 2026-07-02 | 使用专用OpenClaw取材Agent，接入微博搜索与浏览器正文核验路由 |
+| 1.3.8 | 2026-07-02 | 适配微博异步分析轮询，pending不熔断、不写失败缓存并回退浏览器 |
+| 1.3.9 | 2026-07-02 | 综合播报复用微博智搜HTTP模块，专用Agent仅负责站外浏览器兜底 |
+| 1.3.10 | 2026-07-02 | 收紧语义事件边界，增加共同事件锚点、关系类型和逐成员证据校验 |
+| 1.3.11 | 2026-07-02 | 增加游戏事件性质过滤，例行版本与官方活动默认退出主榜 |
+| 1.2.8 | 2026-07-01 | 接入OpenClaw Agent + Agent Reach联网取材，双来源校验后交给Elixir生成摘要 |
+| 1.2.7 | 2026-07-01 | 新增联网检索能力状态表、48/96小时熔断、半恢复与探测机制 |
+| 1.2.6 | 2026-06-22 | 修正部署自检 webhook 判断，区分当前进程环境变量和 OpenClaw 任务 payload 注入 |
 | 1.2.5 | 2026-06-22 | 新增部署后自检脚本，提示 webhook、微博智搜、AI 模型、时区、数据目录和人工确认项 |
 | 1.2.4 | 2026-06-22 | 微博智搜凭据和 endpoint 支持环境变量及 `alerts.weiboAI` 配置，保留 OpenClaw 原配置回退 |
 | 1.2.3 | 2026-06-22 | 将综合分展示档位简化为三档：观察、关注后续、强热点 |

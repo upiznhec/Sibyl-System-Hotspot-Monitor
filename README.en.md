@@ -14,11 +14,11 @@ The system is designed for fast operational reading: it keeps high-heat Weibo an
 - Sends instant alerts for high-ranking or high-heat Weibo and Douyin topics.
 - Builds hourly integrated hotspot briefings from the latest snapshot and recent history.
 - Filters topics into game, esports, and sports categories.
-- Merges similar platform signals into event-level topic clusters.
+- Merges alternate platform topic terms on the same timeline into semantic hotspot event threads.
 - Scores topics by rank, heat, platform coverage, category matches, and cross-platform resonance.
 - Tracks trend movement with previous-state and recent-snapshot comparison.
 - Generates Markdown reports suitable for enterprise WeChat webhook delivery.
-- Uses conservative AI-assisted summaries and handling suggestions when model configuration is available.
+- Uses Agent Reach and Elixir to create source-checked event summaries when model configuration is available.
 
 ## Use Cases
 
@@ -61,7 +61,7 @@ The system is designed for fast operational reading: it keeps high-heat Weibo an
 - Node.js 18 or newer.
 - Network access to the monitored public hot-board pages.
 - Optional enterprise WeChat webhook for alert and report delivery.
-- Optional OpenClaw model/provider configuration for AI summaries and suggestions.
+- Optional OpenClaw model/provider configuration for semantic event merging and event summaries.
 
 The core scripts use Node.js built-in modules only. No package installation is required for the current version.
 
@@ -92,7 +92,7 @@ Common settings:
 ```json
 {
   "filters": {
-    "allowedCategories": ["游戏", "电竞", "体育"],
+    "allowedCategories": ["游戏", "电竞", "体育", "AI"],
     "minTitleLength": 4
   },
   "snapshot": {
@@ -182,7 +182,7 @@ Runtime data is intentionally ignored by Git.
 - Weibo and Douyin are used as report seed platforms because they represent broad public attention and short-video diffusion.
 - Tieba and Hupu are treated as supporting community signals and do not dominate the main report by default.
 - Heat values are not directly added across platforms; the composite score is a ranking signal.
-- AI summaries and suggestions are conservative: when reliable information is unavailable, the system should not invent facts.
+- Semantic merging and event summaries are conservative: uncertain relationships stay separate and unavailable facts are not invented.
 - Instant alerts are deduplicated by natural day, while hourly reports may repeat topics only when trend movement adds value.
 
 ## Documentation

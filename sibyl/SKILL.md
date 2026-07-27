@@ -1,7 +1,7 @@
 ---
 name: sibyl
 description: Sibyl 是多平台热点信号聚合与趋势研判系统，以微博、抖音热搜作为播报种子，聚合贴吧、虎扑补充信号，按统一模型做事件合并、综合评分、趋势判断和Markdown简报生成，可选推送企业微信。
-version: 1.2.5
+version: 1.3.20
 author: Misaka Studio
 license: MIT
 tags:
@@ -36,7 +36,7 @@ tags:
       ↓
 统一 HotSignal
       ↓
-大类识别：游戏 / 电竞 / 体育
+大类识别：游戏 / 电竞 / 体育 / AI
       ↓
 关键词精筛与加分
       ↓
@@ -78,6 +78,9 @@ node scripts/sibyl.js --print --no-push
 ├── signals-latest.json      # 最新统一信号
 ├── clusters-latest.json     # 最新聚合话题
 ├── report-latest.md         # 最新综合播报
+├── report-summaries.json    # 综合播报事件摘要缓存
+├── report-retrieval-failures.json # 取材失败短缓存
+├── retrieval-health.json    # 联网检索能力状态与熔断记录
 └── state.json               # 上一轮状态，用于计算趋势
 ```
 
@@ -101,20 +104,62 @@ cp scripts/config.example.json /root/.openclaw/workspace/data/sibyl/config.json
 ```json
 {
   "filters": {
-    "allowedCategories": ["游戏", "电竞", "体育"],
+    "allowedCategories": ["游戏", "电竞", "体育", "AI"],
     "minTitleLength": 4
   },
   "snapshot": {
     "maxAgeMinutes": 20,
     "trendWindowMinutes": 70
   },
+  "eventMerge": {
+    "enabled": true,
+    "candidateLimit": 36,
+    "minConfidence": 0.8
+  },
+  "eventSummary": {
+    "enabled": true,
+    "cacheTtlHours": 6,
+    "retrievalLimit": 10,
+    "concurrency": 2,
+    "timeBudgetSeconds": 180,
+    "failureCacheTtlMinutes": 30
+  },
+  "eventFilter": {
+    "enabled": true,
+    "minConfidence": 0.75
+  },
+  "retrieval": {
+    "health": {
+      "confirmationDelayMinutes": 30,
+      "firstOpenHours": 48,
+      "repeatOpenHours": 96,
+      "recoverySuccessesRequired": 2
+    },
+    "capabilities": [
+      "openclaw.agent.sibyl-retriever",
+      "browser.search",
+      "web_fetch.read"
+    ]
+  },
   "alerts": {
     "pushWeCom": false,
     "webhook": "",
     "dedupe": "daily",
     "summaries": true,
-    "aiSearchSummary": {
+    "agentReachSummary": {
       "enabled": true,
+      "command": "openclaw",
+      "agent": "sibyl-retriever",
+      "sessionFlag": "none",
+      "timeoutSeconds": 90,
+      "minSources": 2,
+      "minConfidence": "medium",
+      "capabilities": [
+        "browser.search"
+      ]
+    },
+    "aiSearchSummary": {
+      "enabled": false,
       "maxChars": 110
     }
   },
@@ -123,8 +168,6 @@ cp scripts/config.example.json /root/.openclaw/workspace/data/sibyl/config.json
     "minScore": 20,
     "requireSeedPlatforms": true,
     "seedPlatforms": ["weibo", "douyin"],
-    "aiSuggestions": true,
-    "aiSuggestionLimit": 8,
     "pushWeCom": false,
     "webhook": ""
   }
@@ -132,15 +175,38 @@ cp scripts/config.example.json /root/.openclaw/workspace/data/sibyl/config.json
 ```
 
 说明：
-- `allowedCategories` 是硬门槛，只有命中游戏、电竞、体育之一的话题才会进入播报。
+- `allowedCategories` 是硬门槛，只有命中游戏、电竞、体育、AI之一的话题才会进入播报。
 - `requireSeedPlatforms: true` 是播报门槛：话题必须至少命中微博或抖音之一，才会进入热点综合播报；虎扑、贴吧只作为补充来源和加分来源。
 - `seedPlatforms` 默认是 `["weibo", "douyin"]`，用于定义哪些平台能作为播报种子。
 - 关键词库用于两层判断：先判断大类，再作为具体关键词给综合分加权。
-- 聚合以“事件”为单位，不只按同名关键词合并；同一个人、队伍或赛事如果动作不同，默认拆成不同话题。
-- `aiSuggestions: true` 时，Sibyl 会尝试调用 OpenClaw 模型生成更自然的处理建议；若模型不可用，会自动使用规则兜底，并在运行日志与聚合数据中标记建议来源。
-- `处理建议` 面向用增市场阅读者，目标是判断热点能否服务“当日首次消费内容去高活DAU”；它用于判断是否适合作为当日首消内容入口、如何承接、观察什么风险，不是对事件当事人、球队、选手或产品方的建议，也不回答热点标题里的争议问题。
+- 字符串关键词直接匹配；对象关键词可用 `requireAny` 要求至少一个正向语境词，并用 `exclude` 排除明确误报语境。
+- 三字以上中文实体允许在连续中文标题中匹配；两字泛词仍保留边界限制。
+- 综合播报以“热点事件线”为单位：同一事实的不同表达，以及同一时间线上的结果、回应、赛后/上线后动态和直接衍生讨论可以合并；仅主体相同的无关内容保持拆分。
+- 语义合并必须给出具体共同事件锚点、关系类型和每个成员的关系证据；“关键词匹配、品类一致、同一人物”不能通过后处理校验。
+- 游戏事件在聚合后判断事件性质。例行版本、维护、官方活动、福利和商业宣发默认不进入主榜；只有争议事故或明确的玩家自发破圈事件可以恢复。
+- 游戏关键词仅作为事件性质线索，不直接删除信号；过滤原因和恢复原因保存在聚合数据中，不显示在播报正文。
+- 语义事件线只判断能否形成一段具体、连贯的叙述，不维护体育、电竞、游戏各自的固定字段模板。
+- 合并标题采用“核心事实 + 最具代表性的衍生事实”，禁止使用“相关动态、持续升温、引发关注”等空泛事件标题。
+- `事件摘要`优先复用即时预警摘要；缺失或发生合并时，通过专用`sibyl-retriever`取材并交给Elixir生成。原`处理建议`不再生成。
 - 企业微信 Webhook 推荐使用环境变量，不要硬编码到脚本。即时预警优先读取 `SIBYL_ALERT_WEBHOOK`，小时综合播报优先读取 `SIBYL_REPORT_WEBHOOK`；未配置时都会回退到旧的 `WECOM_WEBHOOK` 和配置文件里的 `webhook`。
 - 微博智搜用于即时预警摘要补全，配置优先级为：环境变量 → `alerts.weiboAI` → `/root/.openclaw/openclaw.json` 的 `channels.weibo` → 默认 endpoint。建议凭据继续放在 OpenClaw 环境或配置里，不要写入技能源码。
+- 联网取材前应先用 `scripts/retrieval-health.js select` 选择健康能力，调用后回写真实结果。状态表不会自行联网，也不会把“无搜索结果”误判为后端故障。
+- 即时预警和综合播报共用微博智搜HTTP模块。没有缓存时先直连微博智搜并交给Elixir；无内容时才调用专用Agent的`browser + web_fetch`站外兜底。
+- 微博智搜在第一组查询获得内容后立即停止；精确标题无内容时才尝试事件别名，避免重复请求。
+
+检索能力状态与熔断：
+
+```bash
+node scripts/retrieval-health.js status --json
+node scripts/retrieval-health.js select browser.search --json
+node scripts/retrieval-health.js failure browser.search --type=timeout --reason=request_timeout --json
+node scripts/retrieval-health.js success browser.search --latency-ms=1200 --json
+node scripts/retrieval-health.js probe-due --json
+node scripts/retrieval-health.js reset browser.search --json
+node scripts/test-retrieval-summary.js --topic="测试话题" --platform=douyin --category=体育
+```
+
+连续两次普通故障会熔断48小时；恢复探测再次失败、鉴权失败或明确风控会熔断96小时。`not_configured` 会停用能力，直到配置变化后手动 `reset`；`no_results`、`topic_miss` 和单页 `page_error` 不会触发整条能力熔断。
 
 Webhook 示例：
 
@@ -167,20 +233,22 @@ cd /root/.openclaw/workspace/skills/sibyl
 node scripts/check-deploy.js
 ```
 
+如果 webhook 写在 OpenClaw 定时任务 payload 中，而不是系统环境变量中，自检脚本手动运行时可能读不到。可以用 `--task-command` 传入任务命令做辅助检查：
+
+```bash
+node scripts/check-deploy.js --task-command='export SIBYL_REPORT_WEBHOOK=... && node scripts/sibyl.js --push'
+```
+
 ## 播报格式
 
 ```md
-### 1. 🎮 🔥 Faker 怒喷拳头 elo 机制
+### 1. ⚽ 🔥 哈兰德助挪威晋级，赛后纽约逛街成为热点
 
 **综合分：92/100（强热点）**
 
-**入选依据：** 微博多平台连续命中电竞品类关键词，当前热度上升中。
+**热度表现：** 微博#8 50万、抖音#12 80万；2个平台共同出现；同一事件覆盖3个话题词；当前热度上升中。
 
-**平台表现：** 微博#8 50万 ｜ 抖音#12 80万 ｜ 虎扑/英雄联盟#3 ｜ 社区补充：贴吧#2。
-
-**趋势变化：** 热度上升 ｜ 比上轮高 35% ｜ 覆盖 3 个平台。
-
-**处理建议：** 可作为当日首消切入点，优先准备话题素材和承接内容。
+**事件摘要：** 哈兰德帮助挪威晋级世界杯16强，赛后在纽约逛街的相关内容随后成为社交平台热点。
 
 [查看微博话题](https://s.weibo.com/weibo?q=Faker) ｜ [查看抖音话题](https://www.douyin.com/search/Faker) ｜ [查看虎扑热帖](https://bbs.hupu.com/xxx.html)
 
@@ -190,8 +258,8 @@ node scripts/check-deploy.js
 ```
 
 说明：
-- 标题前缀使用“品类 emoji + 状态 emoji”。品类包括：游戏 `🕹️`、电竞 `🎮`、篮球 `🏀`、足球 `⚽`、体育 `🏅`。
-- `趋势变化` 只展示本轮状态、相对上轮变化和平台覆盖；不再展示跨平台累计热度，避免不同平台热度口径混用。
+- 标题前缀使用“品类 emoji + 状态 emoji”。品类包括：游戏 `🕹️`、电竞 `🎮`、篮球 `🏀`、足球 `⚽`、体育 `🏅`、AI `🤖`。
+- `热度表现`统一承载原入选依据、平台表现和趋势变化，不展示具体命中关键词，也不计算跨平台累计热度。
 - `社区观察` 只列未命中微博/抖音的虎扑、贴吧话题，不进入主榜排序，用于保留垂类早期信号。
 - 微博、抖音链接命中本平台热搜/话题词时，文案为“查看微博话题”“查看抖音话题”。
 - 虎扑链接命中本平台帖子时，文案为“查看虎扑热帖”。
@@ -218,7 +286,7 @@ node scripts/check-deploy.js
 具体规则：
 - 排名分：排名越靠前越高，主要看前35名。
 - 热度分：按热度取对数，避免超大平台热度把其他平台完全压住。
-- 关键词加分：命中游戏、电竞、体育等关键词会加分，最多加12分。
+- 关键词加分：命中游戏、电竞、体育、AI等关键词会加分，最多加12分。
 - 社区板块加分：虎扑等垂类社区热帖会有少量补充加分。
 - 平台权重：微博、抖音权重最高；虎扑权重为 0.6，作为垂类社区补充来源；贴吧权重为 0.5，仅作为弱补充信号。
 - 来源类型权重：热搜/热榜高于普通板块热帖。
@@ -268,7 +336,7 @@ OpenClaw 定时任务环境检查：
 
 重复播报原则：
 - 首次命中微博或抖音并达到分数门槛时进入播报。
-- 后续仍在主榜时可以继续出现，状态变化通过 `趋势变化` 体现。
+- 后续仍在主榜时可以继续出现，状态变化通过 `热度表现` 体现。
 - 常见复播原因包括：综合分明显上升或下降、新增平台信号、最高排名上升、覆盖平台增加、持续在榜但变化不大；这些原因会保留在聚合数据中，默认不在播报正文展示。
 
 ## 与旧监控的关系

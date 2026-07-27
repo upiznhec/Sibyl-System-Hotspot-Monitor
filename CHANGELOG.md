@@ -9,6 +9,6 @@ Choose a language:
 
 ## Latest
 
-- Current version: `1.2.5`
-- Latest release date: `2026-06-22`
+- Current version: `1.3.20`
+- Latest release date: `2026-07-27`
 - Project: `Sibyl System Hotspot Monitor`

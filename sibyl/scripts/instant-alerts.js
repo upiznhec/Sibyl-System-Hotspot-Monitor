@@ -2,10 +2,15 @@
 
 const fs = require('fs');
 const https = require('https');
-const http = require('http');
 const path = require('path');
 
 const { collectSnapshot } = require('./collect-snapshot');
+const {
+  buildDouyinHotListEvidence,
+  retrieveDouyinTopicEvidence
+} = require('./lib/douyin-topic');
+const { retrieveAgentReachEvidence } = require('./lib/agent-reach-retriever');
+const { getWeiboTokenResult, searchWeiboAIResult } = require('./lib/weibo-wis');
 const { classifySignal } = require('./lib/category-classifier');
 const { formatHeat, normalizeForCompare } = require('./lib/signals');
 const { callAIModel, summarizeContent } = require('../../elixir-summarizer/scripts/elixir-summarizer');
@@ -22,7 +27,7 @@ const {
 
 const DEFAULT_CONFIG = {
   filters: {
-    allowedCategories: ['游戏', '电竞', '体育']
+    allowedCategories: ['游戏', '电竞', '体育', 'AI']
   },
   snapshot: {
     maxAgeMinutes: 20
@@ -33,8 +38,31 @@ const DEFAULT_CONFIG = {
     webhook: '',
     dedupe: 'daily',
     summaries: true,
-    aiSearchSummary: {
+    douyinTopic: {
       enabled: true,
+      directPageEnabled: false,
+      relatedTopicLimit: 8,
+      timeout: 12000,
+      retries: 0
+    },
+    agentReachSummary: {
+      enabled: true,
+      command: 'openclaw',
+      agent: 'sibyl-retriever',
+      sessionFlag: 'none',
+      timeoutSeconds: 90,
+      thinking: 'low',
+      minSources: 2,
+      minConfidence: 'medium',
+      maxSources: 4,
+      maxAgeHours: 96,
+      maxEvidenceChars: 6000,
+      capabilities: [
+        'browser.search'
+      ]
+    },
+    aiSearchSummary: {
+      enabled: false,
       maxChars: 110
     },
     weiboAI: {
@@ -74,15 +102,12 @@ const AI_SEARCH_SUMMARY_PROMPT = `你是热点即时预警摘要助手。请围�
 3. 摘要控制在60-100字，最多不超过{maxChars}字。
 4. 摘要面向用增市场阅读者，重点说明：发生了什么、为什么被讨论、是否适合作为内容入口观察。
 5. 不输出分析过程、来源列表、标题、引号或Markdown，只输出摘要正文。
-6. 如果搜索到的信息显示该话题是商业推广、财经、汽车、手机、电商等非游戏/电竞/体育内容，返回：暂无摘要
+6. 如果搜索到的信息显示该话题是商业推广、财经、汽车、手机、电商等非游戏/电竞/体育/AI内容，返回：暂无摘要
 
 话题：{topic}
 平台：{platform}
 
 请直接输出摘要正文。`;
-
-const DEFAULT_WEIBO_WIS_AUTH_URL = 'https://open-im.api.weibo.com/open/auth/ws_token';
-const DEFAULT_WEIBO_WIS_SEARCH_URL = 'https://open-im.api.weibo.com/open/wis/search_query';
 
 function loadConfig() {
   const dataDir = getDataDir();
@@ -207,104 +232,6 @@ function getModelConfig(customConfig = null) {
   }
 }
 
-function getWeiboAIConfig(customConfig = {}) {
-  const openclawConfig = readOpenClawConfig();
-  const openclawWeibo = openclawConfig.channels?.weibo || {};
-  const configured = customConfig.alerts?.weiboAI || customConfig.weiboAI || {};
-
-  return {
-    appId: String(process.env.SIBYL_WEIBO_APP_ID || configured.appId || openclawWeibo.appId || ''),
-    appSecret: process.env.SIBYL_WEIBO_APP_SECRET || configured.appSecret || openclawWeibo.appSecret || '',
-    authUrl: process.env.SIBYL_WEIBO_WIS_AUTH_URL || configured.authUrl || DEFAULT_WEIBO_WIS_AUTH_URL,
-    searchUrl: process.env.SIBYL_WEIBO_WIS_SEARCH_URL || configured.searchUrl || DEFAULT_WEIBO_WIS_SEARCH_URL
-  };
-}
-
-function requestClient(parsedUrl) {
-  return parsedUrl.protocol === 'http:' ? http : https;
-}
-
-function getWeiboToken(customConfig = {}) {
-  return new Promise((resolve) => {
-    const { appId, appSecret, authUrl } = getWeiboAIConfig(customConfig);
-    if (!appId || !appSecret) {
-      resolve(null);
-      return;
-    }
-
-    const data = JSON.stringify({ app_id: appId, app_secret: appSecret });
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(authUrl);
-    } catch (e) {
-      resolve(null);
-      return;
-    }
-
-    const req = requestClient(parsedUrl).request({
-      hostname: parsedUrl.hostname,
-      port: parsedUrl.port || (parsedUrl.protocol === 'http:' ? 80 : 443),
-      path: parsedUrl.pathname + parsedUrl.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data)
-      }
-    }, (res) => {
-      let responseData = '';
-      res.on('data', chunk => responseData += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(responseData);
-          resolve(parsed.data?.token || null);
-        } catch (e) {
-          resolve(null);
-        }
-      });
-    });
-
-    req.on('error', () => resolve(null));
-    req.setTimeout(10000, () => {
-      req.destroy();
-      resolve(null);
-    });
-    req.write(data);
-    req.end();
-  });
-}
-
-function searchWeiboAI(query, token, customConfig = {}) {
-  return new Promise((resolve) => {
-    if (!token) {
-      resolve('');
-      return;
-    }
-
-    let parsedUrl;
-    try {
-      parsedUrl = new URL(getWeiboAIConfig(customConfig).searchUrl);
-      parsedUrl.searchParams.set('query', query);
-      parsedUrl.searchParams.set('token', token);
-    } catch (e) {
-      resolve('');
-      return;
-    }
-
-    requestClient(parsedUrl).get(parsedUrl, { headers: { 'Content-Type': 'application/json' } }, (res) => {
-      let data = '';
-      res.on('data', chunk => data += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(data);
-          resolve(parsed.code === 0 && parsed.data && !parsed.data.noContent ? parsed.data.msg || '' : '');
-        } catch (e) {
-          resolve('');
-        }
-      });
-    }).on('error', () => resolve(''));
-  });
-}
-
 function normalizeSummary(summary) {
   const text = String(summary || '').replace(/\s+/g, ' ').trim();
   if (!text || /^\[商业广告\]/.test(text)) return '';
@@ -364,9 +291,53 @@ async function buildAlertSummary(alert, context) {
 
   if (!context.enableSummaries) return { summary: '暂无摘要' };
 
-  const token = context.weiboToken || await getWeiboToken(context.config);
-  context.weiboToken = token;
-  const rawContent = await searchWeiboAI(signal.title, token, context.config);
+  if (signal.platform === 'douyin') {
+    const douyinOptions = context.config.alerts?.douyinTopic || {};
+    let douyinResult = douyinOptions.enabled === false
+      ? { success: false, failureReason: 'douyin_topic_disabled' }
+      : buildDouyinHotListEvidence(signal, context.snapshotSignals, douyinOptions);
+    if (!douyinResult.success && douyinOptions.directPageEnabled === true) {
+      douyinResult = await retrieveDouyinTopicEvidence(signal, douyinOptions);
+    }
+    if (douyinResult.success) {
+      const elixirResult = await summarizeContent(douyinResult.evidenceText, signal.title);
+      if (elixirResult.isCommercial) {
+        return {
+          filtered: true,
+          reason: elixirResult.reason || 'Elixir判定为商业推广或非目标内容'
+        };
+      }
+      const summary = normalizeSummary(elixirResult.summary);
+      if (summary) {
+        context.summaryCache[cacheKey] = {
+          platform: signal.platform,
+          title: signal.title,
+          summary,
+          source: `${douyinResult.source || 'douyin-topic'}-elixir`,
+          sourceUrl: douyinResult.sourceUrl,
+          evidenceCount: douyinResult.itemCount,
+          updatedAt: new Date().toISOString()
+        };
+        return { summary };
+      }
+    } else {
+      console.log(`⚠️ 抖音话题页未生成材料: ${signal.title} - ${douyinResult.failureReason}`);
+    }
+  }
+
+  if (!context.weiboTokenChecked) {
+    const tokenResult = await getWeiboTokenResult(context.config);
+    context.weiboToken = tokenResult.token;
+    context.weiboTokenChecked = true;
+    if (!tokenResult.token) {
+      console.log(`⚠️ 微博智搜鉴权不可用: ${tokenResult.reason || 'unknown'}`);
+    }
+  }
+  const wisResult = await searchWeiboAIResult(signal.title, context.weiboToken, context.config);
+  const rawContent = wisResult.content;
+  if (!rawContent) {
+    console.log(`⚠️ 微博智搜未生成材料: ${signal.title} - ${wisResult.reason || 'unknown'}`);
+  }
   if (rawContent) {
     const elixirResult = await summarizeContent(rawContent, signal.title);
     if (elixirResult.isCommercial) {
@@ -389,6 +360,41 @@ async function buildAlertSummary(alert, context) {
     }
   }
 
+  if (context.agentReachSummary.enabled) {
+    const retrieval = await retrieveAgentReachEvidence({
+      ...signal,
+      category: alert.category
+    }, context.config);
+
+    if (retrieval.success && retrieval.evidenceText) {
+      const elixirResult = await summarizeContent(retrieval.evidenceText, signal.title);
+      if (elixirResult.isCommercial) {
+        return {
+          filtered: true,
+          reason: elixirResult.reason || 'Elixir判定为商业推广或非目标内容'
+        };
+      }
+
+      const summary = normalizeSummary(elixirResult.summary);
+      const invalidFallback = /^来源\b|^\[来源\]/.test(summary);
+      if (summary && !invalidFallback) {
+        context.summaryCache[cacheKey] = {
+          platform: signal.platform,
+          title: signal.title,
+          summary,
+          source: 'browser-elixir',
+          retrievalRoute: retrieval.routeUsed,
+          confidence: retrieval.confidence,
+          sources: retrieval.sources,
+          updatedAt: new Date().toISOString()
+        };
+        return { summary };
+      }
+    } else if (retrieval.failureReason) {
+      console.log(`⚠️ 站外取材未生成摘要: ${signal.title} - ${retrieval.failureReason}`);
+    }
+  }
+
   const aiSearchSummary = await generateAISearchSummary(signal, context);
   if (aiSearchSummary) {
     context.summaryCache[cacheKey] = {
@@ -404,16 +410,24 @@ async function buildAlertSummary(alert, context) {
   return { summary: '暂无摘要' };
 }
 
-async function enrichAlertsWithSummaries(alerts, config, args) {
+async function enrichAlertsWithSummaries(alerts, config, args, snapshotSignals = []) {
   const context = {
     enableSummaries: config.alerts?.summaries !== false && !args.includes('--no-summary'),
+    agentReachSummary: {
+      ...(config.alerts?.agentReachSummary || {}),
+      enabled: config.alerts?.agentReachSummary?.enabled !== false &&
+        !args.includes('--no-agent-reach-summary')
+    },
     aiSearchSummary: {
       ...(config.alerts?.aiSearchSummary || {}),
-      enabled: config.alerts?.aiSearchSummary?.enabled !== false && !args.includes('--no-ai-search-summary')
+      enabled: config.alerts?.aiSearchSummary?.enabled === true &&
+        !args.includes('--no-ai-search-summary')
     },
     config,
+    snapshotSignals,
     summaryCache: loadSummaryCache(),
-    weiboToken: null
+    weiboToken: null,
+    weiboTokenChecked: false
   };
   const enriched = [];
 
@@ -496,7 +510,7 @@ function sendWeComMessage(webhookUrl, message) {
 }
 
 function selectAlerts(snapshot, config, state, platforms) {
-  const allowedCategories = new Set(config.filters?.allowedCategories || ['游戏', '电竞', '体育']);
+  const allowedCategories = new Set(config.filters?.allowedCategories || ['游戏', '电竞', '体育', 'AI']);
   const platformSet = new Set(platforms);
   const dateKey = beijingDateKey(snapshot.capturedAt);
   const alerts = [];
@@ -553,7 +567,12 @@ async function main() {
 
   const state = loadState();
   const selectedAlerts = selectAlerts(snapshot, config, state, platforms);
-  const alerts = await enrichAlertsWithSummaries(selectedAlerts, config, args);
+  const alerts = await enrichAlertsWithSummaries(
+    selectedAlerts,
+    config,
+    args,
+    snapshotToSignals(snapshot)
+  );
   const webhook = process.env.SIBYL_ALERT_WEBHOOK ||
     process.env.WECOM_WEBHOOK ||
     config.alerts?.webhook ||

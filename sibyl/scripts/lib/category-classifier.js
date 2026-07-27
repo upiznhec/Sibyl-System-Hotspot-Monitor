@@ -15,13 +15,25 @@ const CATEGORY_GROUPS = {
     'esports_players_lpl',
     'esports_players_kpl'
   ],
-  体育: ['sports', 'sports_stars', 'worldcup_national_teams']
+  体育: ['sports', 'sports_stars', 'worldcup_national_teams'],
+  AI: [
+    'ai_general',
+    'ai_models_products',
+    'ai_coding_agents',
+    'ai_generation',
+    'ai_infrastructure',
+    'ai_robotics',
+    'ai_science',
+    'ai_safety_governance',
+    'ai_key_person'
+  ]
 };
 
-const CATEGORY_PRIORITY = ['电竞', '体育', '游戏'];
+const CATEGORY_PRIORITY = ['电竞', '体育', 'AI', '游戏'];
 const BOARD_CATEGORY_HINTS = [
   { pattern: /英雄联盟|lol|kpl|lpl|电竞|王者荣耀/i, category: '电竞' },
   { pattern: /nba|篮球|足球|国际足球|cba|英超|西甲|体育/i, category: '体育' },
+  { pattern: /人工智能|生成式ai|aigc|大模型|智能体|deepseek|openai/i, category: 'AI' },
   { pattern: /游戏|steam|主机|手游/i, category: '游戏' }
 ];
 

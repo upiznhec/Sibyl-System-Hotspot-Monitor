@@ -41,15 +41,51 @@
     }
   },
   "filters": {
-    "allowedCategories": ["游戏", "电竞", "体育"],
+    "allowedCategories": ["游戏", "电竞", "体育", "AI"],
     "minTitleLength": 4
   },
   "cluster": {
     "similarityThreshold": 0.42
   },
+  "eventMerge": {
+    "enabled": true,
+    "candidateLimit": 36,
+    "preSummaryCandidateLimit": 12,
+    "preSummaryRetrievalLimit": 4,
+    "preSummaryTimeBudgetSeconds": 90,
+    "maxMergeBatchSize": 8,
+    "minConfidence": 0.8
+  },
+  "eventSummary": {
+    "enabled": true,
+    "cacheTtlHours": 6,
+    "retrievalLimit": 10,
+    "concurrency": 2,
+    "timeBudgetSeconds": 180,
+    "failureCacheTtlMinutes": 30,
+    "weiboWisEnabled": true,
+    "weiboWisQueryLimit": 3
+  },
+  "eventFilter": {
+    "enabled": true,
+    "minConfidence": 0.75
+  },
   "snapshot": {
     "maxAgeMinutes": 20,
     "trendWindowMinutes": 70
+  },
+  "retrieval": {
+    "health": {
+      "confirmationDelayMinutes": 30,
+      "firstOpenHours": 48,
+      "repeatOpenHours": 96,
+      "recoverySuccessesRequired": 2
+    },
+    "capabilities": [
+      "openclaw.agent.sibyl-retriever",
+      "browser.search",
+      "web_fetch.read"
+    ]
   },
   "alerts": {
     "enabled": true,
@@ -57,8 +93,43 @@
     "webhook": "",
     "dedupe": "daily",
     "summaries": true,
-    "aiSearchSummary": {
+    "douyinTopic": {
       "enabled": true,
+      "directPageEnabled": false,
+      "relatedTopicLimit": 8,
+      "timeout": 12000,
+      "retries": 0
+    },
+    "agentReachSummary": {
+      "enabled": true,
+      "command": "openclaw",
+      "agent": "sibyl-retriever",
+      "sessionFlag": "none",
+      "retryDelayMs": 1000,
+      "timeoutSeconds": 90,
+      "thinking": "low",
+      "minSources": 2,
+      "minConfidence": "medium",
+      "maxSources": 4,
+      "maxAgeHours": 96,
+      "maxEvidenceChars": 6000,
+      "allowTrustedSingleSource": true,
+      "trustedDomains": [
+        "cctv.com",
+        "xinhuanet.com",
+        "news.cn",
+        "fifa.com",
+        "uefa.com",
+        "the-afc.com",
+        "olympics.com",
+        "nba.com"
+      ],
+      "capabilities": [
+        "browser.search"
+      ]
+    },
+    "aiSearchSummary": {
+      "enabled": false,
       "maxChars": 110
     },
     "weiboAI": {
@@ -85,8 +156,6 @@
     "minScore": 20,
     "requireSeedPlatforms": true,
     "seedPlatforms": ["weibo", "douyin"],
-    "aiSuggestions": true,
-    "aiSuggestionLimit": 8,
     "pushWeCom": false,
     "webhook": ""
   }
