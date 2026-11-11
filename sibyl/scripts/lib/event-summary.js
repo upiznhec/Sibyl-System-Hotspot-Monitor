@@ -4,6 +4,7 @@ const path = require('path');
 const { summarizeContent } = require('../../../elixir-summarizer/scripts/elixir-summarizer');
 const { resolveModelConfig } = require('./model-config');
 const { isNoSummary } = require('./locale');
+const { retrieveNewsEvidence } = require('./news-evidence');
 const {
   getDataDir,
   readJson,
@@ -180,7 +181,8 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
       platform: 'multi',
       platformLabel: '多平台',
       category: cluster.category,
-      url: cluster.mainSignal?.url || ''
+      url: cluster.mainSignal?.url || '',
+      signals: cluster.signals || []
     }, fullConfig);
     if (!retrieval.success) {
       retrievalFailure = retrieval.retryable
@@ -194,7 +196,7 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
       if (result.summary) {
         return {
           summary: result.summary,
-          source: 'browser-elixir',
+          source: `${retrieval.routeUsed || 'retrieval'}-elixir`,
           sourceHash: hash,
           retrievalRoute: retrieval.routeUsed,
           confidence: retrieval.confidence,
@@ -243,7 +245,8 @@ async function applyEventSummaries(clusters, fullConfig = {}, dependencies = {})
     failureCache: loadFailureCache(),
     alertSummaries: loadAlertSummaries(),
     modelConfig: resolveModelConfig(fullConfig),
-    retrieveEvidence: null,
+    // News links saved with the items (lib/news-evidence.js); "newsEvidence": false turns it off.
+    retrieveEvidence: options.newsEvidence === false ? null : retrieveNewsEvidence,
     retrievalCount: 0,
     deadlineAt: Date.now() + Math.max(1, Number(options.timeBudgetSeconds) || 180) * 1000
   };

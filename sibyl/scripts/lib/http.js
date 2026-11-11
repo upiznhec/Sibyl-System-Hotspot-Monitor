@@ -2,11 +2,21 @@ const http = require('http');
 const https = require('https');
 
 const DEFAULT_TIMEOUT = 15000;
+// Requests say which tool they come from. Sites such as Wikimedia ask automated clients to add
+// a way to reach the operator: set config.http.userAgent (or SIBYL_USER_AGENT) to do that.
+const DEFAULT_USER_AGENT = 'SibylHotspotMonitor (fork of liray0919/Sibyl-System-Hotspot-Monitor)';
 const DEFAULT_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
+  'User-Agent': DEFAULT_USER_AGENT,
   'Accept': 'application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.7'
+  'Accept-Language': 'en-US,en;q=0.9'
 };
+
+function configureHttp(options = {}) {
+  const userAgent = process.env.SIBYL_USER_AGENT || options.userAgent;
+  if (userAgent) DEFAULT_HEADERS['User-Agent'] = String(userAgent);
+  if (options.acceptLanguage) DEFAULT_HEADERS['Accept-Language'] = String(options.acceptLanguage);
+  return { ...DEFAULT_HEADERS };
+}
 
 function requestText(url, options = {}) {
   const {
@@ -87,6 +97,8 @@ async function requestJson(url, options = {}) {
 }
 
 module.exports = {
+  DEFAULT_USER_AGENT,
+  configureHttp,
   requestText,
   requestJson
 };

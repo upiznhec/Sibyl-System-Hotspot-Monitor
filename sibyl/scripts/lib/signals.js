@@ -79,6 +79,10 @@ function heatUnit(platform) {
   return require('./source-registry').getSource(platform)?.heatUnit || '';
 }
 
+function showsBoard(platform) {
+  return require('./source-registry').getSource(platform)?.showBoard !== false;
+}
+
 // Heat as shown next to a rank: "120万" (zh), or "85M views" and "20K+ searches" (en).
 function displayHeat(signal) {
   return text().displayHeat(signal, formatHeat, heatUnit(signal.platform));
@@ -88,7 +92,7 @@ function displayHeat(signal) {
 function formatSignalBrief(signal) {
   return text().signalBrief({
     label: signal.platformLabel,
-    board: signal.board,
+    board: showsBoard(signal.platform) ? signal.board : null,
     rank: signal.rank,
     heat: signal.heat ? displayHeat(signal) : ''
   });
@@ -112,7 +116,9 @@ function makeSignal(input) {
     engagement: input.engagement || {},
     raw: input.raw || null,
     capturedAt: input.capturedAt || new Date().toISOString(),
-    matchedKeywords: input.matchedKeywords || []
+    matchedKeywords: input.matchedKeywords || [],
+    // News links for summaries (Google Trends, feeds); absent for sources without them.
+    ...(Array.isArray(input.evidence) && input.evidence.length ? { evidence: input.evidence } : {})
   };
 }
 

@@ -1,6 +1,7 @@
 const { formatSignalBrief, normalizeForCompare, stableHash } = require('./signals');
 const { text } = require('./locale');
 const {
+  sourceHeatReference,
   sourceLabel,
   sourceTypeBoost,
   sourceTypeWeight,
@@ -40,7 +41,12 @@ function scoreSignal(signal) {
   const listTypeWeight = sourceTypeWeight(signal.sourceType);
   const rank = signal.rank || 999;
   const rankScore = Math.max(0, 36 - Math.min(rank, 35)) * 1.25;
-  const heatScore = Math.min(36, Math.log10((signal.heat || 0) + 10) * 6);
+  // v1.3.20 reaches the 36-point cap near 1,000,000 heat (Weibo, Douyin). Other sources count
+  // in other units, so their adapter says which heat should reach the cap.
+  const heatReference = sourceHeatReference(signal.platform);
+  const heatScore = heatReference
+    ? Math.min(36, Math.log10((signal.heat || 0) + 10) * (36 / Math.log10(heatReference + 10)))
+    : Math.min(36, Math.log10((signal.heat || 0) + 10) * 6);
   const keywordBoost = Math.min(12, (signal.matchedKeywords || []).length * 2.5);
   const boardBoost = sourceTypeBoost(signal.sourceType);
   return Math.round((rankScore + heatScore + keywordBoost + boardBoost) * platformWeight * listTypeWeight);

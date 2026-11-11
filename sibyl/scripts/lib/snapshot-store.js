@@ -73,7 +73,8 @@ function signalToRecord(signal, capturedAt) {
     heatText: signal.heatText || '',
     url: signal.url || '',
     sourceType: signal.sourceType || 'hot',
-    board: signal.board || null
+    board: signal.board || null,
+    ...(signal.evidence?.length ? { evidence: signal.evidence } : {})
   };
 }
 
@@ -87,7 +88,8 @@ function recordToSignal(record) {
     heat: record.heat || 0,
     heatText: record.heatText || undefined,
     url: record.url || '',
-    capturedAt: record.capturedAt
+    capturedAt: record.capturedAt,
+    evidence: record.evidence
   });
 }
 

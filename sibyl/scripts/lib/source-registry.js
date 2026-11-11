@@ -1,6 +1,10 @@
 // Source registry. Each adapter declares its own metadata in `module.exports.source`:
-//   id, label, weight, sourceTypeWeights, sourceTypeBoosts, displayOrder,
-//   defaultRole ('seed' = main source, 'community' = supporting source),
+//   id, label, access (how it is read), weight, sourceTypeWeights, sourceTypeBoosts, displayOrder,
+//   defaultRole ('seed' = main source; 'community' = a source the user follows, listed under
+//   "From sources you follow"; 'support' = adds weight to events seen on a main source),
+//   heatUnit ("views"), heatReference (the heat that earns the full 36 heat points; without it
+//   the v1.3.20 scale applies), showBoard (show the list name next to the label),
+//   alertSourceTypes (which lists may raise instant alerts; default all),
 //   fetch(config), an optional link(cluster, helpers) for the briefing and an optional
 //   fallbackItemLink(title) for instant alerts on items that have no URL.
 // Adapters are loaded lazily so that lib/signals.js can ask for labels without a require cycle.
@@ -9,7 +13,14 @@ const ADAPTER_LOADERS = {
   weibo: () => require('../adapters/weibo-adapter'),
   douyin: () => require('../adapters/douyin-adapter'),
   tieba: () => require('../adapters/tieba-adapter'),
-  hupu: () => require('../adapters/hupu-adapter')
+  hupu: () => require('../adapters/hupu-adapter'),
+  'google-trends': () => require('../adapters/google-trends-adapter'),
+  'tiktok-creative-center': () => require('../adapters/tiktok-creative-center-adapter'),
+  'x-trends': () => require('../adapters/x-trends-adapter'),
+  'youtube-search': () => require('../adapters/youtube-search-adapter'),
+  wikipedia: () => require('../adapters/wikipedia-adapter'),
+  'youtube-channels': () => require('../adapters/youtube-channels-adapter'),
+  rss: () => require('../adapters/rss-adapter')
 };
 
 const SOURCE_ORDER = Object.keys(ADAPTER_LOADERS);
@@ -63,8 +74,22 @@ function displayOrder(id) {
   return getSource(id)?.displayOrder ?? DEFAULT_DISPLAY_ORDER;
 }
 
-function defaultSeedPlatforms() {
-  return allSources().filter(source => source.defaultRole === 'seed').map(source => source.id);
+function sourceHeatReference(id) {
+  return getSource(id)?.heatReference || null;
+}
+
+// Main sources by default. With the platforms config, only the ones switched on.
+function defaultSeedPlatforms(platformsConfig = null) {
+  return allSources()
+    .filter(source => source.defaultRole === 'seed')
+    .filter(source => !platformsConfig ||
+      (platformsConfig[source.id] && platformsConfig[source.id].enabled !== false))
+    .map(source => source.id);
+}
+
+// Which of a source's lists may raise instant alerts (null = all of them).
+function alertSourceTypes(id) {
+  return getSource(id)?.alertSourceTypes || null;
 }
 
 function isCommunitySource(id) {
@@ -84,6 +109,7 @@ function sourceFetchers(platformsConfig = {}, onlyIds = null) {
 
 module.exports = {
   SOURCE_ORDER,
+  alertSourceTypes,
   allSources,
   defaultSeedPlatforms,
   displayOrder,
@@ -91,6 +117,7 @@ module.exports = {
   isCommunitySource,
   linkSources,
   sourceFetchers,
+  sourceHeatReference,
   sourceLabel,
   sourceTypeBoost,
   sourceTypeWeight,
