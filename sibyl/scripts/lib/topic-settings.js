@@ -1,14 +1,17 @@
 // Topic settings: which topics to keep, their keywords, priority, hints, icons and noise rules.
-// They come from config.topics (an object, or the name of a preset in sibyl/presets/).
-// Without config.topics the default preset is used.
+// They come from config.topics: a list of topics, an object, or the name of a preset in
+// sibyl/presets/. Without config.topics the example preset is used (English output), or
+// v1.3.20's topics for the Chinese output of the rewrite check.
 
 const fs = require('fs');
 const path = require('path');
 
-const PRESETS_DIR = path.resolve(__dirname, '..', '..', 'presets');
-const DEFAULT_PRESET = 'zh-v1.3.20';
+const { text } = require('./locale');
 
-let defaultSettings = null;
+const PRESETS_DIR = path.resolve(__dirname, '..', '..', 'presets');
+const DEFAULT_PRESETS = { en: 'example-beauty', zh: 'zh-v1.3.20' };
+
+const presetCache = new Map();
 
 function readJsonFile(file) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
@@ -88,9 +91,14 @@ function loadPreset(name) {
   return compileTopicSettings(readJsonFile(file), path.dirname(file));
 }
 
+function defaultPresetName() {
+  return DEFAULT_PRESETS[text().code] || DEFAULT_PRESETS.en;
+}
+
 function defaultTopicSettings() {
-  if (!defaultSettings) defaultSettings = loadPreset(DEFAULT_PRESET);
-  return defaultSettings;
+  const name = defaultPresetName();
+  if (!presetCache.has(name)) presetCache.set(name, loadPreset(name));
+  return presetCache.get(name);
 }
 
 function loadTopicSettings(config = {}, configFile = null) {
@@ -103,8 +111,9 @@ function loadTopicSettings(config = {}, configFile = null) {
 }
 
 module.exports = {
-  DEFAULT_PRESET,
+  DEFAULT_PRESETS,
   compileTopicSettings,
+  defaultPresetName,
   defaultTopicSettings,
   loadPreset,
   loadTopicSettings

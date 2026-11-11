@@ -4,6 +4,104 @@ const fs = require('fs');
 const path = require('path');
 
 const { readModelSettings } = require('./lib/model-config');
+const { isValidTimeZone, systemTimeZone } = require('./lib/locale');
+const { loadPages } = require('./lib/pages-file');
+const { loadTopicSettings } = require('./lib/topic-settings');
+const {
+  defaultPlatformsConfig,
+  defaultSeedPlatforms,
+  getSource,
+  sourceLabel
+} = require('./lib/source-registry');
+
+// Saved pages older than this are reported: the agent should read them once a day.
+const PAGES_STALE_HOURS = 30;
+
+function platformsConfig(config) {
+  const merged = defaultPlatformsConfig();
+  Object.entries(config.platforms || {}).forEach(([id, value]) => {
+    merged[id] = { ...(merged[id] || {}), ...(value || {}) };
+  });
+  return merged;
+}
+
+// One line per switched-on source: what it needs and whether that is in place.
+function checkSources(config, dataDir, recommended, optional) {
+  const platforms = platformsConfig(config);
+  const enabled = Object.keys(platforms).filter(id => platforms[id]?.enabled && getSource(id));
+  const seeds = Array.isArray(config.report?.seedPlatforms) && config.report.seedPlatforms.length
+    ? config.report.seedPlatforms
+    : defaultSeedPlatforms(platforms);
+  const pages = loadPages(config, dataDir);
+  const pageAge = (source, view = null) => pages.sections
+    .filter(section => section.source === source && (!view || (section.view || 'trending') === view))
+    .map(section => section.ageHours);
+
+  checkLine(recommended, 'recommended', '主来源', seeds.length > 0 && seeds.every(id => enabled.includes(id)),
+    seeds.map(sourceLabel).join('、') || '无',
+    '主来源必须是已开启的来源（platforms 中 enabled: true），见 report.seedPlatforms。');
+
+  enabled.forEach(id => {
+    const settings = platforms[id] || {};
+    const label = sourceLabel(id);
+    if (id === 'google-trends') {
+      checkLine(recommended, 'recommended', `${label} RSS`, settings.rss !== false,
+        settings.rss !== false ? `脚本每次运行读取（国家 ${String(settings.geo || config.country || 'US').toUpperCase()}）` : '已关闭',
+        'RSS 是即时预警的来源，建议保持开启（platforms["google-trends"].rss）。');
+      if (settings.pages !== false) {
+        ['trending', 'explore'].forEach(view => {
+          const ages = pageAge(id, view);
+          const name = view === 'trending' ? `${label} 类别页面` : `${label} Explore`;
+          checkLine(recommended, 'recommended', name, ages.length > 0 && Math.min(...ages) <= PAGES_STALE_HOURS,
+            ages.length ? `pages.json 中 ${ages.length} 段，最近一次 ${Math.min(...ages)} 小时前读取` : 'pages.json 中还没有',
+            '让 agent 每天读取一次该页面并写入 pages.json（见 lib/pages-file.js 的格式）。');
+        });
+      }
+      return;
+    }
+    if (id === 'tiktok-creative-center') {
+      const ages = pageAge(id);
+      checkLine(recommended, 'recommended', `${label} 话题标签榜`, ages.length > 0 && Math.min(...ages) <= PAGES_STALE_HOURS,
+        ages.length ? `pages.json 中 ${ages.length} 段，最近一次 ${Math.min(...ages)} 小时前读取` : 'pages.json 中还没有',
+        '让 agent 每天在浏览器里读取一次 Creative Center 话题标签榜并写入 pages.json；不登录只显示前 3 名。');
+      return;
+    }
+    if (id === 'wikipedia') {
+      const hasContact = /@|https?:\/\//.test(String(process.env.SIBYL_USER_AGENT || config.http?.userAgent || ''));
+      checkLine(optional, 'optional', `${label} 请求标识`, hasContact,
+        hasContact ? '已包含联系方式' : '未包含联系方式',
+        'Wikimedia 要求自动程序在 user-agent 中写明联系方式：在 http.userAgent（或 SIBYL_USER_AGENT）中加上你的网址或邮箱。');
+      return;
+    }
+    if (id === 'youtube-channels' || id === 'rss') {
+      const list = id === 'rss' ? settings.feeds : settings.channels;
+      const count = Array.isArray(list) ? list.length : 0;
+      checkLine(optional, 'optional', label, count > 0,
+        count > 0 ? `已关注 ${count} 个${id === 'rss' ? '网站' : '频道'}` : '已开启，但没有填写',
+        id === 'rss'
+          ? '在 platforms.rss.feeds 中填写网站的 RSS 地址；有的网站只允许个人使用其 RSS，添加前看一下条款。'
+          : '在 platforms["youtube-channels"].channels 中填写频道 ID（以 UC 开头）。');
+      return;
+    }
+    if (id === 'youtube-search') {
+      const hasKey = Boolean(process.env.SIBYL_YOUTUBE_API_KEY || settings.apiKey);
+      checkLine(optional, 'optional', label, hasKey,
+        hasKey ? `已设置 API key，每 ${settings.minIntervalMinutes ?? 60} 分钟最多搜索一次` : '已开启，但没有 API key',
+        '设置 SIBYL_YOUTUBE_API_KEY（YouTube Data API v3 的免费 key；搜索每天约 100 次）。');
+      return;
+    }
+    if (id === 'x-trends') {
+      const hasToken = Boolean(process.env.SIBYL_X_BEARER_TOKEN || settings.bearerToken);
+      checkLine(optional, 'optional', label, hasToken,
+        hasToken ? `已设置 bearer token，每 ${settings.minIntervalMinutes ?? 30} 分钟最多请求一次（每次请求约 0.01 美元）` : '已开启，但没有 bearer token',
+        '设置 SIBYL_X_BEARER_TOKEN；X 的开发者账号需要预充值，按请求次数扣费。');
+    }
+  });
+  pages.problems
+    .filter(problem => !/^no pages file/.test(problem))
+    .forEach(problem => checkLine(recommended, 'recommended', 'pages.json', false, problem,
+      '让 agent 重新读取页面并按 lib/pages-file.js 的格式保存。'));
+}
 const {
   CHANNELS,
   alertTarget,
@@ -225,20 +323,39 @@ function main() {
       '设置 SIBYL_AI_MODEL 或 config.ai.model；接口默认 OpenAI，其他兼容接口设置 SIBYL_AI_BASE_URL 或 config.ai.baseUrl。只有密钥没有模型名称时，AI 步骤不会启用。');
   }
 
+  const topicSettings = loadTopicSettings(config, configFile);
+  const keywordCount = topicSettings.categories.reduce((sum, topic) => sum + topic.keywords.length, 0);
+  checkLine(recommended, 'recommended', '领域', Boolean(config.topics) && keywordCount > 0,
+    config.topics
+      ? `${topicSettings.categoryNames.length} 个领域（${topicSettings.categoryNames.join('、')}），关键词 ${keywordCount} 个`
+      : `未设置，正在使用示例领域（${topicSettings.categoryNames.join('、')}）`,
+    '让 agent 根据你的需求起草领域、关键词和排除词，你确认后写入 config.topics。');
+
+  checkSources(config, dataDir, recommended, optional);
+
+  // Briefing times use config.timeZone; cron runs on the computer's own zone.
   const timezone = readTimezone();
-  const timezoneOk = [timezone.intl, timezone.timezoneFile, timezone.localtime]
-    .filter(Boolean)
-    .some(value => /Asia\/Shanghai|Shanghai/.test(value));
-  checkLine(recommended, 'recommended', '系统时区', timezoneOk,
-    `Intl=${timezone.intl || '未知'} / timezone=${timezone.timezoneFile || '未知'} / localtime=${timezone.localtime || '未知'}`,
-    'Sibyl 的 10-22 调度窗口按北京时间理解，建议统一为 Asia/Shanghai。');
+  const systemZone = timezone.intl || systemTimeZone();
+  const configuredZone = config.timeZone || '';
+  const zoneValid = !configuredZone || isValidTimeZone(configuredZone);
+  const zoneMatches = !configuredZone || configuredZone === systemZone;
+  checkLine(recommended, 'recommended', '时区', zoneValid && zoneMatches,
+    !zoneValid
+      ? `timeZone "${configuredZone}" 无效，将使用系统时区 ${systemZone}`
+      : `播报时间按 ${configuredZone || systemZone}${configuredZone ? '' : '（系统时区）'} 显示；系统时区 ${systemZone}`,
+    zoneValid
+      ? `定时任务按系统时区运行；把任务时间换算到 ${configuredZone || systemZone}，或把 timeZone 设成系统时区。`
+      : 'timeZone 用 IANA 名称，例如 America/New_York、Europe/London、Asia/Singapore。');
 
   checkLine(manual, 'manual', '避免重复推送', false,
     '需要在调度工具中人工确认',
     '脚本带 --push 时自己调用 webhook；调度工具只负责按时运行，不要再把运行结果另发一次。');
   checkLine(manual, 'manual', '定时任务', false,
     '需要在 crontab 或其他调度工具中人工确认',
-    '10:00-22:00 每10分钟运行 collect-snapshot + instant-alerts；每小时运行 sibyl.js --push。');
+    '在你设定的时段内每10分钟运行 collect-snapshot + instant-alerts；每小时运行 sibyl.js --push。');
+  checkLine(manual, 'manual', '每天读网页', false,
+    '需要确认 agent 每天读取一次 TikTok 和 Google Trends 页面',
+    'agent 读取话题标签榜、类别页面和 Explore，写入 pages.json；没读时脚本沿用上一次的结果。');
   checkLine(manual, 'manual', '定时任务中的 webhook', taskHasAlertWebhook && taskHasReportWebhook,
     taskCommands ? '已根据传入任务命令做辅助检查' : '未传入任务命令；若 webhook 只写在定时任务里，请以任务配置为准',
     '自检脚本读不到调度工具里的任务配置；可用 --task-command 或 SIBYL_TASK_COMMANDS 辅助检查。');

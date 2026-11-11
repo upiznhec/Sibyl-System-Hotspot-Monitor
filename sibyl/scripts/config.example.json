@@ -1,51 +1,61 @@
 {
+  "language": "en",
+  "country": "US",
+  "timeZone": "",
+  "topics": [
+    {
+      "name": "Beauty",
+      "icon": "🧴",
+      "keywords": [
+        "skincare", "skin care", "makeup", "sunscreen",
+        { "word": "SPF", "requireAny": ["sunscreen", "skin", "UV", "lotion", "stick"] },
+        "serum", "moisturizer", "lipstick", "mascara", "beauty", "cosmetics"
+      ],
+      "briefingExclude": ["promo code", "coupon", "discount code"]
+    }
+  ],
   "platforms": {
-    "weibo": {
+    "google-trends": {
       "enabled": true,
+      "rss": true,
+      "pages": true,
+      "maxItems": 25
+    },
+    "tiktok-creative-center": {
+      "enabled": true
+    },
+    "wikipedia": {
+      "enabled": true,
+      "project": "en.wikipedia",
       "maxItems": 50
     },
-    "douyin": {
-      "enabled": true,
-      "maxItems": 50
+    "youtube-channels": {
+      "enabled": false,
+      "channels": [],
+      "maxAgeDays": 7
     },
-    "tieba": {
-      "enabled": true,
-      "maxItems": 50,
-      "hotTopicUrl": "https://tieba.baidu.com/hottopic/browse/topicList?res_type=1"
+    "rss": {
+      "enabled": false,
+      "feeds": [],
+      "maxAgeDays": 3
     },
-    "hupu": {
-      "enabled": true,
-      "maxItems": 80,
-      "boards": [
-        {
-          "board": "步行街",
-          "url": "https://bbs.hupu.com/all-gambia",
-          "maxItems": 25
-        },
-        {
-          "board": "英雄联盟",
-          "url": "https://bbs.hupu.com/lol",
-          "maxItems": 25
-        },
-        {
-          "board": "NBA",
-          "url": "https://bbs.hupu.com/nba",
-          "maxItems": 25
-        },
-        {
-          "board": "国际足球",
-          "url": "https://bbs.hupu.com/soccer",
-          "maxItems": 25
-        }
-      ]
+    "youtube-search": {
+      "enabled": false,
+      "queries": [],
+      "minIntervalMinutes": 60
+    },
+    "x-trends": {
+      "enabled": false,
+      "minIntervalMinutes": 30
     }
   },
+  "pagesMaxAgeHours": 168,
   "filters": {
-    "allowedCategories": ["游戏", "电竞", "体育", "AI"],
-    "minTitleLength": 4
+    "minTitleLength": 3
   },
-  "cluster": {
-    "similarityThreshold": 0.42
+  "snapshot": {
+    "maxAgeMinutes": 20,
+    "trendWindowMinutes": 70
   },
   "eventMerge": {
     "enabled": true,
@@ -58,6 +68,7 @@
   },
   "eventSummary": {
     "enabled": true,
+    "newsEvidence": true,
     "cacheTtlHours": 6,
     "retrievalLimit": 10,
     "concurrency": 2,
@@ -65,12 +76,7 @@
     "failureCacheTtlMinutes": 30
   },
   "eventFilter": {
-    "enabled": true,
-    "minConfidence": 0.75
-  },
-  "snapshot": {
-    "maxAgeMinutes": 20,
-    "trendWindowMinutes": 70
+    "enabled": true
   },
   "alerts": {
     "enabled": true,
@@ -79,27 +85,20 @@
     "webhook": "",
     "dedupe": "daily",
     "summaries": true,
-    "douyinTopic": {
-      "enabled": true,
-      "directPageEnabled": false,
-      "relatedTopicLimit": 8,
-      "timeout": 12000,
-      "retries": 0
-    },
     "aiSearchSummary": {
       "enabled": false,
-      "maxChars": 110
+      "maxWords": 50
     },
     "platforms": {
-      "weibo": {
+      "google-trends": {
         "enabled": true,
-        "rankMax": 10,
-        "hotMin": 500000
+        "rankMax": 3,
+        "hotMin": 20000
       },
-      "douyin": {
+      "x-trends": {
         "enabled": true,
-        "rankMax": 10,
-        "hotMin": 8000000
+        "rankMax": 5,
+        "hotMin": 50000
       }
     }
   },
@@ -107,7 +106,7 @@
     "topN": 10,
     "minScore": 20,
     "requireSeedPlatforms": true,
-    "seedPlatforms": ["weibo", "douyin"],
+    "seedPlatforms": ["google-trends", "tiktok-creative-center"],
     "push": false,
     "channel": "",
     "webhook": ""
@@ -119,6 +118,9 @@
   },
   "archive": {
     "keepDays": 7
+  },
+  "http": {
+    "userAgent": ""
   },
   "ai": {
     "baseUrl": "https://api.openai.com/v1",

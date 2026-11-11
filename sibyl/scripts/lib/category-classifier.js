@@ -81,7 +81,10 @@ function categoryGroups(settings = defaultTopicSettings()) {
 }
 
 module.exports = {
-  CATEGORY_GROUPS: categoryGroups(),
+  // Read when used, so that it follows the configured language's default topics.
+  get CATEGORY_GROUPS() {
+    return categoryGroups();
+  },
   categoryGroups,
   classifySignal
 };

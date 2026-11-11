@@ -40,8 +40,8 @@ const original = {
 };
 
 const registry = require(path.join(repo, 'sibyl/scripts/lib/source-registry'));
-const { defaultTopicSettings } = require(path.join(repo, 'sibyl/scripts/lib/topic-settings'));
-const settings = defaultTopicSettings();
+const { loadPreset } = require(path.join(repo, 'sibyl/scripts/lib/topic-settings'));
+const settings = loadPreset('zh-v1.3.20');
 const checks = [];
 
 function check(name, fn) {

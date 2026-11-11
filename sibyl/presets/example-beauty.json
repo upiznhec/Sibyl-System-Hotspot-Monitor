@@ -1,0 +1,19 @@
+{
+  "name": "example-beauty",
+  "description": "Example topic used when the config names none. During setup the user's agent replaces it with the user's own topics, keywords and exclude words, and the user confirms them before the first run.",
+  "topics": [
+    {
+      "name": "Beauty",
+      "icon": "🧴",
+      "keywords": [
+        "skincare", "skin care", "makeup", "sunscreen", "sunblock",
+        { "word": "SPF", "requireAny": ["sunscreen", "skin", "UV", "lotion", "stick"] },
+        "serum", "moisturizer", "cleanser", "retinol", "lipstick", "mascara",
+        { "word": "foundation", "requireAny": ["makeup", "skin", "shade", "concealer", "beauty"] },
+        "concealer", "eyeliner", "beauty", "cosmetics", "fragrance", "perfume",
+        "nail polish", "haircare", "hair care"
+      ],
+      "briefingExclude": ["promo code", "coupon", "discount code"]
+    }
+  ]
+}
