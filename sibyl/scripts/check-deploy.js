@@ -134,6 +134,19 @@ function platformsConfig(config) {
   return merged;
 }
 
+// How a page on the daily reading list is named in the check.
+function dailyPageName(page) {
+  const label = sourceLabel(page.source);
+  if (page.industry) return `${label}: ${page.industry}`;
+  if (page.category) return `${label} category: ${page.category}`;
+  if (page.keyword) return `${label} Explore: ${page.keyword}`;
+  return label;
+}
+
+function sameText(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
 function pagesDetail(ages) {
   return ages.length
     ? `${ages.length} saved in pages.json, the newest read ${Math.min(...ages)} hours ago`
@@ -152,6 +165,8 @@ function checkSources(config, dataDir, recommended, optional) {
     .filter(section => section.source === source && (!view || (section.view || 'trending') === view))
     .map(section => section.ageHours);
   const fresh = ages => ages.length > 0 && Math.min(...ages) <= PAGES_STALE_HOURS;
+  // The agent's daily reading list (config.dailyPages): one line per page when it is set.
+  const dailyPages = Array.isArray(config.dailyPages) ? config.dailyPages.filter(page => page?.source) : [];
 
   checkLine(recommended, 'recommended', 'Main sources', seeds.length > 0 && seeds.every(id => enabled.includes(id)),
     seeds.map(sourceLabel).join(', ') || 'none',
@@ -166,7 +181,7 @@ function checkSources(config, dataDir, recommended, optional) {
           ? `read by the script on every run (country ${String(settings.geo || config.country || 'US').toUpperCase()})`
           : 'off',
         'The RSS feed is where instant alerts come from; keep it on (platforms["google-trends"].rss).');
-      if (settings.pages !== false) {
+      if (settings.pages !== false && !dailyPages.length) {
         [['trending', `${label} category page`], ['explore', `${label} Explore`]].forEach(([view, name]) => {
           const ages = pageAges(id, view);
           checkLine(recommended, 'recommended', name, fresh(ages), pagesDetail(ages),
@@ -176,6 +191,7 @@ function checkSources(config, dataDir, recommended, optional) {
       return;
     }
     if (id === 'tiktok-creative-center') {
+      if (dailyPages.length) return;
       const ages = pageAges(id);
       checkLine(recommended, 'recommended', `${label} hashtags`, fresh(ages), pagesDetail(ages),
         'Have your agent read the Creative Center hashtag list in a browser once a day and save it to pages.json; without a login it shows the top 3.');
@@ -213,6 +229,20 @@ function checkSources(config, dataDir, recommended, optional) {
           : 'on, but no bearer token',
         'Set SIBYL_X_BEARER_TOKEN. The X developer account needs prepaid credits and is charged per request.');
     }
+  });
+  if (!dailyPages.length && enabled.some(id => id === 'google-trends' || id === 'tiktok-creative-center')) {
+    checkLine(recommended, 'recommended', 'Daily reading list', false, 'dailyPages is not set',
+      'After mapping the topics, write the pages to read each day as config.dailyPages (see AGENTS.md, "Mapping topics").');
+  }
+  dailyPages.forEach(page => {
+    const view = page.source === 'google-trends' ? (page.view || 'trending') : null;
+    const ages = pages.sections
+      .filter(section => section.source === page.source)
+      .filter(section => !view || (section.view || 'trending') === view)
+      .filter(section => ['industry', 'category', 'keyword'].every(key => !page[key] || sameText(section[key], page[key])))
+      .map(section => section.ageHours);
+    checkLine(recommended, 'recommended', dailyPageName(page), fresh(ages), pagesDetail(ages),
+      'Have your agent read this page and save it to pages.json (see AGENTS.md, "Reading the daily pages").');
   });
   pages.problems
     .filter(problem => !/^no pages file/.test(problem))

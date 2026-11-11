@@ -2,6 +2,8 @@
 
 [English](CHANGELOG.en.md) | [中文 README](README.zh-CN.md)
 
+> 本 fork（Workflow Library 版）的改动见 [CHANGELOG.en.md](CHANGELOG.en.md)。以下是原版 v1.3.20 及之前的更新记录。
+
 作者：Misaka Studio
 
 ## 1.3.20 - 2026-07-27

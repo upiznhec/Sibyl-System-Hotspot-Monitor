@@ -44,7 +44,8 @@ try {
   const result = spawnSync(process.execPath, [path.join(__dirname, 'check-deploy.js'), '--strict'], { env, encoding: 'utf8' });
   assert.strictEqual(result.status, 0, result.stdout + result.stderr);
   assert.ok(result.stdout.includes('[OK] Main sources: Google Trends, TikTok'));
-  assert.ok(result.stdout.includes('[WARN] TikTok hashtags: not in pages.json yet'));
+  assert.ok(result.stdout.includes('[WARN] TikTok: Beauty & Personal Care: not in pages.json yet'));
+  assert.ok(result.stdout.includes('[WARN] Google Trends Explore: sunscreen: not in pages.json yet'));
   assert.ok(result.stdout.includes('## Reading briefings'));
 } finally {
   fs.rmSync(dataDir, { recursive: true, force: true });

@@ -49,6 +49,11 @@
       "minIntervalMinutes": 30
     }
   },
+  "dailyPages": [
+    { "source": "tiktok-creative-center", "region": "US", "industry": "Beauty & Personal Care", "topic": "Beauty" },
+    { "source": "google-trends", "view": "trending", "region": "US", "category": "Beauty and Fashion", "categoryId": 2, "topic": "Beauty" },
+    { "source": "google-trends", "view": "explore", "region": "US", "keyword": "sunscreen", "topic": "Beauty" }
+  ],
   "pagesMaxAgeHours": 168,
   "filters": {
     "minTitleLength": 3
