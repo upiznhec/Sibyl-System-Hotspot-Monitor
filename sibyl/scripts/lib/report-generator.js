@@ -1,4 +1,5 @@
-const { formatHeat } = require('./signals');
+const { displayHeat, formatSignalBrief } = require('./signals');
+const { localClock, localDateTime, text, zoneName } = require('./locale');
 const {
   defaultSeedPlatforms,
   displayOrder,
@@ -16,26 +17,26 @@ const STATUS_ICON = {
   cooling: '⬇️'
 };
 
+// Date and time in the configured time zone (lib/locale.js).
 function formatTime(date = new Date()) {
-  const d = date instanceof Date ? date : new Date(date);
-  const beijing = new Date(d.getTime() + 8 * 60 * 60 * 1000);
-  return beijing.toISOString().replace('T', ' ').slice(0, 16);
+  return localDateTime(date);
 }
 
 function formatClock(date = new Date()) {
-  return formatTime(date).slice(11, 16);
+  return localClock(date);
 }
 
 function formatGrowth(cluster) {
-  if (cluster.growthRate === null || cluster.growthRate === undefined) return '首次出现';
+  const growth = text().growth;
+  if (cluster.growthRate === null || cluster.growthRate === undefined) return growth.first;
   const percent = Math.round(cluster.growthRate * 100);
-  if (percent > 0) return `比上轮高 ${percent}%`;
-  if (percent < 0) return `比上轮低 ${Math.abs(percent)}%`;
-  return '和上轮接近';
+  if (percent > 0) return growth.up(percent);
+  if (percent < 0) return growth.down(Math.abs(percent));
+  return growth.flat;
 }
 
 function pickCategory(cluster) {
-  return cluster.category || '未分类';
+  return cluster.category || text().uncategorized;
 }
 
 function clusterText(cluster) {
@@ -65,19 +66,16 @@ function platformNamesForCluster(cluster, seedSet) {
     .filter(signal => seedSet.has(signal.platform))
     .map(signal => signal.platformLabel)
     .filter(Boolean);
+  const join = text().nameJoin;
   const uniqueNames = [...new Set(names)];
-  if (uniqueNames.length > 0) return uniqueNames.join('、');
-  return [...new Set((cluster.signals || []).map(signal => signal.platformLabel).filter(Boolean))].join('、') || '未知';
+  if (uniqueNames.length > 0) return uniqueNames.join(join);
+  return [...new Set((cluster.signals || []).map(signal => signal.platformLabel).filter(Boolean))].join(join) ||
+    text().unknownSource;
 }
 
 function basisStatusText(cluster) {
-  return {
-    new: '本轮首次进入候选',
-    rising: '当前热度上升中',
-    holding: '当前持续在榜',
-    steady: '当前热度平稳',
-    cooling: '当前热度回落中'
-  }[cluster.status] || `当前${cluster.statusLabel || '状态待观察'}`;
+  const wording = text();
+  return wording.basisStatus[cluster.status] || wording.basisStatusFallback(cluster.statusLabel);
 }
 
 function scoreToPercent(rawScore = 0) {
@@ -107,21 +105,15 @@ function scoreToPercent(rawScore = 0) {
 }
 
 function scoreLevel(displayScore) {
-  if (displayScore >= 85) return '强热点';
-  if (displayScore >= 60) return '关注后续';
-  return '观察';
+  const levels = text().levels;
+  if (displayScore >= 85) return levels.strong;
+  if (displayScore >= 60) return levels.follow;
+  return levels.watch;
 }
 
 function formatDisplayScore(rawScore) {
   const displayScore = scoreToPercent(rawScore);
-  return `${displayScore}/100（${scoreLevel(displayScore)}）`;
-}
-
-function formatSignalBrief(signal) {
-  const rank = signal.rank ? `#${signal.rank}` : '未排名';
-  const heat = signal.heat ? ` ${formatHeat(signal.heat)}` : '';
-  const board = signal.board ? `${signal.platformLabel}/${signal.board}` : signal.platformLabel;
-  return `${board}${rank}${heat}`;
+  return text().displayScore(displayScore, scoreLevel(displayScore));
 }
 
 function signalDisplayOrder(signal) {
@@ -140,7 +132,7 @@ function compareSignalsForDisplay(a, b) {
 
 function buildHeatLine(cluster) {
   const sortedSignals = (cluster.signals || []).slice().sort(compareSignalsForDisplay);
-  if (sortedSignals.length === 0) return (cluster.platformSummary || []).slice(0, 3).join(' ｜ ');
+  if (sortedSignals.length === 0) return (cluster.platformSummary || []).slice(0, 3).join(text().pipe);
 
   const strongestByPlatform = [];
   const seenPlatforms = new Set();
@@ -149,45 +141,49 @@ function buildHeatLine(cluster) {
     seenPlatforms.add(signal.platform);
     strongestByPlatform.push(signal);
   });
-  return strongestByPlatform.slice(0, 4).map(formatSignalBrief).join('、');
+  return strongestByPlatform.slice(0, 4).map(formatSignalBrief).join(text().heatJoin);
 }
 
 function buildTrendSummary(cluster) {
+  const wording = text().trend;
   if (cluster.hourlyTrend?.sampleCount >= 2) {
     const trend = cluster.hourlyTrend;
     const parts = [];
     if (cluster.status !== 'new') parts.push(basisStatusText(cluster));
     if (trend.dropFromPeak > 0) {
-      parts.push(`较小时最高点低 ${Math.round(trend.dropFromPeak * 100)}%`);
+      parts.push(wording.belowPeak(Math.round(trend.dropFromPeak * 100)));
     } else {
-      parts.push('处于小时内高点');
+      parts.push(wording.atPeak);
     }
     if (trend.peakHeat) {
-      const rank = trend.peakRank ? `#${trend.peakRank} ` : '';
-      const platform = trend.peakPlatformLabel || '主平台';
-      const time = trend.peakAt ? `（${formatClock(trend.peakAt)}）` : '';
-      parts.push(`${platform}小时最高 ${rank}${formatHeat(trend.peakHeat)}${time}`);
+      parts.push(wording.peak({
+        source: trend.peakPlatformLabel || wording.mainSource,
+        rank: trend.peakRank,
+        heat: displayHeat({ platform: trend.peakPlatform, heat: trend.peakHeat, heatText: '' }),
+        time: trend.peakAt ? formatClock(trend.peakAt) : ''
+      }));
     }
-    return parts.join('，');
+    return parts.join(wording.join);
   }
 
   if (cluster.status === 'new') return '';
-  return `${basisStatusText(cluster)}，${formatGrowth(cluster)}`;
+  return wording.withGrowth(basisStatusText(cluster), formatGrowth(cluster));
 }
 
 function buildPerformanceLine(cluster, seedSet) {
+  const wording = text().performance;
   const parts = [buildHeatLine(cluster)];
   const platformText = platformNamesForCluster(cluster, seedSet);
   parts.push(cluster.platformCount > 1
-    ? `${cluster.platformCount}个平台共同出现`
-    : `${platformText}单平台出现`);
+    ? wording.multi(cluster.platformCount)
+    : wording.single(platformText));
   if ((cluster.aliases || []).length > 1) {
-    parts.push(`同一事件覆盖${cluster.aliases.length}个话题词`);
+    parts.push(wording.aliases(cluster.aliases.length));
   }
-  parts.push(cluster.previousScore ? '连续进入播报' : '首次进入播报');
+  parts.push(cluster.previousScore ? wording.repeat : wording.first);
   const trend = buildTrendSummary(cluster);
   if (trend) parts.push(trend);
-  return `${parts.filter(Boolean).join('；')}。`;
+  return `${parts.filter(Boolean).join(wording.join)}${wording.end}`;
 }
 
 function bestSignalForPlatform(cluster, platform) {
@@ -198,34 +194,7 @@ function fallbackTopicTerm(cluster, settings) {
   const keywords = [...new Set(cluster.keywords || [])]
     .filter(keyword => String(keyword).trim().length >= 2)
     .slice(0, 4);
-  return keywords.length ? keywords.join(' ') : inferTopicTerm(cluster.mainSignal.title, settings.knownTerms);
-}
-
-function includesTerm(text, term) {
-  return text.toLowerCase().includes(String(term).toLowerCase());
-}
-
-function inferTopicTerm(title = '', knownTerms = []) {
-  const text = String(title)
-    .replace(/^原创\s*/i, '')
-    .replace(/[《》“”"']/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-
-  const entities = knownTerms.filter(term => includesTerm(text, term));
-  if (entities.length) return entities.slice(0, 3).join(' ');
-
-  const segments = text
-    .split(/[：:，,。！？?；;｜|\-—\s]+/)
-    .map(segment => segment.trim())
-    .filter(Boolean);
-  const concise = segments.find(segment =>
-    segment.length >= 2 &&
-    segment.length <= 18 &&
-    !/^(原创|如何看待|怎么看|为什么|有没有|大家|他们|这个|那个|也期待)$/.test(segment)
-  );
-
-  return concise || text.slice(0, 18);
+  return keywords.length ? keywords.join(' ') : text().inferTopicTerm(cluster.mainSignal.title, settings.knownTerms);
 }
 
 function platformTopicTerm(cluster, platform, settings) {
@@ -241,7 +210,7 @@ function platformSearchLink(cluster, platform, directLabel, fallbackLabel, urlBu
   return `[${label}](${urlBuilder(encoded)})`;
 }
 
-// Each source builds its own link; the helpers give it the shared lookup rules.
+// Each source builds its own link, or returns '' to show none; the helpers give it the shared lookup rules.
 function detailLinks(cluster, settings) {
   const helpers = {
     bestSignalForPlatform,
@@ -251,7 +220,8 @@ function detailLinks(cluster, settings) {
   };
   return linkSources()
     .map(source => source.link(cluster, helpers))
-    .join(' ｜ ');
+    .filter(Boolean)
+    .join(text().pipe);
 }
 
 function seedPlatforms(config = {}) {
@@ -263,7 +233,7 @@ function seedPlatforms(config = {}) {
 function seedPlatformText(config = {}) {
   return seedPlatforms(config)
     .map(sourceLabel)
-    .join('或');
+    .join(text().or);
 }
 
 function hasBroadcastSeed(cluster, config = {}) {
@@ -302,11 +272,12 @@ function renderCluster(cluster, index, context) {
 
   lines.push(`### ${index + 1}. ${category} ${icon} ${cluster.canonicalTitle || cluster.mainSignal.title}`);
   lines.push('');
-  lines.push(`**综合分：${formatDisplayScore(cluster.score)}**`);
+  const wording = text().report;
+  lines.push(wording.scoreLine(formatDisplayScore(cluster.score)));
   lines.push('');
-  lines.push(`**热度表现：** ${buildPerformanceLine(cluster, context.seedSet)}`);
+  lines.push(wording.signalsLine(buildPerformanceLine(cluster, context.seedSet)));
   lines.push('');
-  lines.push(`**事件摘要：** ${cluster.eventSummary || '暂缺可靠摘要。'}`);
+  lines.push(wording.summaryLine(cluster.eventSummary));
   lines.push('');
   lines.push(detailLinks(cluster, context.settings));
   lines.push('');
@@ -325,14 +296,16 @@ function generateReport(clusters, meta = {}, config = {}) {
     seedSet: new Set(seedPlatforms(config))
   };
 
+  const wording = text().report;
+  const generatedAt = meta.generatedAt || new Date();
   const lines = [];
-  lines.push('# 热点综合播报');
+  lines.push(wording.title);
   lines.push('');
-  lines.push(`播报时间：${formatTime(meta.generatedAt || new Date())}`);
+  lines.push(wording.generated(formatTime(generatedAt), zoneName(generatedAt)));
   lines.push('');
 
   if (selected.length === 0) {
-    lines.push(`本轮暂无命中${seedPlatformText(config)}热搜且达到入选标准的热点。`);
+    lines.push(wording.noItems(seedPlatformText(config)));
     return lines.join('\n');
   }
 
@@ -345,23 +318,28 @@ function generateReport(clusters, meta = {}, config = {}) {
 
   const watchlist = eligibleClusters.slice(topN, topN + 5);
   if (watchlist.length > 0) {
-    lines.push('### 观察列表');
+    lines.push(wording.watchlistHeading);
     lines.push('');
     watchlist.forEach(cluster => {
-      const heat = cluster.platformSummary.slice(0, 2).join(' ｜ ');
-      lines.push(`- ${cluster.canonicalTitle || cluster.mainSignal.title}：${cluster.statusLabel} ｜ ${heat}`);
+      const heat = cluster.platformSummary.slice(0, 2).join(text().pipe);
+      lines.push(wording.watchlistLine(cluster.canonicalTitle || cluster.mainSignal.title, cluster.statusLabel, heat));
     });
     lines.push('');
   }
 
   const communityWatchlist = communityOnlyClusters(clusters, config);
   if (communityWatchlist.length > 0) {
-    lines.push('### 社区观察');
+    lines.push(wording.followedHeading);
     lines.push('');
     communityWatchlist.forEach(cluster => {
       const category = visualCategory(cluster, context.settings);
       const heat = buildHeatLine(cluster);
-      lines.push(`- ${category} ｜ ${cluster.canonicalTitle || cluster.mainSignal.title} ｜ 综合分 ${formatDisplayScore(cluster.score)} ｜ ${heat}`);
+      lines.push(wording.followedLine(
+        category,
+        cluster.canonicalTitle || cluster.mainSignal.title,
+        formatDisplayScore(cluster.score),
+        heat
+      ));
     });
     lines.push('');
   }

@@ -3,6 +3,7 @@ const path = require('path');
 
 const { summarizeContent } = require('../../../elixir-summarizer/scripts/elixir-summarizer');
 const { resolveModelConfig } = require('./model-config');
+const { isNoSummary } = require('./locale');
 const {
   getDataDir,
   readJson,
@@ -50,7 +51,7 @@ function loadAlertSummaries() {
 
 function normalizeSummary(summary) {
   const text = String(summary || '').replace(/\s+/g, ' ').trim();
-  if (!text || text === '暂无摘要' || /^\[?来源\]?/.test(text)) return '';
+  if (!text || isNoSummary(text) || /^\[?来源\]?/.test(text)) return '';
   return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }
 

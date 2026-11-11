@@ -10,6 +10,8 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+const { writeCheckConfig } = require('./check-config');
+
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
   return index === -1 ? fallback : process.argv[index + 1];
@@ -31,7 +33,7 @@ snapshots.forEach(({ file, snapshot }, index) => {
   const step = index + 1;
   const dataDir = path.join(outDir, `step-${step}`, 'data');
   fs.mkdirSync(dataDir, { recursive: true });
-  fs.copyFileSync(path.join(fixturesDir, 'config.json'), path.join(dataDir, 'config.json'));
+  writeCheckConfig(fixturesDir, path.join(dataDir, 'config.json'));
   fs.copyFileSync(file, path.join(dataDir, 'snapshot-latest.json'));
   const previousState = path.join(outDir, `step-${step - 1}`, 'data', 'alerts-state.json');
   if (step > 1 && fs.existsSync(previousState)) {

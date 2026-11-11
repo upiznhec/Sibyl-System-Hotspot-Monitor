@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+// These tests use the v1.3.20 wording until they are rewritten for English sources.
+require('./lib/locale').configureLocale({ language: 'zh', timeZone: 'Asia/Shanghai' });
 
 const assert = require('assert');
 const os = require('os');

@@ -8,14 +8,20 @@ const {
   retrieveDouyinTopicEvidence
 } = require('./lib/douyin-topic');
 const { classifySignal } = require('./lib/category-classifier');
-const { formatHeat, normalizeForCompare } = require('./lib/signals');
+const { displayHeat, normalizeForCompare } = require('./lib/signals');
+const {
+  configureLocale,
+  isNoSummary,
+  localClock,
+  localDateKey,
+  text,
+  zoneName
+} = require('./lib/locale');
 const { callAIModel, summarizeContent } = require('../../elixir-summarizer/scripts/elixir-summarizer');
 const { resolveModelConfig } = require('./lib/model-config');
 const { defaultSeedPlatforms, getSource } = require('./lib/source-registry');
 const { alertTarget, sendMessage } = require('./lib/webhook');
 const {
-  beijingDateKey,
-  beijingTimeShort,
   getDataDir,
   loadLatestSnapshot,
   mergeConfig,
@@ -133,9 +139,10 @@ function dedupeKey(platform, title, dateKey) {
 function triggerType(signal, thresholds) {
   const hotTriggered = Number(signal.heat || 0) >= thresholds.hotMin;
   const rankTriggered = Number(signal.rank || 999) <= thresholds.rankMax;
-  if (hotTriggered && rankTriggered) return '热度&位次规则';
-  if (hotTriggered) return '热度规则';
-  if (rankTriggered) return '位次规则';
+  const rules = text().alert.rules;
+  if (hotTriggered && rankTriggered) return rules.both;
+  if (hotTriggered) return rules.heat;
+  if (rankTriggered) return rules.rank;
   return '';
 }
 
@@ -152,7 +159,7 @@ function detailLink(signal) {
 function normalizeSummary(summary) {
   const text = String(summary || '').replace(/\s+/g, ' ').trim();
   if (!text || /^\[商业广告\]/.test(text)) return '';
-  if (text === '暂无摘要') return '';
+  if (isNoSummary(text)) return '';
   return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }
 
@@ -194,7 +201,7 @@ async function buildAlertSummary(alert, context) {
   const cached = normalizeSummary(context.summaryCache[cacheKey]?.summary);
   if (cached) return { summary: cached };
 
-  if (!context.enableSummaries) return { summary: '暂无摘要' };
+  if (!context.enableSummaries) return { summary: text().noSummary };
 
   if (signal.platform === 'douyin') {
     const douyinOptions = context.config.alerts?.douyinTopic || {};
@@ -242,7 +249,7 @@ async function buildAlertSummary(alert, context) {
     return { summary: aiSearchSummary };
   }
 
-  return { summary: '暂无摘要' };
+  return { summary: text().noSummary };
 }
 
 async function enrichAlertsWithSummaries(alerts, config, args, snapshotSignals = []) {
@@ -268,7 +275,7 @@ async function enrichAlertsWithSummaries(alerts, config, args, snapshotSignals =
     }
     enriched.push({
       ...alert,
-      summary: result.summary || '暂无摘要'
+      summary: result.summary || text().noSummary
     });
   }
 
@@ -278,17 +285,18 @@ async function enrichAlertsWithSummaries(alerts, config, args, snapshotSignals =
 
 function buildMessage(alert, capturedAt) {
   const signal = alert.signal;
+  const wording = text().alert;
   const link = detailLink(signal);
   const lines = [
-    `🔥 ${platformLabel(signal)}高热度即时预警`,
+    wording.heading(platformLabel(signal)),
     '━━━━━━━━━━━━━━',
     signal.title,
-    `位次：#${signal.rank || '-'} ｜ 热度：${formatHeat(signal.heat)}`,
-    `摘要：${alert.summary || '暂无摘要'}`,
-    link ? `[查看详情](${link})` : '',
+    wording.rankHeat(signal.rank || '-', displayHeat(signal)),
+    wording.summary(alert.summary || text().noSummary),
+    link ? `[${wording.viewDetails}](${link})` : '',
     '━━━━━━━━━━━━━━',
-    `触发规则：${alert.triggerType}`,
-    `触发时间：${beijingTimeShort(capturedAt)}`
+    wording.trigger(alert.triggerType),
+    wording.time(localClock(capturedAt), zoneName(capturedAt))
   ].filter(Boolean);
   return lines.join('\n');
 }
@@ -296,7 +304,7 @@ function buildMessage(alert, capturedAt) {
 function selectAlerts(snapshot, config, state, platforms) {
   const allowedCategories = new Set(config.filters?.allowedCategories || ['游戏', '电竞', '体育', 'AI']);
   const platformSet = new Set(platforms);
-  const dateKey = beijingDateKey(snapshot.capturedAt);
+  const dateKey = localDateKey(snapshot.capturedAt);
   const alerts = [];
 
   for (const signal of snapshotToSignals(snapshot)) {
@@ -338,6 +346,7 @@ async function loadSnapshotForAlerts(config, args) {
 async function main() {
   const args = process.argv.slice(2);
   const config = loadConfig();
+  configureLocale(config);
   if (config.alerts?.enabled === false) {
     console.log('Sibyl 即时预警已在配置中关闭');
     return;

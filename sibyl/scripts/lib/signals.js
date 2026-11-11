@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 
+const { text } = require('./locale');
+
 function decodeHtml(text = '') {
   return String(text)
     .replace(/&nbsp;/g, ' ')
@@ -42,22 +44,26 @@ function parseNumber(value) {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   const text = String(value).replace(/,/g, '').trim();
-  const matched = text.match(/([\d.]+)\s*(亿|万|w|W)?/);
+  // 万/亿 as in v1.3.20; K, M and B as in "20K+" (Google Trends). A letter after the unit
+  // (as in "5 mins") means it is not a unit.
+  const matched = text.match(/([\d.]+)\s*(亿|万|w|W|[kKmMbB](?![a-zA-Z]))?/);
   if (!matched) return 0;
   const num = parseFloat(matched[1]);
   if (!Number.isFinite(num)) return 0;
   const unit = matched[2];
   if (unit === '亿') return Math.round(num * 100000000);
   if (unit === '万' || unit === 'w' || unit === 'W') return Math.round(num * 10000);
+  if (unit === 'k' || unit === 'K') return Math.round(num * 1000);
+  if (unit === 'm' || unit === 'M') return Math.round(num * 1000000);
+  if (unit === 'b' || unit === 'B') return Math.round(num * 1000000000);
   return Math.round(num);
 }
 
+// Heat in the configured language's units: "120万" (zh) or "1.2M" (en).
 function formatHeat(value) {
   const num = parseNumber(value);
   if (!num) return '0';
-  if (num >= 100000000) return `${(num / 100000000).toFixed(num >= 1000000000 ? 1 : 2).replace(/\.0+$/, '')}亿`;
-  if (num >= 10000) return `${(num / 10000).toFixed(num >= 100000 ? 0 : 1).replace(/\.0$/, '')}万`;
-  return String(num);
+  return text().formatHeat(num);
 }
 
 function stableHash(input, length = 12) {
@@ -67,6 +73,25 @@ function stableHash(input, length = 12) {
 function platformLabel(platform) {
   // Required here, not at the top: the registry loads adapters, which load this file.
   return require('./source-registry').sourceLabel(platform);
+}
+
+function heatUnit(platform) {
+  return require('./source-registry').getSource(platform)?.heatUnit || '';
+}
+
+// Heat as shown next to a rank: "120万" (zh), or "85M views" and "20K+ searches" (en).
+function displayHeat(signal) {
+  return text().displayHeat(signal, formatHeat, heatUnit(signal.platform));
+}
+
+// One source's rank and heat: "微博#3 120万" (zh) or "TikTok #2 85M views" (en).
+function formatSignalBrief(signal) {
+  return text().signalBrief({
+    label: signal.platformLabel,
+    board: signal.board,
+    rank: signal.rank,
+    heat: signal.heat ? displayHeat(signal) : ''
+  });
 }
 
 function makeSignal(input) {
@@ -107,6 +132,8 @@ module.exports = {
   normalizeForCompare,
   parseNumber,
   formatHeat,
+  displayHeat,
+  formatSignalBrief,
   stableHash,
   platformLabel,
   makeSignal,

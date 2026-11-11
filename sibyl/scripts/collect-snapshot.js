@@ -3,6 +3,7 @@
 const path = require('path');
 
 const { sourceFetchers } = require('./lib/source-registry');
+const { configureLocale } = require('./lib/locale');
 const {
   getDataDir,
   mergeConfig,
@@ -70,6 +71,7 @@ async function collectPlatform(name, fetcher, platformConfig) {
 async function collectSnapshot(options = {}) {
   const args = options.args || [];
   const config = options.config || loadConfig();
+  configureLocale(config);
   const onlyPlatforms = options.platforms || parsePlatforms(args);
   const platformSet = onlyPlatforms ? new Set(onlyPlatforms) : null;
   const platformFetchers = sourceFetchers(config.platforms, platformSet);

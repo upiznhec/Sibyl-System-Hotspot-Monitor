@@ -12,6 +12,8 @@ const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
+const { writeCheckConfig } = require('./check-config');
+
 function argValue(name, fallback) {
   const index = process.argv.indexOf(name);
   if (index === -1) return fallback;
@@ -22,7 +24,6 @@ const toolDir = __dirname;
 const codeRoot = path.resolve(argValue('--code', path.resolve(toolDir, '..', '..')));
 const outDir = path.resolve(argValue('--out', path.join(toolDir, 'out')));
 const fixturesDir = path.resolve(argValue('--fixtures', path.join(toolDir, 'fixtures')));
-const configFile = path.join(fixturesDir, 'config.json');
 const outputs = ['report-latest.md', 'clusters-latest.json', 'signals-latest.json', 'state.json'];
 
 function readJson(file) {
@@ -61,7 +62,7 @@ function main() {
     const dataDir = path.join(stepDir, 'data');
     fs.mkdirSync(dataDir, { recursive: true });
 
-    copyFile(configFile, path.join(dataDir, 'config.json'));
+    writeCheckConfig(fixturesDir, path.join(dataDir, 'config.json'));
     snapshots.slice(0, step).forEach(item => {
       copyFile(item.file, storedSnapshotPath(dataDir, item.snapshot.capturedAt));
     });

@@ -158,21 +158,7 @@ function snapshotToSignals(snapshot) {
   return (snapshot?.records || []).map(recordToSignal).filter(signal => signal.title);
 }
 
-function beijingDateKey(date = new Date()) {
-  const d = date instanceof Date ? date : new Date(date);
-  const beijing = new Date(d.getTime() + 8 * 60 * 60 * 1000);
-  return beijing.toISOString().slice(0, 10);
-}
-
-function beijingTimeShort(date = new Date()) {
-  const d = date instanceof Date ? date : new Date(date);
-  const beijing = new Date(d.getTime() + 8 * 60 * 60 * 1000);
-  return beijing.toISOString().slice(11, 16);
-}
-
 module.exports = {
-  beijingDateKey,
-  beijingTimeShort,
   ensureDir,
   getDataDir,
   latestSnapshotFile,

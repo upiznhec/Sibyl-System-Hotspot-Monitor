@@ -27,6 +27,7 @@ if (!originalOut || !originalAlerts) {
 const scratch = path.resolve(argValue('--work', path.join(tool, 'out-push')));
 const fixtures = path.join(tool, 'fixtures');
 const { toSlackMarkup } = require(path.join(repo, 'sibyl/scripts/lib/webhook'));
+const { checkConfig } = require('./check-config');
 
 const cleanEnv = { ...process.env };
 ['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK', 'SIBYL_AI_API_KEY', 'SIBYL_AI_MODEL', 'SIBYL_AI_BASE_URL']
@@ -37,7 +38,7 @@ const snap = fs.readdirSync(path.join(fixtures, 'snapshots')).filter(f => f.ends
   .map(file => ({ file, snapshot: JSON.parse(fs.readFileSync(file, 'utf8')) }))
   .sort((a, b) => Date.parse(a.snapshot.capturedAt) - Date.parse(b.snapshot.capturedAt))[0];
 const fakeNow = new Date(Date.parse(snap.snapshot.capturedAt) + 5 * 60000).toISOString();
-const baseConfig = JSON.parse(fs.readFileSync(path.join(fixtures, 'config.json'), 'utf8'));
+const baseConfig = checkConfig(fixtures);
 
 function startServer(reply) {
   return new Promise(resolve => {

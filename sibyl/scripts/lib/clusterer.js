@@ -1,4 +1,5 @@
-const { formatHeat, normalizeForCompare, stableHash } = require('./signals');
+const { formatSignalBrief, normalizeForCompare, stableHash } = require('./signals');
+const { text } = require('./locale');
 const {
   sourceLabel,
   sourceTypeBoost,
@@ -185,12 +186,7 @@ function summarizePlatforms(signals) {
   return signals
     .slice()
     .sort((a, b) => scoreSignal(b) - scoreSignal(a))
-    .map(signal => {
-      const rank = signal.rank ? `#${signal.rank}` : '未排名';
-      const heat = signal.heat ? ` ${formatHeat(signal.heat)}` : '';
-      const board = signal.board ? `${signal.platformLabel}/${signal.board}` : signal.platformLabel;
-      return `${board}${rank}${heat}`;
-    });
+    .map(formatSignalBrief);
 }
 
 function dominantCategory(signals) {
@@ -216,21 +212,16 @@ function statusFrom(prev, score, firstSeenAt) {
 }
 
 function statusLabel(status) {
-  return {
-    new: '新上榜',
-    rising: '热度上升',
-    holding: '持续在榜',
-    steady: '稳定观察',
-    cooling: '热度回落'
-  }[status] || status;
+  return text().statusLabels[status] || status;
 }
 
 function platformNames(platforms = []) {
-  return platforms.map(sourceLabel).join('、');
+  return platforms.map(sourceLabel).join(text().nameJoin);
 }
 
 function buildBroadcastReasons(cluster, prev) {
-  if (!prev) return ['首次进入播报候选'];
+  const wording = text().reasons;
+  if (!prev) return [wording.first];
 
   const reasons = [];
   const growthPercent = cluster.growthRate === null || cluster.growthRate === undefined
@@ -238,27 +229,27 @@ function buildBroadcastReasons(cluster, prev) {
     : Math.round(cluster.growthRate * 100);
 
   if (growthPercent >= 30) {
-    reasons.push(`综合分较上轮上升 ${growthPercent}%`);
+    reasons.push(wording.scoreUp(growthPercent));
   } else if (growthPercent <= -25) {
-    reasons.push(`综合分较上轮下降 ${Math.abs(growthPercent)}%`);
+    reasons.push(wording.scoreDown(Math.abs(growthPercent)));
   }
 
   const previousPlatforms = new Set(prev.platforms || []);
   const newPlatforms = cluster.platforms.filter(platform => !previousPlatforms.has(platform));
   if (newPlatforms.length > 0) {
-    reasons.push(`新增${platformNames(newPlatforms)}信号`);
+    reasons.push(wording.newSources(platformNames(newPlatforms)));
   }
 
   if (prev.bestRank && cluster.bestRank && cluster.bestRank < prev.bestRank) {
-    reasons.push(`最高排名从 #${prev.bestRank} 升至 #${cluster.bestRank}`);
+    reasons.push(wording.rankUp(prev.bestRank, cluster.bestRank));
   }
 
   if ((prev.platforms || []).length && cluster.platformCount > (prev.platforms || []).length) {
-    reasons.push(`覆盖平台从 ${(prev.platforms || []).length} 个增至 ${cluster.platformCount} 个`);
+    reasons.push(wording.moreSources((prev.platforms || []).length, cluster.platformCount));
   }
 
   if (reasons.length === 0) {
-    reasons.push('延续在榜，综合分和平台覆盖变化不大');
+    reasons.push(wording.unchanged);
   }
 
   return reasons;

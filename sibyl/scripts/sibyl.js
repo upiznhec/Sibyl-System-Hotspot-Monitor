@@ -5,6 +5,7 @@ const path = require('path');
 
 const { defaultSeedPlatforms, sourceFetchers } = require('./lib/source-registry');
 const { loadTopicSettings } = require('./lib/topic-settings');
+const { configureLocale, text } = require('./lib/locale');
 const { reportTarget, sendInParts } = require('./lib/webhook');
 const { clusterSignals, buildNextState } = require('./lib/clusterer');
 const { generateReport, selectReportClusters, hasBroadcastSeed } = require('./lib/report-generator');
@@ -281,12 +282,13 @@ async function maybePushReport(report, config, args) {
   const shouldPush = (pushEnabled || args.includes('--push')) && !args.includes('--no-push') && webhook;
   if (!shouldPush) return false;
 
-  return sendInParts(webhook, report, { channel, title: '热点综合播报' });
+  return sendInParts(webhook, report, { channel, title: text().report.pushTitle });
 }
 
 async function main() {
   const args = process.argv.slice(2);
   const config = loadConfig();
+  configureLocale(config);
   const previousState = readJson(STATE_FILE, {});
   const reportConfig = config.report || {};
   const seedPlatforms = reportConfig.seedPlatforms || defaultSeedPlatforms();

@@ -5,6 +5,7 @@ const { resolveModelConfig } = require('./model-config');
 const { rebuildClusterFromSignals } = require('./clusterer');
 const { getDataDir, readJson } = require('./snapshot-store');
 const { normalizeForCompare } = require('./signals');
+const { isNoSummary } = require('./locale');
 const { defaultSeedPlatforms } = require('./source-registry');
 
 const DEFAULT_CONFIG = {
@@ -78,7 +79,7 @@ function alertSummaryMap() {
   Object.values(cache || {}).forEach(item => {
     const title = normalizeForCompare(item?.title || '');
     const summary = String(item?.summary || '').replace(/\s+/g, ' ').trim();
-    if (title && summary && summary !== '暂无摘要') result.set(title, summary);
+    if (title && summary && !isNoSummary(summary)) result.set(title, summary);
   });
   return result;
 }
