@@ -66,6 +66,8 @@ const source = {
   showBoard: true,
   displayOrder: 6,
   defaultRole: 'community',
+  defaultEnabled: false,
+  defaultConfig: { feeds: [] },
   fetch: fetchRssSignals,
   link
 };

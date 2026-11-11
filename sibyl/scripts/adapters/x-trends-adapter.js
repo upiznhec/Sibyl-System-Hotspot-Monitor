@@ -66,6 +66,7 @@ const source = {
   alertSourceTypes: ['x_trend'],
   displayOrder: 2,
   defaultRole: 'seed',
+  defaultEnabled: false,
   fetch: fetchXTrendSignals,
   link,
   fallbackItemLink: searchUrl

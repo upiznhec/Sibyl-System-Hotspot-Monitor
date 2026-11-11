@@ -26,7 +26,8 @@ async function fetchTikTokSignals(config = {}, context = {}) {
       rank: item.rank,
       heat: parseNumber(item.views),
       url: /^https?:\/\//i.test(String(item.url || '')) ? item.url : tagUrl(item.title),
-      engagement: { posts: parseNumber(item.posts), views: parseNumber(item.views) }
+      engagement: { posts: parseNumber(item.posts), views: parseNumber(item.views) },
+      topicHint: section.topic
     }))
   ).filter(signal => signal.title);
 }
@@ -47,6 +48,7 @@ const source = {
   showBoard: false,
   displayOrder: 1,
   defaultRole: 'seed',
+  defaultEnabled: true,
   fetch: fetchTikTokSignals,
   link
 };

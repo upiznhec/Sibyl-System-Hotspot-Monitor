@@ -44,7 +44,8 @@ function classifySignal(signal, settings = defaultTopicSettings()) {
     categoryMatches[category.name] = matchKeywords(title, category.keywords);
   }
 
-  const hintedCategory = boardCategory(signal.board || '', settings);
+  const topicHint = settings.categoryNames.includes(signal.topicHint) ? signal.topicHint : null;
+  const hintedCategory = boardCategory(signal.board || '', settings) || topicHint;
   const category = chooseCategory(categoryMatches, hintedCategory, settings.priority);
   if (!category) {
     return {

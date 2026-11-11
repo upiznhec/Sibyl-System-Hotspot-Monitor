@@ -1,0 +1,50 @@
+{
+  "pages": [
+    {
+      "source": "tiktok-creative-center",
+      "region": "US",
+      "industry": "Beauty & Personal Care",
+      "period": "7 days",
+      "topic": "Beauty",
+      "readAt": "__READ_AT__",
+      "items": [
+        { "rank": 1, "title": "#grwm", "posts": 43700, "views": 325300000 },
+        { "rank": 2, "title": "sunscreenrecall", "posts": 15500, "views": 73100000 }
+      ]
+    },
+    {
+      "source": "google-trends",
+      "view": "trending",
+      "region": "US",
+      "category": "Beauty and Fashion",
+      "period": "24 hours",
+      "topic": "Beauty",
+      "readAt": "__READ_AT__",
+      "items": [
+        { "rank": 1, "title": "example designer collection", "searchVolume": "2K+", "rise": "200%" },
+        { "rank": 2, "title": "mineral sunscreen recall", "searchVolume": "20K+", "rise": "1,000%",
+          "news": [ { "title": "Brand A recalls mineral sunscreen", "url": "https://news.example.test/brand-a-recall", "source": "Example News" } ] }
+      ]
+    },
+    {
+      "source": "google-trends",
+      "view": "explore",
+      "region": "US",
+      "period": "7 days",
+      "keyword": "sunscreen",
+      "topic": "Beauty",
+      "readAt": "__READ_AT__",
+      "items": [
+        { "rank": 1, "kind": "query", "title": "live tinted sunscreen", "rise": "+50%" },
+        { "rank": 1, "kind": "topic", "title": "Reef Safe - Topic", "rise": "Breakout" }
+      ]
+    },
+    {
+      "source": "tiktok-creative-center",
+      "region": "US",
+      "readAt": "2020-01-01T00:00:00Z",
+      "items": [ { "rank": 1, "title": "#tooold", "views": 1 } ]
+    },
+    { "items": [] }
+  ]
+}

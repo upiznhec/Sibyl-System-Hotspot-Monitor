@@ -19,7 +19,14 @@ const {
 } = require('./lib/locale');
 const { callAIModel, summarizeContent } = require('../../elixir-summarizer/scripts/elixir-summarizer');
 const { resolveModelConfig } = require('./lib/model-config');
-const { defaultSeedPlatforms, getSource } = require('./lib/source-registry');
+const {
+  alertSourceTypes,
+  defaultPlatformsConfig,
+  defaultSeedPlatforms,
+  getSource
+} = require('./lib/source-registry');
+const { loadTopicSettings } = require('./lib/topic-settings');
+const { evidenceItems, evidenceText } = require('./lib/news-evidence');
 const { alertTarget, sendMessage } = require('./lib/webhook');
 const { saveAlert } = require('./lib/briefing-archive');
 const {
@@ -32,9 +39,7 @@ const {
 } = require('./lib/snapshot-store');
 
 const DEFAULT_CONFIG = {
-  filters: {
-    allowedCategories: ['游戏', '电竞', '体育', 'AI']
-  },
+  // filters.allowedCategories: by default every topic in the topic settings.
   snapshot: {
     maxAgeMinutes: 20
   },
@@ -56,7 +61,19 @@ const DEFAULT_CONFIG = {
       enabled: false,
       maxChars: 110
     },
+    // Thresholds per main source: an item alerts when its rank is within rankMax or its heat
+    // reaches hotMin. The Google Trends and X values are first guesses, to be set in calibration.
     platforms: {
+      'google-trends': {
+        enabled: true,
+        rankMax: 3,
+        hotMin: 20000
+      },
+      'x-trends': {
+        enabled: true,
+        rankMax: 5,
+        hotMin: 50000
+      },
       weibo: {
         enabled: true,
         rankMax: 10,
@@ -127,9 +144,15 @@ function saveSummaryCache(cache) {
   writeJsonAtomic(summaryFile(), cache);
 }
 
-function parsePlatforms(args) {
+// Alerts come from the main sources: as set in report.seedPlatforms, or those switched on.
+function parsePlatforms(args, config = {}) {
   const platformArg = args.find(arg => arg.startsWith('--platform='));
-  if (!platformArg) return defaultSeedPlatforms();
+  const seeds = config.report?.seedPlatforms;
+  if (!platformArg) {
+    return Array.isArray(seeds) && seeds.length
+      ? seeds
+      : defaultSeedPlatforms(config.platforms || defaultPlatformsConfig());
+  }
   return platformArg.replace('--platform=', '').split(',').map(item => item.trim()).filter(Boolean);
 }
 
@@ -238,6 +261,30 @@ async function buildAlertSummary(alert, context) {
     }
   }
 
+  // News links saved with the item (Google Trends gives up to 3 per search).
+  const news = evidenceItems([signal]);
+  if (news.length) {
+    const elixirResult = await summarizeContent(evidenceText(news), signal.title, context.modelConfig);
+    if (elixirResult.isCommercial) {
+      return {
+        filtered: true,
+        reason: elixirResult.reason || 'Elixir判定为商业推广或非目标内容'
+      };
+    }
+    const summary = normalizeSummary(elixirResult.summary);
+    if (summary) {
+      context.summaryCache[cacheKey] = {
+        platform: signal.platform,
+        title: signal.title,
+        summary,
+        source: 'news-links-elixir',
+        sources: news.map(item => ({ title: item.title, url: item.url, source: item.source || '' })),
+        updatedAt: new Date().toISOString()
+      };
+      return { summary };
+    }
+  }
+
   const aiSearchSummary = await generateAISearchSummary(signal, context);
   if (aiSearchSummary) {
     context.summaryCache[cacheKey] = {
@@ -302,21 +349,24 @@ function buildMessage(alert, capturedAt) {
   return lines.join('\n');
 }
 
-function selectAlerts(snapshot, config, state, platforms) {
-  const allowedCategories = new Set(config.filters?.allowedCategories || ['游戏', '电竞', '体育', 'AI']);
+function selectAlerts(snapshot, config, state, platforms, topicSettings = loadTopicSettings(config)) {
+  const allowedCategories = new Set(config.filters?.allowedCategories || topicSettings.categoryNames);
   const platformSet = new Set(platforms);
   const dateKey = localDateKey(snapshot.capturedAt);
   const alerts = [];
 
   for (const signal of snapshotToSignals(snapshot)) {
     if (!platformSet.has(signal.platform)) continue;
+    // Lists read once a day by the agent (pages.json) do not raise instant alerts.
+    const alertTypes = alertSourceTypes(signal.platform);
+    if (alertTypes && !alertTypes.includes(signal.sourceType)) continue;
     const platformConfig = config.alerts?.platforms?.[signal.platform];
     if (!platformConfig || platformConfig.enabled === false) continue;
 
     const currentTriggerType = triggerType(signal, platformConfig);
     if (!currentTriggerType) continue;
 
-    const classification = classifySignal(signal);
+    const classification = classifySignal(signal, topicSettings);
     if (!classification.category || !allowedCategories.has(classification.category)) continue;
 
     const key = dedupeKey(signal.platform, signal.title, dateKey);
@@ -352,7 +402,9 @@ async function main() {
     console.log('Sibyl 即时预警已在配置中关闭');
     return;
   }
-  const platforms = parsePlatforms(args);
+  const platforms = parsePlatforms(args, config);
+  const configFile = process.env.SIBYL_CONFIG || path.join(getDataDir(), 'config.json');
+  const topicSettings = loadTopicSettings(config, configFile);
   const snapshot = await loadSnapshotForAlerts(config, args);
 
   if (!snapshot) {
@@ -360,7 +412,7 @@ async function main() {
   }
 
   const state = loadState();
-  const selectedAlerts = selectAlerts(snapshot, config, state, platforms);
+  const selectedAlerts = selectAlerts(snapshot, config, state, platforms, topicSettings);
   const alerts = await enrichAlertsWithSummaries(
     selectedAlerts,
     config,

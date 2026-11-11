@@ -4,6 +4,9 @@
 //   have no effect on it. Instant alerts come from this list.
 // - The Trending Now page for the chosen categories. There is no feed for categories, so the
 //   user's agent reads the page once a day into pages.json (see lib/pages-file.js).
+// - Explore, rising related searches for the user's own keywords, also read by the agent once
+//   a day. It covers narrow topics that seldom reach Trending Now. Classic Explore works without
+//   login; Google says it is expiring, and the new Explore asks the user to sign in.
 
 const { requestText } = require('../lib/http');
 const { blocks, parseFeed, tagText } = require('../lib/feed');
@@ -60,8 +63,38 @@ function rssSignals(xml, geo, maxItems = 25) {
   }).filter(signal => signal.title);
 }
 
+// "+350%" → 350; "Breakout" (Google: more than +5000%) → 5000.
+function riseValue(rise) {
+  const text = String(rise ?? '').trim();
+  if (/breakout/i.test(text)) return { heat: 5000, text: 'Breakout' };
+  const percent = parseNumber(text.replace(/[+%]/g, ''));
+  return { heat: percent, text: percent ? `+${percent}%` : '' };
+}
+
+function exploreSignals(section, geo) {
+  const keyword = String(section.keyword || '').trim();
+  return section.items.map(item => {
+    const rise = riseValue(item.rise);
+    // Topics show as "Reef Safe - Topic" on the page; keep the name.
+    const title = item.kind === 'topic' ? item.title.replace(/\s+-\s+[^-]+$/, '') : item.title;
+    return makeSignal({
+      platform: 'google-trends',
+      sourceType: 'explore_rising',
+      board: keyword || null,
+      title,
+      rank: item.rank,
+      heat: rise.heat,
+      heatText: rise.text ? `${rise.text} rising with "${keyword || 'your keyword'}"` : undefined,
+      url: exploreUrl(title, section.region || geo),
+      topicHint: section.topic
+    });
+  });
+}
+
 function pageSignals(pages, geo) {
-  return sectionsFor(pages, 'google-trends').flatMap(section => section.items.map(item => {
+  return sectionsFor(pages, 'google-trends').flatMap(section => (section.view === 'explore'
+    ? exploreSignals(section, geo)
+    : section.items.map(item => {
     const volume = item.searchVolume ?? item.volume ?? '';
     return makeSignal({
       platform: 'google-trends',
@@ -72,9 +105,10 @@ function pageSignals(pages, geo) {
       heat: parseNumber(volume),
       heatText: volume ? String(volume) : undefined,
       url: isWebUrl(item.url) ? item.url : exploreUrl(item.title, section.region || geo),
-      evidence: newsFromPage(item.news)
+      evidence: newsFromPage(item.news),
+      topicHint: section.topic
     });
-  })).filter(signal => signal.title);
+  }))).filter(signal => signal.title);
 }
 
 async function fetchGoogleTrendsSignals(config = {}, context = {}) {
@@ -104,13 +138,17 @@ const source = {
   label: 'Google Trends',
   access: 'script (RSS), agent-page (category page)',
   weight: 1.0,
-  sourceTypeWeights: { trending_rss: 1.0, trending_page: 0.95 },
+  sourceTypeWeights: { trending_rss: 1.0, trending_page: 0.95, explore_rising: 0.85 },
   heatUnit: 'searches',
   heatReference: 500000,
+  // Explore items count a rise in percent, not searches: "Breakout" (5000) reaches the cap.
+  heatUnits: { explore_rising: '' },
+  heatReferences: { explore_rising: 5000 },
   showBoard: false,
   alertSourceTypes: ['trending_rss'],
   displayOrder: 0,
   defaultRole: 'seed',
+  defaultEnabled: true,
   fetch: fetchGoogleTrendsSignals,
   link
 };
@@ -119,6 +157,7 @@ module.exports = {
   exploreUrl,
   fetchGoogleTrendsSignals,
   pageSignals,
+  riseValue,
   rssSignals,
   source
 };

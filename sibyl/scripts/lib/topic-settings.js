@@ -32,7 +32,8 @@ function compileTopicSettings(raw, baseDir) {
   const keywordsFile = raw.keywordsFile ? path.resolve(baseDir, raw.keywordsFile) : null;
   const keywordGroups = loadKeywordGroups(keywordsFile);
 
-  const categories = (raw.categories || []).map(category => {
+  // "topics" is the format the agent writes: [{ name, icon, keywords }]. "categories" is v1.3.20's.
+  const categories = (raw.categories || raw.topics || []).map(category => {
     const keywords = [
       ...(category.groups || []).flatMap(name => keywordGroups[name] || []),
       ...(category.keywords || [])
@@ -94,6 +95,7 @@ function loadTopicSettings(config = {}, configFile = null) {
   const topics = config.topics;
   if (!topics) return defaultTopicSettings();
   if (typeof topics === 'string') return loadPreset(topics);
+  if (Array.isArray(topics)) return compileTopicSettings({ topics }, configFile ? path.dirname(configFile) : process.cwd());
   const baseDir = configFile ? path.dirname(configFile) : process.cwd();
   return compileTopicSettings(topics, baseDir);
 }

@@ -84,6 +84,7 @@ const source = {
   showBoard: false,
   displayOrder: 4,
   defaultRole: 'support',
+  defaultEnabled: true,
   fetch: fetchWikipediaSignals,
   link
 };

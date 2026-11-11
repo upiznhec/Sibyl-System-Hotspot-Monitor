@@ -43,7 +43,7 @@ function scoreSignal(signal) {
   const rankScore = Math.max(0, 36 - Math.min(rank, 35)) * 1.25;
   // v1.3.20 reaches the 36-point cap near 1,000,000 heat (Weibo, Douyin). Other sources count
   // in other units, so their adapter says which heat should reach the cap.
-  const heatReference = sourceHeatReference(signal.platform);
+  const heatReference = sourceHeatReference(signal.platform, signal.sourceType);
   const heatScore = heatReference
     ? Math.min(36, Math.log10((signal.heat || 0) + 10) * (36 / Math.log10(heatReference + 10)))
     : Math.min(36, Math.log10((signal.heat || 0) + 10) * 6);

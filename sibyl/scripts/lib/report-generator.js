@@ -159,7 +159,12 @@ function buildTrendSummary(cluster) {
       parts.push(wording.peak({
         source: trend.peakPlatformLabel || wording.mainSource,
         rank: trend.peakRank,
-        heat: displayHeat({ platform: trend.peakPlatform, heat: trend.peakHeat, heatText: '' }),
+        heat: displayHeat({
+          platform: trend.peakPlatform,
+          sourceType: trend.peakPlatform === cluster.mainSignal?.platform ? cluster.mainSignal.sourceType : undefined,
+          heat: trend.peakHeat,
+          heatText: ''
+        }),
         time: trend.peakAt ? formatClock(trend.peakAt) : ''
       }));
     }
@@ -211,7 +216,9 @@ function platformSearchLink(cluster, platform, directLabel, fallbackLabel, urlBu
 }
 
 // Each source builds its own link, or returns '' to show none; the helpers give it the shared lookup rules.
-function detailLinks(cluster, settings) {
+// Only sources that are switched on add links (v1.3.20's Weibo, Douyin and Hupu links appear on
+// every item, so a source that is off must not add them).
+function detailLinks(cluster, settings, enabledPlatforms = null) {
   const helpers = {
     bestSignalForPlatform,
     fallbackTopicTerm: item => fallbackTopicTerm(item, settings),
@@ -219,6 +226,7 @@ function detailLinks(cluster, settings) {
       platformSearchLink(item, platform, directLabel, fallbackLabel, urlBuilder, settings)
   };
   return linkSources()
+    .filter(source => !enabledPlatforms || enabledPlatforms.has(source.id))
     .map(source => source.link(cluster, helpers))
     .filter(Boolean)
     .join(text().pipe);
@@ -279,7 +287,7 @@ function renderCluster(cluster, index, context) {
   lines.push('');
   lines.push(wording.summaryLine(cluster.eventSummary));
   lines.push('');
-  lines.push(detailLinks(cluster, context.settings));
+  lines.push(detailLinks(cluster, context.settings, context.enabledPlatforms));
   lines.push('');
   lines.push('---');
   lines.push('');
@@ -293,7 +301,8 @@ function generateReport(clusters, meta = {}, config = {}) {
   const selected = selectReportClusters(clusters, config);
   const context = {
     settings: meta.topicSettings || defaultTopicSettings(),
-    seedSet: new Set(seedPlatforms(config))
+    seedSet: new Set(seedPlatforms(config)),
+    enabledPlatforms: Array.isArray(meta.enabledPlatforms) ? new Set(meta.enabledPlatforms) : null
   };
 
   const wording = text().report;

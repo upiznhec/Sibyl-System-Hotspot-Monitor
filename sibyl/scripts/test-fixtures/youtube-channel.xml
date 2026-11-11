@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+ <title>Example Skincare</title>
+ <entry>
+  <title>My new sunscreen routine</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=aaaaaaaaaaa"/>
+  <author><name>Example Skincare</name></author>
+  <published>__RECENT_1__</published>
+  <media:group>
+   <media:description>Testing three sunscreens.</media:description>
+   <media:community><media:statistics views="12000"/></media:community>
+  </media:group>
+ </entry>
+ <entry>
+  <title>Sunscreen recall: what to do</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=bbbbbbbbbbb"/>
+  <author><name>Example Skincare</name></author>
+  <published>__RECENT_2__</published>
+  <media:group>
+   <media:description></media:description>
+   <media:community><media:statistics views="250000"/></media:community>
+  </media:group>
+ </entry>
+ <entry>
+  <title>Old video</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=ccccccccccc"/>
+  <author><name>Example Skincare</name></author>
+  <published>2020-01-01T00:00:00+00:00</published>
+  <media:group><media:community><media:statistics views="999999"/></media:community></media:group>
+ </entry>
+</feed>

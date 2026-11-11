@@ -75,8 +75,9 @@ function platformLabel(platform) {
   return require('./source-registry').sourceLabel(platform);
 }
 
-function heatUnit(platform) {
-  return require('./source-registry').getSource(platform)?.heatUnit || '';
+function heatUnit(platform, sourceType) {
+  const source = require('./source-registry').getSource(platform);
+  return source?.heatUnits?.[sourceType] ?? source?.heatUnit ?? '';
 }
 
 function showsBoard(platform) {
@@ -85,7 +86,7 @@ function showsBoard(platform) {
 
 // Heat as shown next to a rank: "120万" (zh), or "85M views" and "20K+ searches" (en).
 function displayHeat(signal) {
-  return text().displayHeat(signal, formatHeat, heatUnit(signal.platform));
+  return text().displayHeat(signal, formatHeat, heatUnit(signal.platform, signal.sourceType));
 }
 
 // One source's rank and heat: "微博#3 120万" (zh) or "TikTok #2 85M views" (en).
@@ -118,7 +119,9 @@ function makeSignal(input) {
     capturedAt: input.capturedAt || new Date().toISOString(),
     matchedKeywords: input.matchedKeywords || [],
     // News links for summaries (Google Trends, feeds); absent for sources without them.
-    ...(Array.isArray(input.evidence) && input.evidence.length ? { evidence: input.evidence } : {})
+    ...(Array.isArray(input.evidence) && input.evidence.length ? { evidence: input.evidence } : {}),
+    // The user's topic a saved page was read for (pages.json "topic").
+    ...(input.topicHint ? { topicHint: String(input.topicHint) } : {})
   };
 }
 

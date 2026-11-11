@@ -2,8 +2,11 @@
 
 const path = require('path');
 
-const { sourceFetchers } = require('./lib/source-registry');
+const { defaultPlatformsConfig, sourceFetchers } = require('./lib/source-registry');
 const { configureLocale } = require('./lib/locale');
+const { configureHttp } = require('./lib/http');
+const { loadPages } = require('./lib/pages-file');
+const { loadTopicSettings } = require('./lib/topic-settings');
 const {
   getDataDir,
   mergeConfig,
@@ -12,25 +15,9 @@ const {
 } = require('./lib/snapshot-store');
 
 const DEFAULT_CONFIG = {
-  platforms: {
-    weibo: { enabled: true, maxItems: 50 },
-    douyin: { enabled: true, maxItems: 50 },
-    tieba: {
-      enabled: true,
-      maxItems: 50,
-      hotTopicUrl: 'https://tieba.baidu.com/hottopic/browse/topicList?res_type=1'
-    },
-    hupu: {
-      enabled: true,
-      maxItems: 80,
-      boards: [
-        { board: '步行街', url: 'https://bbs.hupu.com/all-gambia', maxItems: 25 },
-        { board: '英雄联盟', url: 'https://bbs.hupu.com/lol', maxItems: 25 },
-        { board: 'NBA', url: 'https://bbs.hupu.com/nba', maxItems: 25 },
-        { board: '国际足球', url: 'https://bbs.hupu.com/soccer', maxItems: 25 }
-      ]
-    }
-  },
+  // Google Trends, TikTok and Wikipedia are on; sources that need channels, feeds or a key are
+  // off until set up. See each adapter in adapters/.
+  platforms: defaultPlatformsConfig(),
   snapshot: {
     maxAgeMinutes: 20,
     trendWindowMinutes: 70
@@ -49,13 +36,35 @@ function parsePlatforms(args) {
   return platformArg.replace('--platform=', '').split(',').map(item => item.trim()).filter(Boolean);
 }
 
-async function collectPlatform(name, fetcher, platformConfig) {
+// What adapters may need besides their own settings: the country, the data folder, the pages
+// the agent saved (pages.json) and the user's topics.
+function collectContext(config) {
+  const dataDir = getDataDir();
+  const configFile = process.env.SIBYL_CONFIG || path.join(dataDir, 'config.json');
+  return {
+    config,
+    dataDir,
+    pages: loadPages(config, dataDir),
+    topicSettings: loadTopicSettings(config, configFile)
+  };
+}
+
+function logPages(pages, platformsConfig = {}) {
+  const usesPages = ['google-trends', 'tiktok-creative-center'].some(id => platformsConfig[id]?.enabled);
+  if (!usesPages) return;
+  pages.sections.forEach(section => {
+    console.log(`   pages.json: ${section.source}${section.view ? `/${section.view}` : ''} read ${section.ageHours} h ago, ${section.items.length} items`);
+  });
+  pages.problems.forEach(problem => console.warn(`⚠️ pages.json: ${problem}`));
+}
+
+async function collectPlatform(name, fetcher, platformConfig, context = {}) {
   if (!platformConfig || platformConfig.enabled === false) {
     return { name, signals: [], skipped: true };
   }
 
   try {
-    const signals = await fetcher(platformConfig);
+    const signals = await fetcher(platformConfig, context);
     return { name, signals, skipped: false };
   } catch (error) {
     const partialSignals = Array.isArray(error.partialSignals) ? error.partialSignals : [];
@@ -72,13 +81,16 @@ async function collectSnapshot(options = {}) {
   const args = options.args || [];
   const config = options.config || loadConfig();
   configureLocale(config);
+  configureHttp(config.http || {});
+  const context = collectContext(config);
   const onlyPlatforms = options.platforms || parsePlatforms(args);
   const platformSet = onlyPlatforms ? new Set(onlyPlatforms) : null;
   const platformFetchers = sourceFetchers(config.platforms, platformSet);
 
   console.log('开始采集 Sibyl 统一快照...');
+  logPages(context.pages, config.platforms);
   const results = await Promise.all(platformFetchers.map(([name, fetcher, platformConfig]) =>
-    collectPlatform(name, fetcher, platformConfig)
+    collectPlatform(name, fetcher, platformConfig, context)
   ));
 
   const errors = results
@@ -110,5 +122,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  collectContext,
+  collectPlatform,
   collectSnapshot
 };

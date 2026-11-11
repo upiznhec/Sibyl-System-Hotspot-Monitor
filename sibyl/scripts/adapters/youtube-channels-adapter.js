@@ -73,6 +73,8 @@ const source = {
   showBoard: true,
   displayOrder: 5,
   defaultRole: 'community',
+  defaultEnabled: false,
+  defaultConfig: { channels: [] },
   fetch: fetchYouTubeChannelSignals,
   link
 };

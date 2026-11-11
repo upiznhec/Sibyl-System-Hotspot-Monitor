@@ -112,6 +112,7 @@ const source = {
   showBoard: false,
   displayOrder: 3,
   defaultRole: 'support',
+  defaultEnabled: false,
   fetch: fetchYouTubeSearchSignals,
   link
 };

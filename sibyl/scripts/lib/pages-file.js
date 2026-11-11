@@ -1,11 +1,25 @@
-// Lists that only a browser can read (TikTok Creative Center, Google Trends category pages) are
-// read by the user's agent once a day and saved as pages.json in the data folder. This file
-// reads them for the adapters. Format, one section per page read:
+// Lists that only a browser can read are read by the user's agent once a day and saved as
+// pages.json in the data folder. This file reads them for the adapters. One section per page:
 //
-// { "pages": [ { "source": "tiktok-creative-center", "region": "US",
-//                "industry": "Beauty & Personal Care", "period": "7 days",
-//                "readAt": "2026-11-10T09:00:00-08:00", "url": "https://…",
-//                "items": [ { "rank": 1, "title": "#sunscreen", "posts": 4100, "views": 85000000 } ] } ] }
+// TikTok Creative Center hashtags (top 3 without login; more after the user logs in):
+//   { "source": "tiktok-creative-center", "region": "US", "industry": "Beauty & Personal Care",
+//     "period": "7 days", "readAt": "2026-11-10T09:00:00-08:00", "url": "https://…",
+//     "items": [ { "rank": 1, "title": "#sunscreen", "posts": 4100, "views": 85000000 } ] }
+// Google Trends, Trending Now filtered by category (wait until the row count matches the
+// category before reading; the unfiltered list shows first):
+//   { "source": "google-trends", "view": "trending", "region": "US", "category": "Beauty and Fashion",
+//     "period": "24 hours", "readAt": "…", "url": "https://…",
+//     "items": [ { "rank": 1, "title": "tommy hilfiger", "searchVolume": "2K+", "rise": "200%",
+//                  "news": [ { "title": "…", "url": "https://…", "source": "…" } ] } ] }
+// Google Trends Explore, rising related searches for one of the user's keywords:
+//   { "source": "google-trends", "view": "explore", "region": "US", "period": "7 days",
+//     "keyword": "sunscreen", "readAt": "…", "url": "https://…",
+//     "items": [ { "rank": 1, "kind": "query", "title": "live tinted sunscreen", "rise": "+50%" },
+//                { "rank": 1, "kind": "topic", "title": "Reef Safe", "rise": "+350%" } ] }
+//
+// Any section may add "topic": the name of the user's topic it was read for (for example the
+// Beauty & Personal Care list read for "Sunscreen"). Items that match no keyword then still
+// count for that topic.
 //
 // A bare array of sections also works. When the agent has not read the pages again, the last
 // file is used and its age is logged; sections older than maxAgeHours are skipped.

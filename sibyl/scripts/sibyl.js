@@ -3,7 +3,9 @@
 const fs = require('fs');
 const path = require('path');
 
-const { defaultSeedPlatforms, sourceFetchers } = require('./lib/source-registry');
+const { defaultPlatformsConfig, defaultSeedPlatforms, sourceFetchers } = require('./lib/source-registry');
+const { configureHttp } = require('./lib/http');
+const { collectContext, collectPlatform } = require('./collect-snapshot');
 const { loadTopicSettings } = require('./lib/topic-settings');
 const { configureLocale, text } = require('./lib/locale');
 const { reportTarget, sendInParts } = require('./lib/webhook');
@@ -25,24 +27,10 @@ const {
 } = require('./lib/snapshot-store');
 
 const DEFAULT_CONFIG = {
-  platforms: {
-    weibo: { enabled: true, maxItems: 50 },
-    douyin: { enabled: true, maxItems: 50 },
-    tieba: { enabled: true, maxItems: 50 },
-    hupu: {
-      enabled: true,
-      maxItems: 80,
-      boards: [
-        { board: '步行街', url: 'https://bbs.hupu.com/all-gambia', maxItems: 25 },
-        { board: '英雄联盟', url: 'https://bbs.hupu.com/lol', maxItems: 25 },
-        { board: 'NBA', url: 'https://bbs.hupu.com/nba', maxItems: 25 },
-        { board: '国际足球', url: 'https://bbs.hupu.com/soccer', maxItems: 25 }
-      ]
-    }
-  },
+  platforms: defaultPlatformsConfig(),
+  // allowedCategories: by default every topic in the topic settings.
   filters: {
-    allowedCategories: ['游戏', '电竞', '体育', 'AI'],
-    minTitleLength: 4
+    minTitleLength: 3
   },
   cluster: {
     similarityThreshold: 0.42
@@ -72,7 +60,6 @@ const DEFAULT_CONFIG = {
     topN: 10,
     minScore: 20,
     requireSeedPlatforms: true,
-    seedPlatforms: defaultSeedPlatforms(),
     push: false,
     channel: '',
     webhook: ''
@@ -142,32 +129,13 @@ function enrichSignals(signals, topicSettings) {
   });
 }
 
-function filterSignals(signals, config) {
+function filterSignals(signals, config, topicSettings) {
   const filters = config.filters || {};
-  const allowedCategories = filters.allowedCategories || ['游戏', '电竞', '体育', 'AI'];
+  const allowedCategories = filters.allowedCategories || topicSettings.categoryNames;
   return signals.filter(signal => {
     if (!signal.title || signal.title.length < (filters.minTitleLength || 4)) return false;
     return signal.category && allowedCategories.includes(signal.category);
   });
-}
-
-async function collectPlatform(name, fetcher, platformConfig) {
-  if (!platformConfig || platformConfig.enabled === false) {
-    return { name, signals: [], skipped: true };
-  }
-
-  try {
-    const signals = await fetcher(platformConfig);
-    return { name, signals, skipped: false };
-  } catch (error) {
-    const partialSignals = Array.isArray(error.partialSignals) ? error.partialSignals : [];
-    return {
-      name,
-      signals: partialSignals,
-      skipped: false,
-      error: error.message
-    };
-  }
 }
 
 function compactSignal(signal) {
@@ -290,9 +258,14 @@ async function main() {
   const args = process.argv.slice(2);
   const config = loadConfig();
   configureLocale(config);
+  configureHttp(config.http || {});
   const previousState = readJson(STATE_FILE, {});
   const reportConfig = config.report || {};
-  const seedPlatforms = reportConfig.seedPlatforms || defaultSeedPlatforms();
+  // Main sources: as set, or the main sources that are switched on.
+  if (!Array.isArray(reportConfig.seedPlatforms) || !reportConfig.seedPlatforms.length) {
+    reportConfig.seedPlatforms = defaultSeedPlatforms(config.platforms);
+  }
+  const seedPlatforms = reportConfig.seedPlatforms;
   const topicSettings = loadTopicSettings(config, CONFIG_FILE);
 
   const platformFetchers = sourceFetchers(config.platforms);
@@ -315,8 +288,9 @@ async function main() {
     console.log(`使用 Sibyl 最新快照生成播报: ${latestSnapshot.capturedAt}`);
   } else {
     console.log('开始采集多平台热点信号...');
+    const context = collectContext(config);
     const results = await Promise.all(platformFetchers.map(([name, fetcher, platformConfig]) =>
-      collectPlatform(name, fetcher, platformConfig)
+      collectPlatform(name, fetcher, platformConfig, context)
     ));
 
     errors = results.filter(result => result.error);
@@ -324,7 +298,7 @@ async function main() {
     platformNames = results.filter(result => !result.skipped).map(result => result.name);
   }
 
-  const signals = filterSignals(enrichSignals(rawSignals, topicSettings), config);
+  const signals = filterSignals(enrichSignals(rawSignals, topicSettings), config, topicSettings);
   let clusters = clusterSignals(signals, previousState, config.cluster || {});
   const eventMergeEnabled = !args.includes('--no-ai') &&
     !args.includes('--no-event-merge') &&
@@ -387,7 +361,8 @@ async function main() {
     rawSignalCount: rawSignals.length,
     signalCount: signals.length,
     source,
-    topicSettings
+    topicSettings,
+    enabledPlatforms: Object.keys(config.platforms || {}).filter(id => config.platforms[id]?.enabled !== false)
   }, reportConfig);
 
   ensureDir(DATA_DIR);

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<rss xmlns:atom="http://www.w3.org/2005/Atom" xmlns:ht="https://trends.google.com/trending/rss" version="2.0">
+	<channel>
+		<title>Daily Search Trends</title>
+		<description>Recent searches</description>
+		<link>https://trends.google.com/trending/rss?geo=US</link>
+		<item>
+			<title>mineral sunscreen recall</title>
+			<ht:approx_traffic>20K+</ht:approx_traffic>
+			<description/>
+			<link>https://trends.google.com/trending/rss?geo=US</link>
+			<pubDate>Tue, 10 Nov 2026 19:00:00 -0800</pubDate>
+			<ht:news_item>
+				<ht:news_item_title>Brand A recalls mineral sunscreen &amp; stick over labeling</ht:news_item_title>
+				<ht:news_item_snippet/>
+				<ht:news_item_url>https://news.example.test/brand-a-recall</ht:news_item_url>
+				<ht:news_item_source>Example News</ht:news_item_source>
+			</ht:news_item>
+			<ht:news_item>
+				<ht:news_item_title>What the sunscreen recall means for shoppers</ht:news_item_title>
+				<ht:news_item_snippet/>
+				<ht:news_item_url>https://daily.example.test/recall-explainer</ht:news_item_url>
+				<ht:news_item_source>Example Daily</ht:news_item_source>
+			</ht:news_item>
+		</item>
+		<item>
+			<title>state college football schedule</title>
+			<ht:approx_traffic>2000+</ht:approx_traffic>
+			<description/>
+			<link>https://trends.google.com/trending/rss?geo=US</link>
+			<pubDate>Tue, 10 Nov 2026 18:00:00 -0800</pubDate>
+		</item>
+		<item>
+			<title>weather tomorrow</title>
+			<ht:approx_traffic>500+</ht:approx_traffic>
+			<description/>
+			<link>https://trends.google.com/trending/rss?geo=US</link>
+			<pubDate>Tue, 10 Nov 2026 17:00:00 -0800</pubDate>
+		</item>
+	</channel>
+</rss>

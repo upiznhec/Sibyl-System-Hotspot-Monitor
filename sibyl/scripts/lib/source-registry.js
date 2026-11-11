@@ -74,8 +74,10 @@ function displayOrder(id) {
   return getSource(id)?.displayOrder ?? DEFAULT_DISPLAY_ORDER;
 }
 
-function sourceHeatReference(id) {
-  return getSource(id)?.heatReference || null;
+// The heat that earns the full 36 heat points, per list type when the adapter sets one.
+function sourceHeatReference(id, sourceType = null) {
+  const source = getSource(id);
+  return (sourceType && source?.heatReferences?.[sourceType]) || source?.heatReference || null;
 }
 
 // Main sources by default. With the platforms config, only the ones switched on.
@@ -85,6 +87,15 @@ function defaultSeedPlatforms(platformsConfig = null) {
     .filter(source => !platformsConfig ||
       (platformsConfig[source.id] && platformsConfig[source.id].enabled !== false))
     .map(source => source.id);
+}
+
+// The default platforms config: each source on or off (defaultEnabled) with its default
+// settings. The v1.3.20 sources are off; the rewrite check switches them on in its config.
+function defaultPlatformsConfig() {
+  return Object.fromEntries(allSources().map(source => [
+    source.id,
+    { enabled: Boolean(source.defaultEnabled), ...(source.defaultConfig || {}) }
+  ]));
 }
 
 // Which of a source's lists may raise instant alerts (null = all of them).
@@ -111,6 +122,7 @@ module.exports = {
   SOURCE_ORDER,
   alertSourceTypes,
   allSources,
+  defaultPlatformsConfig,
   defaultSeedPlatforms,
   displayOrder,
   getSource,
