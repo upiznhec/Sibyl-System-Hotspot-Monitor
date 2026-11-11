@@ -1,7 +1,8 @@
 // Source registry. Each adapter declares its own metadata in `module.exports.source`:
 //   id, label, weight, sourceTypeWeights, sourceTypeBoosts, displayOrder,
 //   defaultRole ('seed' = main source, 'community' = supporting source),
-//   fetch(config) and an optional link(cluster, helpers) for the briefing.
+//   fetch(config), an optional link(cluster, helpers) for the briefing and an optional
+//   fallbackItemLink(title) for instant alerts on items that have no URL.
 // Adapters are loaded lazily so that lib/signals.js can ask for labels without a require cycle.
 
 const ADAPTER_LOADERS = {

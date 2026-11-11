@@ -32,7 +32,10 @@
 
 const https = require('https');
 const http = require('http');
-const fs = require('fs');
+const {
+  chatCompletionsPath,
+  resolveModelConfig
+} = require('../../sibyl/scripts/lib/model-config');
 
 // AI生成摘要提示词模板 - v3.5 多来源核验版
 const AI_SUMMARY_PROMPT = `请根据以下已核验热点材料，生成一个简洁流畅的摘要。材料可能来自微博智搜，也可能来自Agent Reach检索的多个公开来源。
@@ -166,7 +169,7 @@ async function callAIModel(prompt, config, maxRetries = 2, options = {}) {
       const requestOptions = {
         hostname: url.hostname,
         port: url.port || (isHttps ? 443 : 80),
-        path: '/v1/chat/completions',
+        path: chatCompletionsPath(baseUrl),
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -223,12 +226,7 @@ async function callAIModel(prompt, config, maxRetries = 2, options = {}) {
  */
 async function detectCommercialContent(content, title, customConfig = null) {
   try {
-    let modelConfig = customConfig;
-
-    if (!modelConfig) {
-      const openclawConfig = JSON.parse(fs.readFileSync('/root/.openclaw/openclaw.json', 'utf8'));
-      modelConfig = openclawConfig.models?.providers?.aliyun;
-    }
+    const modelConfig = customConfig || resolveModelConfig();
 
     if (!modelConfig || !modelConfig.apiKey) {
       console.log('⚠️ AI模型未配置，无法检测商业广告');
@@ -292,12 +290,7 @@ async function generateAISummary(content, title = '', customConfig = null, retry
   const MAX_RETRIES = 1; // 超长时最多重试1次
   
   try {
-    let modelConfig = customConfig;
-
-    if (!modelConfig) {
-      const openclawConfig = JSON.parse(fs.readFileSync('/root/.openclaw/openclaw.json', 'utf8'));
-      modelConfig = openclawConfig.models?.providers?.aliyun;
-    }
+    const modelConfig = customConfig || resolveModelConfig();
 
     if (!modelConfig || !modelConfig.apiKey) {
       console.log('⚠️ AI模型未配置，无法生成摘要');

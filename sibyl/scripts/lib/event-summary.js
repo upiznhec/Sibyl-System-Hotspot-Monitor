@@ -2,8 +2,7 @@ const crypto = require('crypto');
 const path = require('path');
 
 const { summarizeContent } = require('../../../elixir-summarizer/scripts/elixir-summarizer');
-const { retrieveAgentReachEvidence } = require('./agent-reach-retriever');
-const { getWeiboToken, searchWeiboAI } = require('./weibo-wis');
+const { resolveModelConfig } = require('./model-config');
 const {
   getDataDir,
   readJson,
@@ -17,9 +16,7 @@ const DEFAULT_CONFIG = {
   retrievalLimit: 10,
   concurrency: 2,
   timeBudgetSeconds: 180,
-  failureCacheTtlMinutes: 30,
-  weiboWisEnabled: true,
-  weiboWisQueryLimit: 3
+  failureCacheTtlMinutes: 30
 };
 
 function cacheFile() {
@@ -101,9 +98,9 @@ function memberSummariesForCluster(cluster) {
     .filter(Boolean))];
 }
 
-async function summarizeEvidence(content, title, dependencies = {}) {
+async function summarizeEvidence(content, title, dependencies = {}, modelConfig = null) {
   const summarizer = dependencies.summarize || summarizeContent;
-  const result = await summarizer(content, title);
+  const result = await summarizer(content, title, modelConfig);
   if (result?.isCommercial) {
     return { filtered: true, reason: result.reason || 'Elixir判定为非目标内容' };
   }
@@ -111,35 +108,6 @@ async function summarizeEvidence(content, title, dependencies = {}) {
     summary: normalizeSummary(result?.summary),
     reason: result?.reason || null
   };
-}
-
-async function retrieveWeiboWis(cluster, fullConfig, context, dependencies = {}) {
-  if (context.options.weiboWisEnabled === false) return '';
-  if (Date.now() >= context.deadlineAt) return '';
-  const tokenGetter = dependencies.getWeiboToken || getWeiboToken;
-  const searcher = dependencies.searchWeiboAI || searchWeiboAI;
-  if (!context.weiboTokenPromise) {
-    context.weiboTokenPromise = Promise.resolve(tokenGetter(fullConfig));
-  }
-  const token = await context.weiboTokenPromise;
-  if (!token) return '';
-
-  const queries = [...new Set([
-    cluster.canonicalTitle || cluster.mainSignal.title,
-    ...(cluster.aliases || []),
-    ...(cluster.signals || []).map(signal => signal.title)
-  ].filter(Boolean))].slice(0, Math.max(1, Number(context.options.weiboWisQueryLimit) || 3));
-
-  const contents = [];
-  for (const query of queries) {
-    if (Date.now() >= context.deadlineAt) break;
-    const content = String(await searcher(query, token, fullConfig) || '').trim();
-    if (content && !contents.includes(content)) {
-      contents.push(content);
-      break;
-    }
-  }
-  return contents.join('\n\n');
 }
 
 async function buildEventSummary(cluster, fullConfig, context, dependencies = {}) {
@@ -158,7 +126,8 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
     const result = await summarizeEvidence(
       knownEvidence(cluster, memberSummaries),
       title,
-      dependencies
+      dependencies,
+      context.modelConfig
     );
     if (result.filtered) return result;
     if (result.summary) {
@@ -180,27 +149,6 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
     };
   }
 
-  const weiboWisContent = await retrieveWeiboWis(
-    cluster,
-    fullConfig,
-    context,
-    dependencies
-  );
-  if (weiboWisContent) {
-    const result = await summarizeEvidence(weiboWisContent, title, dependencies);
-    if (result.filtered) return result;
-    if (result.summary) {
-      return {
-        summary: result.summary,
-        source: 'weibo-wis-elixir',
-        sourceHash: hash,
-        confidence: 'medium',
-        confidenceBasis: 'weibo_wis',
-        updatedAt: new Date().toISOString()
-      };
-    }
-  }
-
   const failed = context.failureCache[cluster.topicId];
   if (failureCacheValid(
     failed,
@@ -216,13 +164,15 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
   }
 
   let retrievalFailure = null;
-  const shouldRetrieve = context.retrievalCount < context.options.retrievalLimit &&
+  // Evidence retrieval is pluggable; without a retriever the summary uses the rule-based fallback.
+  const retrieve = dependencies.retrieveEvidence || context.retrieveEvidence;
+  const shouldRetrieve = Boolean(retrieve) &&
+    context.retrievalCount < context.options.retrievalLimit &&
     Date.now() < context.deadlineAt &&
     (cluster.eventMerge?.memberCount > 1 || knownSummaries.length === 0);
 
   if (shouldRetrieve) {
     context.retrievalCount++;
-    const retrieve = dependencies.retrieveEvidence || retrieveAgentReachEvidence;
     const retrieval = await retrieve({
       title,
       relatedTitles: cluster.aliases || [],
@@ -238,7 +188,7 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
       console.warn(`事件取材未采用「${title}」: ${retrieval.failureReason || 'unknown'}`);
     }
     if (retrieval.success && retrieval.evidenceText) {
-      const result = await summarizeEvidence(retrieval.evidenceText, title, dependencies);
+      const result = await summarizeEvidence(retrieval.evidenceText, title, dependencies, context.modelConfig);
       if (result.filtered) return result;
       if (result.summary) {
         return {
@@ -260,7 +210,8 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
     const result = await summarizeEvidence(
       knownEvidence(cluster, knownSummaries),
       title,
-      dependencies
+      dependencies,
+      context.modelConfig
     );
     if (result.filtered) return result;
     if (result.summary) {
@@ -290,7 +241,8 @@ async function applyEventSummaries(clusters, fullConfig = {}, dependencies = {})
     cache: loadCache(),
     failureCache: loadFailureCache(),
     alertSummaries: loadAlertSummaries(),
-    weiboTokenPromise: null,
+    modelConfig: resolveModelConfig(fullConfig),
+    retrieveEvidence: null,
     retrievalCount: 0,
     deadlineAt: Date.now() + Math.max(1, Number(options.timeBudgetSeconds) || 180) * 1000
   };

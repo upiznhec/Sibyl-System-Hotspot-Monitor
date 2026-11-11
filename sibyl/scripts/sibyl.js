@@ -2,10 +2,10 @@
 
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
 
 const { defaultSeedPlatforms, sourceFetchers } = require('./lib/source-registry');
 const { loadTopicSettings } = require('./lib/topic-settings');
+const { reportTarget, sendInParts } = require('./lib/webhook');
 const { clusterSignals, buildNextState } = require('./lib/clusterer');
 const { generateReport, selectReportClusters, hasBroadcastSeed } = require('./lib/report-generator');
 const { classifySignal } = require('./lib/category-classifier');
@@ -60,9 +60,7 @@ const DEFAULT_CONFIG = {
     retrievalLimit: 10,
     concurrency: 2,
     timeBudgetSeconds: 180,
-    failureCacheTtlMinutes: 30,
-    weiboWisEnabled: true,
-    weiboWisQueryLimit: 3
+    failureCacheTtlMinutes: 30
   },
   eventFilter: {
     enabled: true,
@@ -73,17 +71,14 @@ const DEFAULT_CONFIG = {
     minScore: 20,
     requireSeedPlatforms: true,
     seedPlatforms: defaultSeedPlatforms(),
-    pushWeCom: false,
+    push: false,
+    channel: '',
     webhook: ''
   }
 };
 
 function getDefaultDataDir() {
   if (process.env.SIBYL_DATA_DIR) return process.env.SIBYL_DATA_DIR;
-  const openclawWorkspace = '/root/.openclaw/workspace';
-  if (fs.existsSync(openclawWorkspace)) {
-    return path.join(openclawWorkspace, 'data', 'sibyl');
-  }
   return path.resolve(__dirname, '..', 'data');
 }
 
@@ -212,71 +207,6 @@ function compactCluster(cluster, reportConfig = {}) {
   };
 }
 
-function sendWeComMessage(webhookUrl, content) {
-  return new Promise((resolve) => {
-    if (!webhookUrl) {
-      resolve(false);
-      return;
-    }
-
-    const url = new URL(webhookUrl);
-    const data = JSON.stringify({
-      msgtype: 'markdown',
-      markdown: { content }
-    });
-
-    const req = https.request({
-      hostname: url.hostname,
-      path: url.pathname + url.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data)
-      }
-    }, (res) => {
-      let responseData = '';
-      res.on('data', chunk => responseData += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(responseData);
-          resolve(parsed.errcode === 0);
-        } catch (e) {
-          resolve(false);
-        }
-      });
-    });
-
-    req.on('error', () => resolve(false));
-    req.setTimeout(10000, () => {
-      req.destroy();
-      resolve(false);
-    });
-    req.write(data);
-    req.end();
-  });
-}
-
-function messageBytes(text) {
-  return Buffer.byteLength(text, 'utf8');
-}
-
-function splitForWeCom(report, maxBytes = 3200) {
-  if (messageBytes(report) <= maxBytes) return [report];
-  const sections = report.split(/\n(?=### \d+\. )/);
-  const chunks = [];
-  let current = sections.shift() || '';
-  for (const section of sections) {
-    if (messageBytes(current + '\n' + section) > maxBytes && current.trim()) {
-      chunks.push(current.trim());
-      current = section;
-    } else {
-      current += '\n' + section;
-    }
-  }
-  if (current.trim()) chunks.push(current.trim());
-  return chunks;
-}
-
 function snapshotPlatforms(snapshot) {
   return snapshot?.platforms?.length
     ? snapshot.platforms
@@ -345,24 +275,13 @@ function attachSnapshotTrends(clusters, snapshots) {
 
 async function maybePushReport(report, config, args) {
   const reportConfig = config.report || {};
-  const webhook = process.env.SIBYL_REPORT_WEBHOOK ||
-    process.env.WECOM_WEBHOOK ||
-    reportConfig.webhook ||
-    '';
-  const shouldPush = (reportConfig.pushWeCom || args.includes('--push')) && !args.includes('--no-push') && webhook;
+  const { webhook, channel } = reportTarget(config);
+  // "pushWeCom" is the v1.3.20 name of the switch and still works.
+  const pushEnabled = reportConfig.push || reportConfig.pushWeCom;
+  const shouldPush = (pushEnabled || args.includes('--push')) && !args.includes('--no-push') && webhook;
   if (!shouldPush) return false;
 
-  const chunks = splitForWeCom(report);
-  let allSent = true;
-  for (let i = 0; i < chunks.length; i++) {
-    const prefix = chunks.length > 1 ? `热点综合播报 (${i + 1}/${chunks.length})\n\n` : '';
-    const sent = await sendWeComMessage(webhook, prefix + chunks[i]);
-    allSent = allSent && sent;
-    if (i < chunks.length - 1) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-  }
-  return allSent;
+  return sendInParts(webhook, report, { channel, title: '热点综合播报' });
 }
 
 async function main() {
@@ -412,8 +331,7 @@ async function main() {
     eventSummary: {
       ...(config.eventSummary || {}),
       retrievalLimit: config.eventMerge?.preSummaryRetrievalLimit ?? 4,
-      timeBudgetSeconds: config.eventMerge?.preSummaryTimeBudgetSeconds ?? 90,
-      weiboWisQueryLimit: 1
+      timeBudgetSeconds: config.eventMerge?.preSummaryTimeBudgetSeconds ?? 90
     }
   };
   if (eventMergeEnabled && !args.includes('--no-summary') && config.eventSummary?.enabled !== false) {
@@ -486,7 +404,7 @@ async function main() {
   console.log(`   热点事件: ${clusters.length} 个`);
   console.log(`   数据来源: ${source === 'snapshot' ? 'Sibyl快照' : '现场采集'}`);
   console.log(`   报告文件: ${REPORT_FILE}`);
-  console.log(`   企业微信推送: ${pushed ? '已发送' : '未发送'}`);
+  console.log(`   推送: ${pushed ? '已发送' : '未发送'}`);
   errors.forEach(error => console.warn(`⚠️ ${error.name} 采集异常: ${error.error}`));
 }
 

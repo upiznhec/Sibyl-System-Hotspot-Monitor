@@ -1,7 +1,5 @@
 #!/usr/bin/env node
 
-const fs = require('fs');
-const https = require('https');
 const path = require('path');
 
 const { collectSnapshot } = require('./collect-snapshot');
@@ -9,11 +7,12 @@ const {
   buildDouyinHotListEvidence,
   retrieveDouyinTopicEvidence
 } = require('./lib/douyin-topic');
-const { retrieveAgentReachEvidence } = require('./lib/agent-reach-retriever');
-const { getWeiboTokenResult, searchWeiboAIResult } = require('./lib/weibo-wis');
 const { classifySignal } = require('./lib/category-classifier');
 const { formatHeat, normalizeForCompare } = require('./lib/signals');
 const { callAIModel, summarizeContent } = require('../../elixir-summarizer/scripts/elixir-summarizer');
+const { resolveModelConfig } = require('./lib/model-config');
+const { defaultSeedPlatforms, getSource } = require('./lib/source-registry');
+const { alertTarget, sendMessage } = require('./lib/webhook');
 const {
   beijingDateKey,
   beijingTimeShort,
@@ -34,7 +33,8 @@ const DEFAULT_CONFIG = {
   },
   alerts: {
     enabled: true,
-    pushWeCom: false,
+    push: false,
+    channel: '',
     webhook: '',
     dedupe: 'daily',
     summaries: true,
@@ -45,31 +45,9 @@ const DEFAULT_CONFIG = {
       timeout: 12000,
       retries: 0
     },
-    agentReachSummary: {
-      enabled: true,
-      command: 'openclaw',
-      agent: 'sibyl-retriever',
-      sessionFlag: 'none',
-      timeoutSeconds: 90,
-      thinking: 'low',
-      minSources: 2,
-      minConfidence: 'medium',
-      maxSources: 4,
-      maxAgeHours: 96,
-      maxEvidenceChars: 6000,
-      capabilities: [
-        'browser.search'
-      ]
-    },
     aiSearchSummary: {
       enabled: false,
       maxChars: 110
-    },
-    weiboAI: {
-      appId: '',
-      appSecret: '',
-      authUrl: 'https://open-im.api.weibo.com/open/auth/ws_token',
-      searchUrl: 'https://open-im.api.weibo.com/open/wis/search_query'
     },
     platforms: {
       weibo: {
@@ -87,11 +65,6 @@ const DEFAULT_CONFIG = {
   report: {
     webhook: ''
   }
-};
-
-const PLATFORM_LABELS = {
-  weibo: '微博',
-  douyin: '抖音'
 };
 
 const AI_SEARCH_SUMMARY_PROMPT = `你是热点即时预警摘要助手。请围绕以下热榜话题搜索公开信息，并生成一段简洁摘要。
@@ -149,45 +122,8 @@ function saveSummaryCache(cache) {
 
 function parsePlatforms(args) {
   const platformArg = args.find(arg => arg.startsWith('--platform='));
-  if (!platformArg) return ['weibo', 'douyin'];
+  if (!platformArg) return defaultSeedPlatforms();
   return platformArg.replace('--platform=', '').split(',').map(item => item.trim()).filter(Boolean);
-}
-
-function legacyStateFile(platform) {
-  const openclawWorkspace = '/root/.openclaw/workspace';
-  if (!fs.existsSync(openclawWorkspace)) return null;
-  const dir = platform === 'weibo' ? 'weibo-hot' : 'douyin-hot';
-  return path.join(openclawWorkspace, 'data', dir, 'state.json');
-}
-
-function legacyHistoryFile(platform) {
-  const openclawWorkspace = '/root/.openclaw/workspace';
-  if (!fs.existsSync(openclawWorkspace)) return null;
-  const dir = platform === 'weibo' ? 'weibo-hot' : 'douyin-hot';
-  return path.join(openclawWorkspace, 'data', dir, 'history.json');
-}
-
-function legacyConfigWebhook() {
-  const file = '/root/.openclaw/workspace/data/weibo-hot/config.json';
-  const config = readJson(file, {});
-  return config.weComWebhook || '';
-}
-
-function legacySummary(platform, title) {
-  const file = legacyHistoryFile(platform);
-  if (!file) return '';
-  const history = readJson(file, {});
-  const summary = history?.[title]?.summary || '';
-  const isCommercial = history?.[title]?.isCommercial || /^\[商业广告\]/.test(summary);
-  return summary && !isCommercial ? summary : '';
-}
-
-function wasLegacyReportedToday(platform, title, dateKey) {
-  const file = legacyStateFile(platform);
-  if (!file) return false;
-  const state = readJson(file, {});
-  const reportedAt = state.rule2Reported?.[title];
-  return Boolean(reportedAt && beijingDateKey(reportedAt) === dateKey);
 }
 
 function dedupeKey(platform, title, dateKey) {
@@ -203,33 +139,14 @@ function triggerType(signal, thresholds) {
   return '';
 }
 
+function platformLabel(signal) {
+  return getSource(signal.platform)?.label || signal.platformLabel || signal.platform;
+}
+
 function detailLink(signal) {
   if (signal.url) return signal.url;
-  if (signal.platform === 'weibo') {
-    return `https://s.weibo.com/weibo?q=%23${encodeURIComponent(signal.title)}%23`;
-  }
-  if (signal.platform === 'douyin') {
-    return `https://www.douyin.com/search/${encodeURIComponent(signal.title)}`;
-  }
-  return '';
-}
-
-function readOpenClawConfig() {
-  try {
-    return JSON.parse(fs.readFileSync('/root/.openclaw/openclaw.json', 'utf8'));
-  } catch (e) {
-    return {};
-  }
-}
-
-function getModelConfig(customConfig = null) {
-  if (customConfig?.ai && customConfig.ai.apiKey) return customConfig.ai;
-  try {
-    const config = readOpenClawConfig();
-    return config.models?.providers?.aliyun || null;
-  } catch (e) {
-    return null;
-  }
+  // Sources whose items have no URL can build a search link from the title.
+  return getSource(signal.platform)?.fallbackItemLink?.(signal.title) || '';
 }
 
 function normalizeSummary(summary) {
@@ -242,7 +159,7 @@ function normalizeSummary(summary) {
 function buildAISearchSummaryPrompt(signal, options = {}) {
   return AI_SEARCH_SUMMARY_PROMPT
     .replace('{topic}', signal.title || '未知话题')
-    .replace('{platform}', PLATFORM_LABELS[signal.platform] || signal.platformLabel || signal.platform || '未知平台')
+    .replace('{platform}', platformLabel(signal) || '未知平台')
     .replace('{maxChars}', String(options.maxChars || 110));
 }
 
@@ -250,7 +167,7 @@ async function generateAISearchSummary(signal, context) {
   const options = context.aiSearchSummary || {};
   if (!options.enabled) return '';
 
-  const modelConfig = getModelConfig(context.config);
+  const modelConfig = context.modelConfig;
   if (!modelConfig?.apiKey) return '';
 
   const result = await callAIModel(buildAISearchSummaryPrompt(signal, options), modelConfig, 1);
@@ -277,18 +194,6 @@ async function buildAlertSummary(alert, context) {
   const cached = normalizeSummary(context.summaryCache[cacheKey]?.summary);
   if (cached) return { summary: cached };
 
-  const fromLegacy = normalizeSummary(legacySummary(signal.platform, signal.title));
-  if (fromLegacy) {
-    context.summaryCache[cacheKey] = {
-      platform: signal.platform,
-      title: signal.title,
-      summary: fromLegacy,
-      source: 'legacy-history',
-      updatedAt: new Date().toISOString()
-    };
-    return { summary: fromLegacy };
-  }
-
   if (!context.enableSummaries) return { summary: '暂无摘要' };
 
   if (signal.platform === 'douyin') {
@@ -300,7 +205,7 @@ async function buildAlertSummary(alert, context) {
       douyinResult = await retrieveDouyinTopicEvidence(signal, douyinOptions);
     }
     if (douyinResult.success) {
-      const elixirResult = await summarizeContent(douyinResult.evidenceText, signal.title);
+      const elixirResult = await summarizeContent(douyinResult.evidenceText, signal.title, context.modelConfig);
       if (elixirResult.isCommercial) {
         return {
           filtered: true,
@@ -325,76 +230,6 @@ async function buildAlertSummary(alert, context) {
     }
   }
 
-  if (!context.weiboTokenChecked) {
-    const tokenResult = await getWeiboTokenResult(context.config);
-    context.weiboToken = tokenResult.token;
-    context.weiboTokenChecked = true;
-    if (!tokenResult.token) {
-      console.log(`⚠️ 微博智搜鉴权不可用: ${tokenResult.reason || 'unknown'}`);
-    }
-  }
-  const wisResult = await searchWeiboAIResult(signal.title, context.weiboToken, context.config);
-  const rawContent = wisResult.content;
-  if (!rawContent) {
-    console.log(`⚠️ 微博智搜未生成材料: ${signal.title} - ${wisResult.reason || 'unknown'}`);
-  }
-  if (rawContent) {
-    const elixirResult = await summarizeContent(rawContent, signal.title);
-    if (elixirResult.isCommercial) {
-      return {
-        filtered: true,
-        reason: elixirResult.reason || 'Elixir判定为商业推广或非目标内容'
-      };
-    }
-
-    const summary = normalizeSummary(elixirResult.summary);
-    if (summary) {
-      context.summaryCache[cacheKey] = {
-        platform: signal.platform,
-        title: signal.title,
-        summary,
-        source: 'elixir',
-        updatedAt: new Date().toISOString()
-      };
-      return { summary };
-    }
-  }
-
-  if (context.agentReachSummary.enabled) {
-    const retrieval = await retrieveAgentReachEvidence({
-      ...signal,
-      category: alert.category
-    }, context.config);
-
-    if (retrieval.success && retrieval.evidenceText) {
-      const elixirResult = await summarizeContent(retrieval.evidenceText, signal.title);
-      if (elixirResult.isCommercial) {
-        return {
-          filtered: true,
-          reason: elixirResult.reason || 'Elixir判定为商业推广或非目标内容'
-        };
-      }
-
-      const summary = normalizeSummary(elixirResult.summary);
-      const invalidFallback = /^来源\b|^\[来源\]/.test(summary);
-      if (summary && !invalidFallback) {
-        context.summaryCache[cacheKey] = {
-          platform: signal.platform,
-          title: signal.title,
-          summary,
-          source: 'browser-elixir',
-          retrievalRoute: retrieval.routeUsed,
-          confidence: retrieval.confidence,
-          sources: retrieval.sources,
-          updatedAt: new Date().toISOString()
-        };
-        return { summary };
-      }
-    } else if (retrieval.failureReason) {
-      console.log(`⚠️ 站外取材未生成摘要: ${signal.title} - ${retrieval.failureReason}`);
-    }
-  }
-
   const aiSearchSummary = await generateAISearchSummary(signal, context);
   if (aiSearchSummary) {
     context.summaryCache[cacheKey] = {
@@ -413,21 +248,15 @@ async function buildAlertSummary(alert, context) {
 async function enrichAlertsWithSummaries(alerts, config, args, snapshotSignals = []) {
   const context = {
     enableSummaries: config.alerts?.summaries !== false && !args.includes('--no-summary'),
-    agentReachSummary: {
-      ...(config.alerts?.agentReachSummary || {}),
-      enabled: config.alerts?.agentReachSummary?.enabled !== false &&
-        !args.includes('--no-agent-reach-summary')
-    },
     aiSearchSummary: {
       ...(config.alerts?.aiSearchSummary || {}),
       enabled: config.alerts?.aiSearchSummary?.enabled === true &&
         !args.includes('--no-ai-search-summary')
     },
     config,
+    modelConfig: resolveModelConfig(config),
     snapshotSignals,
-    summaryCache: loadSummaryCache(),
-    weiboToken: null,
-    weiboTokenChecked: false
+    summaryCache: loadSummaryCache()
   };
   const enriched = [];
 
@@ -449,10 +278,9 @@ async function enrichAlertsWithSummaries(alerts, config, args, snapshotSignals =
 
 function buildMessage(alert, capturedAt) {
   const signal = alert.signal;
-  const platformLabel = PLATFORM_LABELS[signal.platform] || signal.platformLabel || signal.platform;
   const link = detailLink(signal);
   const lines = [
-    `🔥 ${platformLabel}高热度即时预警`,
+    `🔥 ${platformLabel(signal)}高热度即时预警`,
     '━━━━━━━━━━━━━━',
     signal.title,
     `位次：#${signal.rank || '-'} ｜ 热度：${formatHeat(signal.heat)}`,
@@ -463,50 +291,6 @@ function buildMessage(alert, capturedAt) {
     `触发时间：${beijingTimeShort(capturedAt)}`
   ].filter(Boolean);
   return lines.join('\n');
-}
-
-function sendWeComMessage(webhookUrl, message) {
-  return new Promise((resolve) => {
-    if (!webhookUrl) {
-      resolve(false);
-      return;
-    }
-
-    const url = new URL(webhookUrl);
-    const data = JSON.stringify({
-      msgtype: 'markdown',
-      markdown: { content: message }
-    });
-
-    const req = https.request({
-      hostname: url.hostname,
-      path: url.pathname + url.search,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(data)
-      }
-    }, (res) => {
-      let responseData = '';
-      res.on('data', chunk => responseData += chunk);
-      res.on('end', () => {
-        try {
-          const parsed = JSON.parse(responseData);
-          resolve(parsed.errcode === 0);
-        } catch (e) {
-          resolve(false);
-        }
-      });
-    });
-
-    req.on('error', () => resolve(false));
-    req.setTimeout(10000, () => {
-      req.destroy();
-      resolve(false);
-    });
-    req.write(data);
-    req.end();
-  });
 }
 
 function selectAlerts(snapshot, config, state, platforms) {
@@ -527,7 +311,7 @@ function selectAlerts(snapshot, config, state, platforms) {
     if (!classification.category || !allowedCategories.has(classification.category)) continue;
 
     const key = dedupeKey(signal.platform, signal.title, dateKey);
-    if (state.reported[key] || wasLegacyReportedToday(signal.platform, signal.title, dateKey)) {
+    if (state.reported[key]) {
       continue;
     }
 
@@ -573,12 +357,10 @@ async function main() {
     args,
     snapshotToSignals(snapshot)
   );
-  const webhook = process.env.SIBYL_ALERT_WEBHOOK ||
-    process.env.WECOM_WEBHOOK ||
-    config.alerts?.webhook ||
-    config.report?.webhook ||
-    legacyConfigWebhook();
-  const shouldPush = (config.alerts?.pushWeCom || args.includes('--push')) &&
+  const { webhook, channel } = alertTarget(config);
+  // "pushWeCom" is the v1.3.20 name of the switch and still works.
+  const pushEnabled = config.alerts?.push || config.alerts?.pushWeCom;
+  const shouldPush = (pushEnabled || args.includes('--push')) &&
     !args.includes('--no-push') &&
     webhook;
 
@@ -599,7 +381,7 @@ async function main() {
     };
     saveState(state);
 
-    const sent = await sendWeComMessage(webhook, message);
+    const sent = await sendMessage(webhook, message, { channel });
     if (sent) {
       sentCount++;
     } else {

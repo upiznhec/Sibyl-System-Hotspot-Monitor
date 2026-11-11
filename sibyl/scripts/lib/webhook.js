@@ -1,0 +1,193 @@
+// Generic webhook push for briefings and instant alerts.
+// Channels: WeCom (企业微信, the original), Slack and Discord incoming webhooks.
+// The channel is read from the webhook host, or set explicitly with config "channel".
+// Unknown hosts get the WeCom payload, as v1.3.20 sent to every webhook.
+
+const http = require('http');
+const https = require('https');
+
+const CHANNELS = {
+  wecom: { limit: 3200, unit: 'bytes' },
+  slack: { limit: 3500, unit: 'chars' },
+  discord: { limit: 1900, unit: 'chars' }
+};
+
+function detectChannel(webhookUrl, explicitChannel = '') {
+  if (explicitChannel && CHANNELS[explicitChannel]) return explicitChannel;
+  let host = '';
+  try {
+    host = new URL(webhookUrl).hostname;
+  } catch (e) {
+    return 'wecom';
+  }
+  if (/(^|\.)hooks\.slack\.com$/i.test(host)) return 'slack';
+  if (/(^|\.)(discord|discordapp)\.com$/i.test(host)) return 'discord';
+  return 'wecom';
+}
+
+function measure(text, channel) {
+  return CHANNELS[channel].unit === 'bytes' ? Buffer.byteLength(text, 'utf8') : text.length;
+}
+
+// Splits a message at briefing items ("### N. "), then at lines if one item is still too long.
+function splitMessage(text, channel) {
+  const limit = CHANNELS[channel].limit;
+  if (measure(text, channel) <= limit) return [text];
+
+  const pieces = [];
+  text.split(/\n(?=### \d+\. )/).forEach(section => {
+    if (measure(section, channel) <= limit) {
+      pieces.push(section);
+      return;
+    }
+    let current = '';
+    section.split('\n').forEach(line => {
+      const candidate = current ? `${current}\n${line}` : line;
+      if (measure(candidate, channel) > limit && current) {
+        pieces.push(current);
+        current = line;
+      } else {
+        current = candidate;
+      }
+    });
+    if (current) pieces.push(current);
+  });
+
+  const chunks = [];
+  let current = pieces.shift() || '';
+  for (const piece of pieces) {
+    if (measure(`${current}\n${piece}`, channel) > limit && current.trim()) {
+      chunks.push(current.trim());
+      current = piece;
+    } else {
+      current += `\n${piece}`;
+    }
+  }
+  if (current.trim()) chunks.push(current.trim());
+  return chunks;
+}
+
+// Slack uses its own markup: *bold*, <url|text>, no headings.
+function toSlackMarkup(markdown) {
+  return markdown
+    .split('\n')
+    .map(line => line
+      .replace(/^#{1,6}\s+(.*)$/, '*$1*')
+      .replace(/\*\*([^*]+)\*\*/g, '*$1*')
+      .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<$2|$1>')
+      .replace(/^-{3,}$/, '────────'))
+    .join('\n');
+}
+
+function payloadFor(channel, content) {
+  if (channel === 'slack') return { text: toSlackMarkup(content), mrkdwn: true };
+  if (channel === 'discord') return { content };
+  return { msgtype: 'markdown', markdown: { content } };
+}
+
+function isSuccess(channel, statusCode, body) {
+  if (channel === 'slack') return statusCode === 200 && String(body).trim() === 'ok';
+  if (channel === 'discord') return statusCode === 204 || statusCode === 200;
+  try {
+    return JSON.parse(body).errcode === 0;
+  } catch (e) {
+    return false;
+  }
+}
+
+function sendMessage(webhookUrl, content, options = {}) {
+  return new Promise(resolve => {
+    if (!webhookUrl) {
+      resolve(false);
+      return;
+    }
+
+    let url;
+    try {
+      url = new URL(webhookUrl);
+    } catch (e) {
+      resolve(false);
+      return;
+    }
+    const channel = detectChannel(webhookUrl, options.channel);
+    const data = JSON.stringify(payloadFor(channel, content));
+    const client = url.protocol === 'http:' ? http : https;
+
+    const req = client.request({
+      hostname: url.hostname,
+      port: url.port || undefined,
+      path: url.pathname + url.search,
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(data)
+      }
+    }, res => {
+      let body = '';
+      res.on('data', chunk => body += chunk);
+      res.on('end', () => resolve(isSuccess(channel, res.statusCode, body)));
+    });
+
+    req.on('error', () => resolve(false));
+    req.setTimeout(options.timeoutMs || 10000, () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.write(data);
+    req.end();
+  });
+}
+
+// Where the hourly briefing goes. Environment variables win over config, as in v1.3.20.
+function reportTarget(config = {}) {
+  const report = config.report || {};
+  return {
+    webhook: process.env.SIBYL_REPORT_WEBHOOK || process.env.WECOM_WEBHOOK || report.webhook || '',
+    channel: report.channel || ''
+  };
+}
+
+// Where instant alerts go. Falls back to the briefing webhook, as in v1.3.20.
+// An explicit "channel" belongs to the webhook it is written next to.
+function alertTarget(config = {}) {
+  const alerts = config.alerts || {};
+  const report = config.report || {};
+  const webhook = process.env.SIBYL_ALERT_WEBHOOK ||
+    process.env.WECOM_WEBHOOK ||
+    alerts.webhook ||
+    report.webhook ||
+    '';
+  const usesReportWebhook = Boolean(webhook) && !alerts.webhook && webhook === report.webhook;
+  return {
+    webhook,
+    channel: alerts.channel || (usesReportWebhook ? report.channel || '' : '')
+  };
+}
+
+// Sends a long message in parts, prefixing "<title> (i/n)" when it needs more than one.
+async function sendInParts(webhookUrl, text, options = {}) {
+  const channel = detectChannel(webhookUrl, options.channel);
+  const chunks = splitMessage(text, channel);
+  let allSent = true;
+  for (let i = 0; i < chunks.length; i++) {
+    const prefix = chunks.length > 1 && options.title ? `${options.title} (${i + 1}/${chunks.length})\n\n` : '';
+    const sent = await sendMessage(webhookUrl, prefix + chunks[i], { ...options, channel });
+    allSent = allSent && sent;
+    if (i < chunks.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, options.delayMs ?? 500));
+    }
+  }
+  return allSent;
+}
+
+module.exports = {
+  CHANNELS,
+  alertTarget,
+  detectChannel,
+  payloadFor,
+  reportTarget,
+  sendInParts,
+  sendMessage,
+  splitMessage,
+  toSlackMarkup
+};

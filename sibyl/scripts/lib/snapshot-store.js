@@ -5,10 +5,6 @@ const { makeSignal, normalizeForCompare, platformLabel } = require('./signals');
 
 function getDataDir() {
   if (process.env.SIBYL_DATA_DIR) return process.env.SIBYL_DATA_DIR;
-  const openclawWorkspace = '/root/.openclaw/workspace';
-  if (fs.existsSync(openclawWorkspace)) {
-    return path.join(openclawWorkspace, 'data', 'sibyl');
-  }
   return path.resolve(__dirname, '..', '..', 'data');
 }
 

@@ -10,7 +10,11 @@ Author: Misaka Studio
 >
 > - Each platform adapter declares its own label, weights, display order, role (main or community source) and link rule; `sibyl/scripts/lib/source-registry.js` reads them.
 > - Topic categories, keywords, priority, board hints, icons and noise rules moved from the code into settings (`sibyl/scripts/lib/topic-settings.js`, preset `sibyl/presets/zh-v1.3.20.json`).
+> - Briefings and alerts can be pushed to WeCom (企业微信, as in v1.3.20), Slack or Discord. The service is read from the webhook address or set with `channel` (`sibyl/scripts/lib/webhook.js`). The switch is now called `push`; the old name `pushWeCom` still works.
+> - The optional AI steps use the user's own OpenAI-compatible API key and model (`SIBYL_AI_API_KEY`, `SIBYL_AI_MODEL`, `SIBYL_AI_BASE_URL`, or `ai` in the config file). Without both a key and a model, the rule-based fallback runs, as in v1.3.20.
+> - Removed Weibo intelligent search and the parts that depend on OpenClaw: the Agent Reach retriever and its health table, the OpenClaw file paths and the OpenClaw model settings. The deploy self-check (`sibyl/scripts/check-deploy.js`) now checks the webhooks, the detected service and the model settings.
 > - `tools/rewrite-check/` confirms that the output is identical to v1.3.20 on the same snapshots.
+> - The other documents (README.zh-CN.md, README.en.md and the SKILL.md files) still describe v1.3.20 and will be updated in a later step.
 
 Choose a language:
 

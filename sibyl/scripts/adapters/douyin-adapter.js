@@ -43,7 +43,8 @@ const source = {
     '查看抖音话题',
     '搜索抖音关键词',
     encoded => `https://www.douyin.com/search/${encoded}`
-  )
+  ),
+  fallbackItemLink: title => `https://www.douyin.com/search/${encodeURIComponent(title)}`
 };
 
 module.exports = {

@@ -72,7 +72,6 @@ async function main() {
   let retrievalCalls = 0;
   await applyEventSummaries(merged, {
     eventSummary: {
-      weiboWisEnabled: false,
       retrievalLimit: 10
     }
   }, {

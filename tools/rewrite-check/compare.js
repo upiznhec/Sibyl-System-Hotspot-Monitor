@@ -50,8 +50,15 @@ baselineSteps.forEach(step => {
   outputs.forEach(name => {
     const fileA = path.join(baselineDir, step, 'data', name);
     const fileB = path.join(rewriteDir, step, 'data', name);
-    if (!fs.existsSync(fileA) || !fs.existsSync(fileB)) {
-      console.log(`${step}/${name}: missing in ${fs.existsSync(fileA) ? 'rewrite' : 'baseline'}`);
+    const hasA = fs.existsSync(fileA);
+    const hasB = fs.existsSync(fileB);
+    if (!hasA && !hasB) {
+      // For example alerts-state.json, which is only written when pushing.
+      console.log(`${step}/${name}: not written by either run`);
+      return;
+    }
+    if (!hasA || !hasB) {
+      console.log(`${step}/${name}: missing in ${hasA ? 'rewrite' : 'baseline'}`);
       differences++;
       return;
     }

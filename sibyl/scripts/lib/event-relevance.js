@@ -1,7 +1,5 @@
-const fs = require('fs');
-const path = require('path');
-
 const { callAIModel } = require('../../../elixir-summarizer/scripts/elixir-summarizer');
+const { resolveModelConfig } = require('./model-config');
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -21,23 +19,8 @@ const FILTERED_NATURES = new Set([
 ]);
 
 function loadModelConfig(customConfig = {}) {
-  if (customConfig.ai?.apiKey) return customConfig.ai;
-  const files = [
-    process.env.OPENCLAW_CONFIG,
-    '/root/.openclaw/openclaw.json',
-    path.join(process.env.HOME || '', '.openclaw', 'openclaw.json')
-  ].filter(Boolean);
-  for (const file of files) {
-    try {
-      if (!fs.existsSync(file)) continue;
-      const provider = JSON.parse(fs.readFileSync(file, 'utf8'))
-        .models?.providers?.aliyun;
-      if (provider?.apiKey) return provider;
-    } catch (error) {
-      // Rule fallback remains available.
-    }
-  }
-  return null;
+  // config.ai or SIBYL_AI_* environment variables; null means rule-based fallback.
+  return resolveModelConfig(customConfig);
 }
 
 function clusterText(cluster) {

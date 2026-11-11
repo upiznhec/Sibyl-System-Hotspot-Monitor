@@ -62,9 +62,7 @@
     "retrievalLimit": 10,
     "concurrency": 2,
     "timeBudgetSeconds": 180,
-    "failureCacheTtlMinutes": 30,
-    "weiboWisEnabled": true,
-    "weiboWisQueryLimit": 3
+    "failureCacheTtlMinutes": 30
   },
   "eventFilter": {
     "enabled": true,
@@ -74,22 +72,10 @@
     "maxAgeMinutes": 20,
     "trendWindowMinutes": 70
   },
-  "retrieval": {
-    "health": {
-      "confirmationDelayMinutes": 30,
-      "firstOpenHours": 48,
-      "repeatOpenHours": 96,
-      "recoverySuccessesRequired": 2
-    },
-    "capabilities": [
-      "openclaw.agent.sibyl-retriever",
-      "browser.search",
-      "web_fetch.read"
-    ]
-  },
   "alerts": {
     "enabled": true,
-    "pushWeCom": false,
+    "push": false,
+    "channel": "",
     "webhook": "",
     "dedupe": "daily",
     "summaries": true,
@@ -100,43 +86,9 @@
       "timeout": 12000,
       "retries": 0
     },
-    "agentReachSummary": {
-      "enabled": true,
-      "command": "openclaw",
-      "agent": "sibyl-retriever",
-      "sessionFlag": "none",
-      "retryDelayMs": 1000,
-      "timeoutSeconds": 90,
-      "thinking": "low",
-      "minSources": 2,
-      "minConfidence": "medium",
-      "maxSources": 4,
-      "maxAgeHours": 96,
-      "maxEvidenceChars": 6000,
-      "allowTrustedSingleSource": true,
-      "trustedDomains": [
-        "cctv.com",
-        "xinhuanet.com",
-        "news.cn",
-        "fifa.com",
-        "uefa.com",
-        "the-afc.com",
-        "olympics.com",
-        "nba.com"
-      ],
-      "capabilities": [
-        "browser.search"
-      ]
-    },
     "aiSearchSummary": {
       "enabled": false,
       "maxChars": 110
-    },
-    "weiboAI": {
-      "appId": "",
-      "appSecret": "",
-      "authUrl": "https://open-im.api.weibo.com/open/auth/ws_token",
-      "searchUrl": "https://open-im.api.weibo.com/open/wis/search_query"
     },
     "platforms": {
       "weibo": {
@@ -156,7 +108,13 @@
     "minScore": 20,
     "requireSeedPlatforms": true,
     "seedPlatforms": ["weibo", "douyin"],
-    "pushWeCom": false,
+    "push": false,
+    "channel": "",
     "webhook": ""
+  },
+  "ai": {
+    "baseUrl": "https://api.openai.com/v1",
+    "model": "",
+    "apiKey": ""
   }
 }

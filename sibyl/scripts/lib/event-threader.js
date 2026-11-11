@@ -1,7 +1,7 @@
-const fs = require('fs');
 const path = require('path');
 
 const { callAIModel } = require('../../../elixir-summarizer/scripts/elixir-summarizer');
+const { resolveModelConfig } = require('./model-config');
 const { rebuildClusterFromSignals } = require('./clusterer');
 const { getDataDir, readJson } = require('./snapshot-store');
 const { normalizeForCompare } = require('./signals');
@@ -68,24 +68,8 @@ const COMPETITION_PATTERNS = [
 ];
 
 function loadModelConfig(customConfig = {}) {
-  if (customConfig.ai?.apiKey) return customConfig.ai;
-  const files = [
-    process.env.OPENCLAW_CONFIG,
-    '/root/.openclaw/openclaw.json',
-    path.join(process.env.HOME || '', '.openclaw', 'openclaw.json')
-  ].filter(Boolean);
-
-  for (const file of files) {
-    try {
-      if (!fs.existsSync(file)) continue;
-      const config = JSON.parse(fs.readFileSync(file, 'utf8'));
-      const provider = config.models?.providers?.aliyun;
-      if (provider?.apiKey) return provider;
-    } catch (e) {
-      // 配置不可读时降级为规则聚合。
-    }
-  }
-  return null;
+  // config.ai or SIBYL_AI_* environment variables; null means rule-based fallback.
+  return resolveModelConfig(customConfig);
 }
 
 function alertSummaryMap() {

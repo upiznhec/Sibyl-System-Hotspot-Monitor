@@ -46,7 +46,8 @@ const source = {
     '查看微博话题',
     '搜索微博关键词',
     encoded => `https://s.weibo.com/weibo?q=${encoded}`
-  )
+  ),
+  fallbackItemLink: title => `https://s.weibo.com/weibo?q=%23${encodeURIComponent(title)}%23`
 };
 
 module.exports = {
