@@ -51,7 +51,7 @@ async function main() {
     assert.strictEqual(normal.isCommercial, false);
     assert.strictEqual(normal.summary, SHORT);
     assert.ok(prompts.some(prompt => prompt.includes('at most two sentences and 50 words')));
-    assert.ok(prompts.every(prompt => !/[一-龥]/.test(prompt)), 'prompts are English');
+    assert.ok(prompts.every(prompt => !/[\u4e00-\u9fa5]/.test(prompt)), 'prompts are English');
 
     const long = await summarizeContent(`${material}\nLONG MATERIAL`, 'mineral sunscreen recall', model);
     assert.strictEqual(long.summary, SHORTENED, 'a summary over 50 words is shortened once');

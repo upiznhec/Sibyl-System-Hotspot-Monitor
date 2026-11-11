@@ -52,7 +52,7 @@ function loadAlertSummaries() {
 
 function normalizeSummary(summary) {
   const text = String(summary || '').replace(/\s+/g, ' ').trim();
-  if (!text || isNoSummary(text) || /^\[?来源\]?/.test(text)) return '';
+  if (!text || isNoSummary(text)) return '';
   return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }
 
@@ -88,9 +88,9 @@ function knownSummariesForCluster(cluster, summaries) {
 function knownEvidence(cluster, summaries) {
   const lines = [];
   (cluster.signals || []).forEach(signal => {
-    lines.push(`[平台话题] ${signal.platformLabel || signal.platform}：${signal.title}`);
+    lines.push(`Search term (${signal.platformLabel || signal.platform}): ${signal.title}`);
   });
-  summaries.forEach(summary => lines.push(`[已有摘要] ${summary}`));
+  summaries.forEach(summary => lines.push(`Known summary: ${summary}`));
   return lines.join('\n');
 }
 
@@ -104,7 +104,7 @@ async function summarizeEvidence(content, title, dependencies = {}, modelConfig 
   const summarizer = dependencies.summarize || summarizeContent;
   const result = await summarizer(content, title, modelConfig);
   if (result?.isCommercial) {
-    return { filtered: true, reason: result.reason || 'Elixir判定为非目标内容' };
+    return { filtered: true, reason: result.reason || 'judged to be advertising' };
   }
   return {
     summary: normalizeSummary(result?.summary),
@@ -179,7 +179,7 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
       title,
       relatedTitles: cluster.aliases || [],
       platform: 'multi',
-      platformLabel: '多平台',
+      platformLabel: 'multiple sources',
       category: cluster.category,
       url: cluster.mainSignal?.url || '',
       signals: cluster.signals || []
@@ -188,7 +188,7 @@ async function buildEventSummary(cluster, fullConfig, context, dependencies = {}
       retrievalFailure = retrieval.retryable
         ? null
         : (retrieval.failureReason || 'unknown');
-      console.warn(`事件取材未采用「${title}」: ${retrieval.failureReason || 'unknown'}`);
+      console.warn(`No summary material for "${title}": ${retrieval.failureReason || 'unknown'}`);
     }
     if (retrieval.success && retrieval.evidenceText) {
       const result = await summarizeEvidence(retrieval.evidenceText, title, dependencies, context.modelConfig);
@@ -262,7 +262,7 @@ async function applyEventSummaries(clusters, fullConfig = {}, dependencies = {})
         cluster.eventSummary = '';
         cluster.eventSummarySource = null;
         cluster.summaryError = error.message;
-        console.error(`事件摘要生成失败「${cluster.canonicalTitle || cluster.mainSignal?.title || cluster.topicId}」:`, error.message);
+        console.error(`Summary failed for "${cluster.canonicalTitle || cluster.mainSignal?.title || cluster.topicId}":`, error.message);
         continue;
       }
       if (result.filtered) {

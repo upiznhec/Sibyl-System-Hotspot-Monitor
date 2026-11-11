@@ -3,7 +3,6 @@ node_modules/
 
 # Runtime data
 sibyl/data/
-tools/rewrite-check/out*/
 
 # Logs and local environment files
 *.log

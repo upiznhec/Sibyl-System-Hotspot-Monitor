@@ -43,9 +43,9 @@ try {
   ['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK', 'SIBYL_TELEGRAM_BOT_TOKEN'].forEach(key => delete env[key]);
   const result = spawnSync(process.execPath, [path.join(__dirname, 'check-deploy.js'), '--strict'], { env, encoding: 'utf8' });
   assert.strictEqual(result.status, 0, result.stdout + result.stderr);
-  assert.ok(result.stdout.includes('[OK] 主来源: Google Trends、TikTok'));
-  assert.ok(result.stdout.includes('[WARN] TikTok 话题标签榜: pages.json 中还没有'));
-  assert.ok(result.stdout.includes('## 使用提示'));
+  assert.ok(result.stdout.includes('[OK] Main sources: Google Trends, TikTok'));
+  assert.ok(result.stdout.includes('[WARN] TikTok hashtags: not in pages.json yet'));
+  assert.ok(result.stdout.includes('## Reading briefings'));
 } finally {
   fs.rmSync(dataDir, { recursive: true, force: true });
 }

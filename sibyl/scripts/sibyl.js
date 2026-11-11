@@ -100,7 +100,7 @@ function readJson(file, fallback) {
       return JSON.parse(fs.readFileSync(file, 'utf8'));
     }
   } catch (e) {
-    console.error(`读取JSON失败 ${file}:`, e.message);
+    console.error(`Could not read JSON ${file}:`, e.message);
   }
   return fallback;
 }
@@ -284,9 +284,9 @@ async function main() {
     platformNames = snapshotPlatforms(latestSnapshot);
     errors = snapshotErrors(latestSnapshot);
     recentSnapshots = loadRecentSnapshots({ minutes: config.snapshot?.trendWindowMinutes || 70 });
-    console.log(`使用 Sibyl 最新快照生成播报: ${latestSnapshot.capturedAt}`);
+    console.log(`Briefing from the latest snapshot: ${latestSnapshot.capturedAt}`);
   } else {
-    console.log('开始采集多平台热点信号...');
+    console.log('No recent snapshot; collecting from the sources...');
     const context = collectContext(config);
     const results = await Promise.all(platformFetchers.map(([name, fetcher, platformConfig]) =>
       collectPlatform(name, fetcher, platformConfig, context)
@@ -381,18 +381,18 @@ async function main() {
     console.log('\n' + report);
   }
 
-  console.log('✅ Sibyl 生成热点综合播报完成');
-  console.log(`   原始信号: ${rawSignals.length} 条`);
-  console.log(`   入池信号: ${signals.length} 条`);
-  console.log(`   热点事件: ${clusters.length} 个`);
-  console.log(`   数据来源: ${source === 'snapshot' ? 'Sibyl快照' : '现场采集'}`);
-  console.log(`   报告文件: ${REPORT_FILE}`);
-  console.log(`   推送: ${pushed ? '已发送' : '未发送'}`);
-  if (savedFile) console.log(`   播报存档: ${savedFile}`);
-  errors.forEach(error => console.warn(`⚠️ ${error.name} 采集异常: ${error.error}`));
+  console.log('✅ Sibyl briefing done');
+  console.log(`   Items collected: ${rawSignals.length}`);
+  console.log(`   Items in your topics: ${signals.length}`);
+  console.log(`   Events: ${clusters.length}`);
+  console.log(`   Data: ${source === 'snapshot' ? 'latest snapshot' : 'collected now'}`);
+  console.log(`   Briefing file: ${REPORT_FILE}`);
+  console.log(`   Pushed: ${pushed ? 'yes' : 'no'}`);
+  if (savedFile) console.log(`   Saved copy: ${savedFile}`);
+  errors.forEach(error => console.warn(`⚠️ ${error.name} could not be read: ${error.error}`));
 }
 
 main().catch(error => {
-  console.error('❌ Sibyl 执行失败:', error.message);
+  console.error('❌ Sibyl briefing failed:', error.message);
   process.exit(1);
 });

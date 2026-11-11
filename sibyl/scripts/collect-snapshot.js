@@ -87,7 +87,7 @@ async function collectSnapshot(options = {}) {
   const platformSet = onlyPlatforms ? new Set(onlyPlatforms) : null;
   const platformFetchers = sourceFetchers(config.platforms, platformSet);
 
-  console.log('开始采集 Sibyl 统一快照...');
+  console.log('Collecting a Sibyl snapshot...');
   logPages(context.pages, config.platforms);
   const results = await Promise.all(platformFetchers.map(([name, fetcher, platformConfig]) =>
     collectPlatform(name, fetcher, platformConfig, context)
@@ -96,15 +96,15 @@ async function collectSnapshot(options = {}) {
   const errors = results
     .filter(result => result.error)
     .map(result => ({ platform: result.name, message: result.error }));
-  errors.forEach(error => console.warn(`⚠️ ${error.platform} 采集异常: ${error.message}`));
+  errors.forEach(error => console.warn(`⚠️ ${error.platform} could not be read: ${error.message}`));
 
   const signals = results.flatMap(result => result.signals);
   const snapshot = saveSnapshot(signals, { errors });
-  console.log('✅ Sibyl 快照采集完成');
-  console.log(`   快照时间: ${snapshot.capturedAt}`);
-  console.log(`   信号总数: ${snapshot.records.length}`);
+  console.log('✅ Sibyl snapshot saved');
+  console.log(`   Time: ${snapshot.capturedAt}`);
+  console.log(`   Items: ${snapshot.records.length}`);
   Object.entries(snapshot.counts).forEach(([platform, count]) => {
-    console.log(`   ${platform}: ${count} 条`);
+    console.log(`   ${platform}: ${count}`);
   });
 
   if (args.includes('--print')) {
@@ -116,7 +116,7 @@ async function collectSnapshot(options = {}) {
 
 if (require.main === module) {
   collectSnapshot({ args: process.argv.slice(2) }).catch(error => {
-    console.error('❌ Sibyl 快照采集失败:', error.message);
+    console.error('❌ Sibyl snapshot failed:', error.message);
     process.exit(1);
   });
 }

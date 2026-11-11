@@ -70,7 +70,7 @@ function startServer() {
       req.on('end', () => {
         received.push({ path: req.url, auth: req.headers.authorization, body: JSON.parse(body) });
         res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ choices: [{ message: { content: '测试回复' } }] }));
+        res.end(JSON.stringify({ choices: [{ message: { content: 'test reply' } }] }));
       });
     });
     server.listen(0, '127.0.0.1', () => resolve({ server, received, port: server.address().port }));
@@ -82,29 +82,29 @@ async function checkRequest() {
   const modelConfig = resolveModelConfig({
     ai: { apiKey: 'test-key', model: 'test-model', baseUrl: `http://127.0.0.1:${port}/proxy/v1` }
   });
-  const result = await callAIModel('你好', modelConfig, 1);
+  const result = await callAIModel('hello', modelConfig, 1);
   server.close();
-  assert.deepStrictEqual(result, { success: true, content: '测试回复' });
+  assert.deepStrictEqual(result, { success: true, content: 'test reply' });
   assert.strictEqual(received.length, 1);
   assert.strictEqual(received[0].path, '/proxy/v1/chat/completions');
   assert.strictEqual(received[0].auth, 'Bearer test-key');
   assert.strictEqual(received[0].body.model, 'test-model');
-  assert.deepStrictEqual(received[0].body.messages, [{ role: 'user', content: '你好' }]);
+  assert.deepStrictEqual(received[0].body.messages, [{ role: 'user', content: 'hello' }]);
 }
 
 async function checkSummaryUsesConfiguredModel() {
   const modelConfig = resolveModelConfig({ ai: { apiKey: 'test-key', model: 'test-model' } });
   const cluster = {
     topicId: 'topic-1',
-    canonicalTitle: '测试事件',
-    mainSignal: { title: '测试事件', platform: 'weibo' },
-    aliases: ['测试事件'],
-    signals: [{ platform: 'weibo', platformLabel: '微博', title: '测试事件' }],
+    canonicalTitle: 'Test event',
+    mainSignal: { title: 'Test event', platform: 'google-trends' },
+    aliases: ['Test event'],
+    signals: [{ platform: 'google-trends', platformLabel: 'Google Trends', title: 'Test event' }],
     eventMerge: {
       memberCount: 2,
       memberSummaries: [
-        { topicId: 'a', summary: '第一条摘要。' },
-        { topicId: 'b', summary: '第二条摘要。' }
+        { topicId: 'a', summary: 'First summary.' },
+        { topicId: 'b', summary: 'Second summary.' }
       ]
     }
   };
@@ -122,11 +122,11 @@ async function checkSummaryUsesConfiguredModel() {
   const result = await buildEventSummary(cluster, {}, context, {
     summarize: async (content, title, config) => {
       seenConfig = config;
-      return { summary: '合并后的摘要。' };
+      return { summary: 'Merged summary.' };
     }
   });
   assert.deepStrictEqual(seenConfig, modelConfig);
-  assert.strictEqual(result.summary, '合并后的摘要。');
+  assert.strictEqual(result.summary, 'Merged summary.');
 }
 
 async function main() {

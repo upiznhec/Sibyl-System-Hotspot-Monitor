@@ -1,7 +1,6 @@
 // Topic settings: which topics to keep, their keywords, priority, hints, icons and noise rules.
 // They come from config.topics: a list of topics, an object, or the name of a preset in
-// sibyl/presets/. Without config.topics the example preset is used (English output), or
-// v1.3.20's topics for the Chinese output of the rewrite check.
+// sibyl/presets/. Without config.topics the example preset is used.
 
 const fs = require('fs');
 const path = require('path');
@@ -9,7 +8,7 @@ const path = require('path');
 const { text } = require('./locale');
 
 const PRESETS_DIR = path.resolve(__dirname, '..', '..', 'presets');
-const DEFAULT_PRESETS = { en: 'example-beauty', zh: 'zh-v1.3.20' };
+const DEFAULT_PRESETS = { en: 'example-beauty' };
 
 const presetCache = new Map();
 

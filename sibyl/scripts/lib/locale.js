@@ -2,9 +2,9 @@
 // Each run sets them once from the config ("language", "timeZone"). The defaults are English
 // and the computer's own time zone, which is also the zone that cron uses.
 
+// Wording files in lib/lang/. English is the only one; another language can be added as a file.
 const LANGUAGE_LOADERS = {
-  en: () => require('./lang/en'),
-  zh: () => require('./lang/zh')
+  en: () => require('./lang/en')
 };
 
 const formatters = new Map();

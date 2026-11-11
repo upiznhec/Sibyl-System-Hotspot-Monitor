@@ -1,16 +1,16 @@
 #!/usr/bin/env node
-// These tests use the v1.3.20 wording until they are rewritten for English sources.
-require('./lib/locale').configureLocale({ language: 'zh', timeZone: 'Asia/Shanghai' });
+
+// Summaries before and after merging: the merge prompt carries known summaries, a merged event
+// keeps its members' summaries, and its new summary is written from them without fetching more.
 
 const assert = require('assert');
 const os = require('os');
 const path = require('path');
 
-process.env.SIBYL_DATA_DIR = path.join(
-  os.tmpdir(),
-  `sibyl-event-summary-merge-${process.pid}`
-);
+process.env.SIBYL_DATA_DIR = path.join(os.tmpdir(), `sibyl-event-summary-merge-${process.pid}`);
 
+const { configureLocale } = require('./lib/locale');
+configureLocale({ language: 'en', timeZone: 'America/Los_Angeles' });
 const { clusterSignals } = require('./lib/clusterer');
 const { applySemanticEventMerge, buildPrompt } = require('./lib/event-threader');
 const { applyEventSummaries } = require('./lib/event-summary');
@@ -19,50 +19,48 @@ function signal(title, platform, rank) {
   return {
     title,
     platform,
-    platformLabel: platform === 'weibo' ? '微博' : '抖音',
-    sourceType: 'hot_search',
+    platformLabel: platform === 'google-trends' ? 'Google Trends' : 'TikTok',
+    sourceType: platform === 'google-trends' ? 'trending_rss' : 'hashtag_ranking',
     rank,
-    heat: 1000000,
-    matchedKeywords: ['C罗'],
-    category: '体育',
+    heat: 100000,
+    matchedKeywords: ['football'],
+    category: 'Sports',
     capturedAt: '2026-07-03T03:00:00.000Z'
   };
 }
 
 async function main() {
   const clusters = clusterSignals([
-    signal('C罗打破淘汰赛零进球纪录', 'douyin', 21),
-    signal('C罗魔笛紧紧相拥', 'douyin', 27),
-    signal('C罗哭了', 'weibo', 5)
+    signal('Silva breaks knockout scoring drought', 'tiktok-creative-center', 21),
+    signal('Silva and Kovac embrace', 'tiktok-creative-center', 27),
+    signal('Silva in tears', 'google-trends', 5)
   ], {}, { similarityThreshold: 1.1 });
 
   const summaries = new Map([
-    ['C罗打破淘汰赛零进球纪录', 'C罗在葡萄牙对克罗地亚的世界杯淘汰赛中进球，帮助球队晋级。'],
-    ['C罗魔笛紧紧相拥', '葡萄牙淘汰克罗地亚后，C罗与莫德里奇在赛后拥抱。'],
-    ['C罗哭了', '葡萄牙晋级后，C罗在赛后落泪。']
+    ['Silva breaks knockout scoring drought', 'Silva scored in the World Cup knockout game against Croatia and Portugal advanced.'],
+    ['Silva and Kovac embrace', 'After Portugal knocked out Croatia, Silva and Kovac embraced on the pitch.'],
+    ['Silva in tears', 'Silva was in tears after Portugal advanced.']
   ]);
   clusters.forEach(cluster => {
     cluster.eventSummary = summaries.get(cluster.mainSignal.title);
   });
 
   const prompt = buildPrompt(clusters, new Map());
-  assert(prompt.includes('葡萄牙晋级后，C罗在赛后落泪。'));
+  assert.ok(prompt.includes('Silva was in tears after Portugal advanced.'));
 
-  const merged = await applySemanticEventMerge(clusters, {}, {
-    minConfidence: 0.8
-  }, {
+  const merged = await applySemanticEventMerge(clusters, {}, { minConfidence: 0.8 }, {
     decideGroups: candidates => ({
       groups: [{
         memberIds: candidates.map((_, index) => `e${index + 1}`),
         confidence: 0.96,
-        sharedEventAnchor: '葡萄牙对克罗地亚的世界杯淘汰赛及赛后',
+        sharedEventAnchor: 'Portugal v Croatia World Cup knockout game and its aftermath',
         relationType: 'direct_aftermath',
         memberEvidence: candidates.map((cluster, index) => ({
           memberId: `e${index + 1}`,
-          evidence: `${cluster.mainSignal.title}直接发生于该场淘汰赛或赛后阶段`
+          evidence: `${cluster.mainSignal.title} happened in or right after that game`
         })),
-        title: 'C罗助葡萄牙晋级，赛后与莫德里奇相拥落泪',
-        reason: '三条话题分别描述同一场淘汰赛的结果与直接赛后动态'
+        title: 'Silva sends Portugal through, then embraces Kovac in tears',
+        reason: 'The three items describe one knockout game and what happened right after it'
       }],
       titles: []
     })
@@ -72,29 +70,20 @@ async function main() {
   assert.strictEqual(merged[0].eventMerge.memberSummaries.length, 3);
 
   let retrievalCalls = 0;
-  await applyEventSummaries(merged, {
-    eventSummary: {
-      retrievalLimit: 10
-    }
-  }, {
+  await applyEventSummaries(merged, { eventSummary: { retrievalLimit: 10 } }, {
     retrieveEvidence: async () => {
       retrievalCalls++;
-      throw new Error('合并摘要不应再次联网');
+      throw new Error('a merged event must not fetch again');
     },
     summarize: async content => ({
-      summary: content.includes('赛后落泪')
-        ? 'C罗帮助葡萄牙晋级并打破纪录，赛后与莫德里奇相拥落泪。'
-        : ''
+      summary: content.includes('in tears') ? 'Silva scored to send Portugal past Croatia and was in tears after the game.' : ''
     })
   });
 
   assert.strictEqual(retrievalCalls, 0);
   assert.strictEqual(merged[0].eventSummarySource, 'member-summaries-elixir');
-  assert.strictEqual(
-    merged[0].eventSummary,
-    'C罗帮助葡萄牙晋级并打破纪录，赛后与莫德里奇相拥落泪。'
-  );
-  console.log('事件摘要前置与合并后归纳测试通过');
+  assert.strictEqual(merged[0].eventSummary, 'Silva scored to send Portugal past Croatia and was in tears after the game.');
+  console.log('event summary merge tests passed');
 }
 
 main().catch(error => {

@@ -34,22 +34,20 @@ function parseNumber(value) {
   if (value === null || value === undefined || value === '') return 0;
   if (typeof value === 'number') return Number.isFinite(value) ? value : 0;
   const text = String(value).replace(/,/g, '').trim();
-  // 万/亿 as in v1.3.20; K, M and B as in "20K+" (Google Trends). A letter after the unit
+  // K, M and B as in "20K+" (Google Trends) or "325.3M" (TikTok). A letter after the unit
   // (as in "5 mins") means it is not a unit.
-  const matched = text.match(/([\d.]+)\s*(亿|万|w|W|[kKmMbB](?![a-zA-Z]))?/);
+  const matched = text.match(/([\d.]+)\s*([kKmMbB](?![a-zA-Z]))?/);
   if (!matched) return 0;
   const num = parseFloat(matched[1]);
   if (!Number.isFinite(num)) return 0;
   const unit = matched[2];
-  if (unit === '亿') return Math.round(num * 100000000);
-  if (unit === '万' || unit === 'w' || unit === 'W') return Math.round(num * 10000);
   if (unit === 'k' || unit === 'K') return Math.round(num * 1000);
   if (unit === 'm' || unit === 'M') return Math.round(num * 1000000);
   if (unit === 'b' || unit === 'B') return Math.round(num * 1000000000);
   return Math.round(num);
 }
 
-// Heat in the configured language's units: "120万" (zh) or "1.2M" (en).
+// Heat in the configured language's units, such as "1.2M".
 function formatHeat(value) {
   const num = parseNumber(value);
   if (!num) return '0';
@@ -74,12 +72,12 @@ function showsBoard(platform) {
   return require('./source-registry').getSource(platform)?.showBoard !== false;
 }
 
-// Heat as shown next to a rank: "120万" (zh), or "85M views" and "20K+ searches" (en).
+// Heat as shown next to a rank, such as "85M views" or "20K+ searches".
 function displayHeat(signal) {
   return text().displayHeat(signal, formatHeat, heatUnit(signal.platform, signal.sourceType));
 }
 
-// One source's rank and heat: "微博#3 120万" (zh) or "TikTok #2 85M views" (en).
+// One source's rank and heat, such as "TikTok #2 85M views".
 function formatSignalBrief(signal) {
   return text().signalBrief({
     label: signal.platformLabel,

@@ -27,9 +27,9 @@ function measure(text, channel) {
 }
 
 function briefing(itemCount, itemChars) {
-  const header = '# 热点综合播报\n生成时间：10:00';
+  const header = '# Trend Briefing\nGenerated: 10:00';
   const items = Array.from({ length: itemCount }, (_, i) =>
-    `### ${i + 1}. 话题${i + 1}\n${'内'.repeat(itemChars)}\n**来源**：[查看](https://example.test/${i + 1})`);
+    `### ${i + 1}. Topic ${i + 1}\n${'é'.repeat(itemChars)}\n**Source:** [View](https://example.test/${i + 1})`);
   return [header, ...items].join('\n');
 }
 
@@ -67,14 +67,14 @@ function checkChannels() {
 function checkPayloads() {
   assert.deepStrictEqual(payloadFor('wecom', 'x'), { msgtype: 'markdown', markdown: { content: 'x' } });
   assert.deepStrictEqual(payloadFor('discord', 'x'), { content: 'x' });
-  assert.deepStrictEqual(payloadFor('slack', '### 1. 标题\n**来源**：[查看](https://example.test/a)\n---'), {
-    text: '*1. 标题*\n*来源*：<https://example.test/a|查看>\n────────',
+  assert.deepStrictEqual(payloadFor('slack', '### 1. Title\n**Source**: [View](https://example.test/a)\n---'), {
+    text: '*1. Title*\n*Source*: <https://example.test/a|View>\n────────',
     mrkdwn: true
   });
 }
 
 function checkSplitting() {
-  assert.deepStrictEqual(splitMessage('短消息', 'wecom'), ['短消息']);
+  assert.deepStrictEqual(splitMessage('short message', 'wecom'), ['short message']);
 
   Object.keys(CHANNELS).forEach(channel => {
     const text = briefing(30, 400);
@@ -86,7 +86,7 @@ function checkSplitting() {
   });
 
   // One item longer than the limit is split at line breaks instead of being sent too long.
-  const longItem = `### 1. 长话题\n${Array.from({ length: 60 }, (_, i) => `第${i + 1}行${'字'.repeat(50)}`).join('\n')}`;
+  const longItem = `### 1. Long topic\n${Array.from({ length: 60 }, (_, i) => `Line ${i + 1} ${'é'.repeat(50)}`).join('\n')}`;
   const parts = splitMessage(longItem, 'discord');
   assert.ok(parts.length > 1);
   parts.forEach(part => assert.ok(part.length <= CHANNELS.discord.limit));
@@ -135,11 +135,11 @@ async function checkSending() {
       res.statusCode = item.status;
       res.end(item.body);
     });
-    const sent = await sendMessage(url, '**测试**', { channel: item.channel });
+    const sent = await sendMessage(url, '**test**', { channel: item.channel });
     server.close();
     assert.strictEqual(sent, item.expected, `${item.channel} ${item.status} ${item.body}`);
     assert.strictEqual(received[0].path, '/hook?key=test');
-    assert.deepStrictEqual(received[0].body, payloadFor(item.channel, '**测试**'));
+    assert.deepStrictEqual(received[0].body, payloadFor(item.channel, '**test**'));
   }
 
   assert.strictEqual(await sendMessage('', 'x'), false);
@@ -151,22 +151,22 @@ async function checkSending() {
     res.statusCode = 204;
     res.end();
   });
-  assert.strictEqual(await sendInParts(discord.url, text, { channel: 'discord', title: '热点综合播报', delayMs: 0 }), true);
+  assert.strictEqual(await sendInParts(discord.url, text, { channel: 'discord', title: 'Trend Briefing', delayMs: 0 }), true);
   discord.server.close();
   const contents = discord.received.map(item => item.body.content);
   assert.ok(contents.length > 1);
   contents.forEach((content, i) => {
-    assert.ok(content.startsWith(`热点综合播报 (${i + 1}/${contents.length})\n\n`));
+    assert.ok(content.startsWith(`Trend Briefing (${i + 1}/${contents.length})\n\n`));
     assert.ok(content.length <= 2000);
   });
-  assert.strictEqual(contents.map(content => content.replace(/^热点综合播报 \(\d+\/\d+\)\n\n/, '')).join('\n'), text);
+  assert.strictEqual(contents.map(content => content.replace(/^Trend Briefing \(\d+\/\d+\)\n\n/, '')).join('\n'), text);
 
   // One failed part makes the whole push count as failed.
   const flaky = await startServer((res, count) => {
     res.statusCode = 200;
     res.end(count === 2 ? '{"errcode":45009}' : '{"errcode":0}');
   });
-  assert.strictEqual(await sendInParts(flaky.url, briefing(30, 400), { title: '热点综合播报', delayMs: 0 }), false);
+  assert.strictEqual(await sendInParts(flaky.url, briefing(30, 400), { title: 'Trend Briefing', delayMs: 0 }), false);
   flaky.server.close();
 }
 

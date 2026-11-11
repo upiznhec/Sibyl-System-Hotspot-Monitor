@@ -1,9 +1,13 @@
 #!/usr/bin/env node
-// These tests use the v1.3.20 wording until they are rewritten for English sources.
-require('./lib/locale').configureLocale({ language: 'zh', timeZone: 'Asia/Shanghai' });
+
+// Events converge over two merge rounds with a model's decisions (mocked here): candidates that
+// share a name or summary are sent together, the ones sharing a name get summaries first, and
+// a second round keeps the merged event whole.
 
 const assert = require('assert');
 
+const { configureLocale } = require('./lib/locale');
+configureLocale({ language: 'en', timeZone: 'America/Los_Angeles' });
 const { clusterSignals } = require('./lib/clusterer');
 const {
   applySemanticEventMerge,
@@ -11,16 +15,16 @@ const {
   selectPreSummaryCandidates
 } = require('./lib/event-threader');
 
-function signal(title, platform, rank, matchedKeywords = ['C罗']) {
+function signal(title, platform, rank) {
   return {
     title,
     platform,
-    platformLabel: platform === 'weibo' ? '微博' : '抖音',
-    sourceType: 'hot_search',
+    platformLabel: platform === 'google-trends' ? 'Google Trends' : 'TikTok',
+    sourceType: platform === 'google-trends' ? 'trending_rss' : 'hashtag_ranking',
     rank,
-    heat: 1000000,
-    matchedKeywords,
-    category: '体育',
+    heat: 100000,
+    matchedKeywords: ['football'],
+    category: 'Sports',
     capturedAt: '2026-07-03T05:00:00.000Z'
   };
 }
@@ -29,64 +33,61 @@ function groupFor(candidates, memberIndexes, title) {
   return {
     memberIds: memberIndexes.map(index => `e${index + 1}`),
     confidence: 0.95,
-    sharedEventAnchor: '葡萄牙对克罗地亚的世界杯淘汰赛及赛后',
+    sharedEventAnchor: 'Portugal v Croatia World Cup quarterfinal and its aftermath',
     relationType: 'direct_aftermath',
     memberEvidence: memberIndexes.map(index => ({
       memberId: `e${index + 1}`,
-      evidence: `${candidates[index].mainSignal.title}直接属于该场淘汰赛时间线`
+      evidence: `${candidates[index].mainSignal.title} is part of that game's timeline`
     })),
     title,
-    reason: '这些话题分别描述同一场淘汰赛的比赛结果与直接赛后动态'
+    reason: 'These items describe the result of one knockout game and what followed it'
   };
 }
 
 async function main() {
   const clusters = clusterSignals([
-    signal('C罗打破淘汰赛零进球纪录', 'douyin', 23),
-    signal('C罗哭了', 'weibo', 1),
-    signal('足球内置芯片救了葡萄牙', 'weibo', 18, ['葡萄牙']),
-    signal('C罗被换下不高兴', 'weibo', 37)
+    signal('Silva breaks knockout scoring drought', 'tiktok-creative-center', 23),
+    signal('Silva in tears after the final whistle', 'google-trends', 1),
+    signal('Smart ball chip saves Portugal', 'google-trends', 18),
+    signal('Silva unhappy after substitution', 'google-trends', 37)
   ], {}, { similarityThreshold: 1.1 });
 
   clusters.forEach(cluster => {
-    cluster.eventSummary = `${cluster.mainSignal.title}发生在葡萄牙淘汰克罗地亚晋级的同一场比赛。`;
+    cluster.eventSummary = `${cluster.mainSignal.title} happened in the same World Cup quarterfinal in which Portugal beat Croatia.`;
   });
   const batches = buildCandidateBatches(clusters);
   assert.strictEqual(batches.length, 1);
   assert.strictEqual(batches[0].length, 4);
 
-  const preSummaryCandidates = selectPreSummaryCandidates(clusters, {
-    preSummaryCandidateLimit: 3
-  });
+  const preSummaryCandidates = selectPreSummaryCandidates(clusters, { preSummaryCandidateLimit: 3 });
   assert.strictEqual(preSummaryCandidates.length, 3);
 
+  // Round one: the model joins the two strongest candidates; the shared name, competition and
+  // stage join the other two.
   const first = await applySemanticEventMerge(clusters, {}, {}, {
     decideGroups: candidates => ({
-      groups: [groupFor(candidates, [0, 1], 'C罗助葡萄牙晋级并在赛后落泪')],
+      groups: [groupFor(candidates, [0, 1], 'Silva sends Portugal through, then tears at the final whistle')],
       titles: []
     })
   });
   assert.strictEqual(first.length, 1);
 
+  // Round two: asked again about the merged event, the model keeps it whole.
   first.forEach(cluster => {
     if (!cluster.eventSummary) {
-      cluster.eventSummary = '葡萄牙淘汰克罗地亚晋级，比赛结果与赛后动态持续受到讨论。';
+      cluster.eventSummary = 'Portugal beat Croatia in the World Cup quarterfinal; the result and what followed are widely discussed.';
     }
   });
   const second = await applySemanticEventMerge(first, {}, {}, {
     decideGroups: candidates => ({
-      groups: [groupFor(
-        candidates,
-        candidates.map((_, index) => index),
-        'C罗助葡萄牙晋级，破纪录及赛后动态引关注'
-      )],
+      groups: [groupFor(candidates, candidates.map((_, index) => index), 'Silva sends Portugal through as a smart ball chip and his record trend')],
       titles: []
     })
   });
 
   assert.strictEqual(second.length, 1);
   assert.strictEqual(second[0].signals.length, 4);
-  console.log('二轮事件收敛合并测试通过');
+  console.log('two-round event convergence tests passed');
 }
 
 main().catch(error => {

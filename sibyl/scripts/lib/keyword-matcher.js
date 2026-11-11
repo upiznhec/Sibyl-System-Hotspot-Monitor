@@ -1,5 +1,7 @@
-// Keyword matching rules, unchanged from weibo-monitor/scripts/keywords-loader.js (v1.3.20).
+// Keyword matching rules from weibo-monitor/scripts/keywords-loader.js (v1.3.20).
 // A keyword is a plain word or { word, requireAny?, exclude? }.
+// Change for English: requireAny and exclude words match whole words, as the keyword itself
+// does ("ai" no longer matches inside "airline"); Chinese words still match inside text.
 
 function getKeywordWord(keyword) {
   if (typeof keyword === 'object' && keyword.word) {
@@ -35,8 +37,8 @@ function hasBasicKeywordMatch(lowerTitle, lowerKeyword, allowChineseSubstring = 
       if (/[a-z0-9]/i.test(prevChar)) beforeValid = false;
       if (
         !allowChineseSubstring &&
-        /[一-龥]/.test(lowerKeyword[0]) &&
-        /[一-龥]/.test(prevChar)
+        /[\u4e00-\u9fa5]/.test(lowerKeyword[0]) &&
+        /[\u4e00-\u9fa5]/.test(prevChar)
       ) {
         beforeValid = false;
       }
@@ -69,7 +71,7 @@ function keywordMatchesTitle(title, keyword, options = {}) {
   const lowerKeyword = String(keywordWord).toLowerCase();
   const requireAny = getKeywordRequireAny(keyword);
   const excludeWords = getKeywordExcludes(keyword);
-  const isLongChineseEntity = /^[一-龥]{3,}$/.test(lowerKeyword);
+  const isLongChineseEntity = /^[\u4e00-\u9fa5]{3,}$/.test(lowerKeyword);
   const allowChineseSubstring = requireAny.length > 0 || isLongChineseEntity;
 
   if (!hasBasicKeywordMatch(lowerTitle, lowerKeyword, allowChineseSubstring)) {
@@ -78,17 +80,17 @@ function keywordMatchesTitle(title, keyword, options = {}) {
 
   if (
     requireAny.length > 0 &&
-    !requireAny.some(word => lowerTitle.includes(String(word).toLowerCase()))
+    !requireAny.some(word => hasBasicKeywordMatch(lowerTitle, String(word).toLowerCase(), true))
   ) {
     return false;
   }
 
   const matchedExclude = excludeWords.find(word =>
-    lowerTitle.includes(String(word).toLowerCase())
+    hasBasicKeywordMatch(lowerTitle, String(word).toLowerCase(), true)
   );
   if (matchedExclude) {
     if (options.logExclusion) {
-      console.log(`[排除] "${title}" 匹配"${keywordWord}"但包含排除词: ${matchedExclude}`);
+      console.log(`[excluded] "${title}" matches "${keywordWord}" but contains "${matchedExclude}"`);
     }
     return false;
   }

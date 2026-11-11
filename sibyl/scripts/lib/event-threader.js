@@ -18,14 +18,6 @@ const DEFAULT_CONFIG = {
   maxTokens: 1400
 };
 
-const VAGUE_TITLE_PATTERNS = [
-  /动态持续升温/,
-  /相关动态/,
-  /引发关注/,
-  /成为焦点/,
-  /话题不断/,
-  /讨论延续/
-];
 const ALLOWED_RELATION_TYPES = new Set([
   'same_fact',
   'cause_result',
@@ -33,62 +25,10 @@ const ALLOWED_RELATION_TYPES = new Set([
   'direct_aftermath',
   'direct_discussion'
 ]);
-const VAGUE_ANCHOR_PATTERNS = [
-  /相关(事件|动态|话题)?$/,
-  /近期动态$/,
-  /热点事件$/,
-  /同一(人物|选手|队伍|俱乐部|游戏|品类)/,
-  /^(人物|选手|队伍|俱乐部|游戏|赛事)动态$/
-];
-const GENERIC_EVIDENCE_PATTERN =
-  /关键词匹配|品类一致|主体一致|名称相同|同一人物|同一选手|同一队伍|同一俱乐部|同一游戏|都是.{0,8}(动态|话题)/;
-const ANCHOR_STOP_BIGRAMS = new Set([
-  '事件', '话题', '热点', '引发', '关注', '相关', '赛后', '比赛', '成为',
-  '表示', '网友', '今日', '目前', '进行', '最终', '同时', '本场'
-]);
-const GENERIC_ANCHOR_PHRASES = new Set([
-  '世界杯', '大满贯', '淘汰赛', '比赛结果', '赛后动态', '引发关注', '成为热点'
-]);
-const DISCIPLINE_PATTERNS = [
-  ['mixed_doubles', /混双|混合双打/],
-  ['mens_singles', /男单|男子单打/],
-  ['womens_singles', /女单|女子单打/],
-  ['mens_doubles', /男双|男子双打/],
-  ['womens_doubles', /女双|女子双打/]
-];
-const STAGE_PATTERNS = [
-  ['r16', /1\/8决赛|八分之一决赛|止步16强|晋级16强|16强|无缘八强|无人晋级八强|未进八强/],
-  ['qf', /1\/4决赛|四分之一决赛|晋级八强|止步八强|八强/],
-  ['sf', /半决赛|晋级四强|止步四强|四强/],
-  ['final', /决赛|夺冠|亚军/]
-];
-const COMPETITION_PATTERNS = [
-  ['wtt_us_smash', /WTT.{0,8}美国大满贯|美国大满贯/i],
-  ['world_cup', /世界杯/],
-  ['champions_league', /欧冠/],
-  ['nba', /\bNBA\b/i]
-];
 
-// v1.3.20's Chinese rules stay as they are for the rewrite check; English output uses the
-// translated rules in lib/lang/en.js.
-const ZH_RULES = {
-  vagueTitles: VAGUE_TITLE_PATTERNS,
-  vagueAnchors: VAGUE_ANCHOR_PATTERNS,
-  genericEvidence: GENERIC_EVIDENCE_PATTERN,
-  disciplines: DISCIPLINE_PATTERNS,
-  stages: STAGE_PATTERNS,
-  competitions: COMPETITION_PATTERNS,
-  minEvidenceLength: 8,
-  fingerprintReason: '赛事、项目与事实锚点形成同一事件指纹',
-  retitleReason: '多话题事件标题归一'
-};
-
-function isEnglish() {
-  return text().code !== 'zh';
-}
-
+// Patterns and wording for merging, translated from v1.3.20 (lib/lang/en.js).
 function rules() {
-  return isEnglish() ? text().merge : ZH_RULES;
+  return text().merge;
 }
 
 function loadModelConfig(customConfig = {}) {
@@ -141,26 +81,11 @@ function selectPreSummaryCandidates(clusters, config = {}) {
     .slice(0, limit);
 }
 
-// English: the content words of the event's title, summary and search terms.
+// The content words of the event's title, summary and search terms.
 function anchorWords(cluster) {
   return new Set([cluster.canonicalTitle, cluster.eventSummary, ...(cluster.aliases || [])]
     .filter(Boolean)
     .flatMap(contentWords));
-}
-
-function anchorBigrams(cluster) {
-  const text = [
-    cluster.canonicalTitle,
-    cluster.eventSummary,
-    ...(cluster.aliases || [])
-  ].filter(Boolean).join('');
-  const chars = text.replace(/[^\u4e00-\u9fa5a-z0-9]/gi, '').toLowerCase();
-  const grams = new Set();
-  for (let index = 0; index < chars.length - 1; index++) {
-    const gram = chars.slice(index, index + 2);
-    if (!ANCHOR_STOP_BIGRAMS.has(gram)) grams.add(gram);
-  }
-  return grams;
 }
 
 function clusterText(cluster) {
@@ -177,22 +102,11 @@ function firstPattern(text, patterns) {
 
 function anchorPhrases(cluster) {
   const phrases = new Set(cluster.entityTokens || []);
-  if (isEnglish()) {
-    // Pairs of neighbouring words, such as "kirk cousins", from the titles.
-    [cluster.canonicalTitle, ...(cluster.aliases || [])].filter(Boolean).forEach(title => {
-      const words = contentWords(title);
-      for (let index = 0; index < words.length - 1; index++) phrases.add(`${words[index]} ${words[index + 1]}`);
-    });
-    return [...phrases].slice(0, 180);
-  }
-  for (const chunk of clusterText(cluster).replace(/\s+/g, '').match(/[\u4e00-\u9fa5]{3,}/g) || []) {
-    for (let size = 3; size <= Math.min(6, chunk.length); size++) {
-      for (let index = 0; index <= chunk.length - size; index++) {
-        const phrase = chunk.slice(index, index + size);
-        if (!GENERIC_ANCHOR_PHRASES.has(phrase)) phrases.add(phrase);
-      }
-    }
-  }
+  // Pairs of neighbouring words, such as "kirk cousins", from the titles.
+  [cluster.canonicalTitle, ...(cluster.aliases || [])].filter(Boolean).forEach(title => {
+    const words = contentWords(title);
+    for (let index = 0; index < words.length - 1; index++) phrases.add(`${words[index]} ${words[index + 1]}`);
+  });
   return [...phrases].slice(0, 180);
 }
 
@@ -228,7 +142,6 @@ function strongFingerprintMatch(left, right) {
   if (sameCompetition && sameStage && sharedEntity) {
     return anchor || sharedEntity || a.competition;
   }
-  if (anchor && /葡萄牙|克罗地亚/.test(anchor)) return anchor;
   return null;
 }
 
@@ -239,16 +152,9 @@ function likelyRelated(left, right) {
   const leftEntities = new Set(left.entityTokens || []);
   if ((right.entityTokens || []).some(entity => leftEntities.has(entity))) return true;
   if (!left.eventSummary || !right.eventSummary) return false;
-  if (isEnglish()) {
-    const leftWords = anchorWords(left);
-    return [...anchorWords(right)].filter(word => leftWords.has(word)).length >= 3;
-  }
-  const leftGrams = anchorBigrams(left);
-  let overlap = 0;
-  for (const gram of anchorBigrams(right)) {
-    if (leftGrams.has(gram)) overlap++;
-  }
-  return overlap >= 5;
+  // Summaries that share at least three content words.
+  const leftWords = anchorWords(left);
+  return [...anchorWords(right)].filter(word => leftWords.has(word)).length >= 3;
 }
 
 function buildCandidateBatches(candidates, config = {}) {
@@ -349,7 +255,7 @@ Reply with valid JSON only.`;
 function buildPrompt(candidates, summaries) {
   const items = candidates.map((cluster, index) => {
     const topics = (cluster.signals || []).map(signal =>
-      `${signal.platformLabel || signal.platform}${isEnglish() ? ': ' : '：'}${signal.title}`
+      `${signal.platformLabel || signal.platform}: ${signal.title}`
     );
     const knownSummaries = [
       cluster.eventSummary,
@@ -368,64 +274,7 @@ function buildPrompt(candidates, summaries) {
     };
   });
 
-  if (isEnglish()) return buildEnglishPrompt(items);
-  return `你负责把多平台热搜整理成“热点事件线”。不要使用固定的体育、电竞或游戏字段模板，只判断不同话题能否组成同一段具体、连贯、没有逻辑跳跃的事件叙述。
-
-合并标准：
-1. 同一事实的不同表述应合并。
-2. 同一时间线上的直接前因、结果、回应、赛后/上线后动态和衍生讨论可以合并。
-3. 例如“哈兰德助挪威晋级”和“哈兰德赛后在纽约逛街”可以合并，因为后者明确处于同一场比赛的赛后时间线。
-4. 仅出现同一个人物、队伍或游戏名不能合并。
-5. 不同比赛、不同版本、不同事故，或产生新的正式处罚、转会、伤病结论等独立结果时应拆分。
-6. 无法确认时保持拆分，不要为了减少条目强行合并。
-7. 不同品类不得合并。
-8. 必须指出一个具体的共同事件锚点。人物、队伍、俱乐部、游戏或品类名称本身不是事件锚点。
-9. 每个成员都必须说明它与共同事件锚点的直接关系；不能只写“关键词匹配、品类一致、同一主体”。
-10. 职业决定与无明确关联的个人活动、比赛纪录与无明确关联的机制讨论等，仅主体相同时应拆分。这些是边界示例，不是固定品类枚举。
-
-关系类型只能选择：
-- same_fact：同一事实的不同表达
-- cause_result：明确的前因与结果
-- official_response：事件与针对该事件的正式回应
-- direct_aftermath：明确属于该事件后的直接动态
-- direct_discussion：明确针对同一事件或同一版本的直接讨论
-
-标题要求：
-- 只根据输入话题和已有摘要生成，不补充外部事实。
-- 使用“核心事实 + 最具代表性的衍生事实”。
-- 标题必须具体描述事件，建议12至32个汉字。
-- 可以写“哈兰德助挪威晋级，赛后纽约逛街成为热点”。
-- 禁止使用“赛后动态持续升温、相关动态、引发关注、成为焦点、话题不断、讨论延续”等空泛表达。
-
-请返回需要合并的组；如果某个候选本身已经包含多个平台话题词，也可以单独为它生成更完整的事件标题。单话题事件不需要改标题。JSON格式：
-{
-  "groups": [
-    {
-      "memberIds": ["e1", "e2"],
-      "confidence": 0.9,
-      "sharedEventAnchor": "具体到比赛、官宣、版本或争议的共同事件",
-      "relationType": "same_fact|cause_result|official_response|direct_aftermath|direct_discussion",
-      "memberEvidence": [
-        {"memberId": "e1", "evidence": "该成员与共同事件的具体关系"},
-        {"memberId": "e2", "evidence": "该成员与共同事件的具体关系"}
-      ],
-      "title": "具体事件标题",
-      "reason": "一句话说明为什么属于同一事件线"
-    }
-  ],
-  "titles": [
-    {
-      "memberId": "e3",
-      "confidence": 0.9,
-      "title": "覆盖该事件多个话题角度的具体标题"
-    }
-  ]
-}
-
-候选事件：
-${JSON.stringify(items, null, 2)}
-
-只输出合法JSON。`;
+  return buildEnglishPrompt(items);
 }
 
 function parseJson(content) {
@@ -443,7 +292,7 @@ function parseJson(content) {
   }
 }
 
-// English titles keep their spaces; 10 to 100 characters, at least two words.
+// Titles keep their spaces; 10 to 100 characters, at least two words.
 function cleanEnglishTitle(title) {
   const cleaned = String(title || '')
     .trim()
@@ -459,36 +308,17 @@ function cleanEnglishTitle(title) {
 }
 
 function cleanTitle(title) {
-  if (isEnglish()) return cleanEnglishTitle(title);
-  const cleaned = String(title || '')
-    .replace(/^["'“”]+|["'“”]+$/g, '')
-    .replace(/^事件标题[:：]\s*/, '')
-    .replace(/\s+/g, '')
-    .trim()
-    .slice(0, 44);
-  if (cleaned.length < 6) return '';
-  if (VAGUE_TITLE_PATTERNS.some(pattern => pattern.test(cleaned))) return '';
-  return cleaned;
+  return cleanEnglishTitle(title);
 }
 
+// A title in words of a readable length, else the longest.
 function fallbackTitle(clusters) {
-  if (isEnglish()) {
-    // A title in words of a readable length, else the longest.
-    return clusters
-      .flatMap(cluster => cluster.aliases || [cluster.mainSignal.title])
-      .filter(Boolean)
-      .sort((a, b) => {
-        const fit = title => (!isHashtag(title) && title.length >= 15 && title.length <= 90 ? 1 : 0);
-        return fit(b) - fit(a) || b.length - a.length;
-      })[0];
-  }
   return clusters
     .flatMap(cluster => cluster.aliases || [cluster.mainSignal.title])
     .filter(Boolean)
     .sort((a, b) => {
-      const aFit = a.length >= 10 && a.length <= 32 ? 1 : 0;
-      const bFit = b.length >= 10 && b.length <= 32 ? 1 : 0;
-      return bFit - aFit || b.length - a.length;
+      const fit = title => (!isHashtag(title) && title.length >= 15 && title.length <= 90 ? 1 : 0);
+      return fit(b) - fit(a) || b.length - a.length;
     })[0];
 }
 
@@ -518,15 +348,9 @@ function categorySet(clusters) {
 }
 
 function cleanAnchor(anchor) {
-  if (isEnglish()) {
-    const value = String(anchor || '').replace(/\s+/g, ' ').trim().slice(0, 120);
-    if (value.length < 8) return '';
-    return rules().vagueAnchors.some(pattern => pattern.test(value)) ? '' : value;
-  }
-  const value = String(anchor || '').replace(/\s+/g, '').trim().slice(0, 60);
-  if (value.length < 6) return '';
-  if (VAGUE_ANCHOR_PATTERNS.some(pattern => pattern.test(value))) return '';
-  return value;
+  const value = String(anchor || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (value.length < 8) return '';
+  return rules().vagueAnchors.some(pattern => pattern.test(value)) ? '' : value;
 }
 
 function validMemberEvidence(group, memberIds) {

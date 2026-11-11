@@ -1,5 +1,5 @@
 // Push for briefings and instant alerts.
-// Channels: WeCom (企业微信, the original), Slack and Discord incoming webhooks, and Telegram
+// Channels: WeCom (WeChat Work, the original), Slack and Discord incoming webhooks, and Telegram
 // (a bot that messages one chat, for people who do not use a work chat app).
 // The channel is read from the webhook host, or set explicitly with config "channel".
 // Unknown hosts get the WeCom payload, as v1.3.20 sent to every webhook.

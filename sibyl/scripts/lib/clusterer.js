@@ -1,12 +1,6 @@
 const { formatSignalBrief, normalizeForCompare, stableHash } = require('./signals');
 const { text } = require('./locale');
 const english = require('./english-words');
-
-// v1.3.20's rules below (bigrams, Chinese stop words and patterns) apply to Chinese output only;
-// English titles are grouped by words (lib/english-words.js, lib/lang/en.js).
-function isEnglish() {
-  return text().code !== 'zh';
-}
 const {
   sourceHeatReference,
   sourceLabel,
@@ -15,41 +9,14 @@ const {
   sourceWeight
 } = require('./source-registry');
 
-const STOP_WORDS = new Set([
-  '热搜', '热榜', '话题', '回应', '官方', '最新', '今天', '今日', '昨日',
-  '怎么回事', '为什么', '排名', '讨论', '网友', '冲上', '登上', '引热议'
-]);
-
-const GENERIC_KEYWORDS = new Set([
-  '游戏', '电竞', '体育', '足球', '篮球', 'nba', 'cba', 'lpl', 'lck', 'kpl',
-  '英雄联盟', '王者荣耀', '世界杯', '欧冠', '英超', 'msi',
-  'ai', '人工智能', '生成式ai', 'aigc', '大模型', '智能体', '热搜', '热榜'
-]);
-
-const EVENT_CONCEPT_PATTERNS = [
-  { concept: 'hat_trick', pattern: /帽子戏法|戴帽|三进球/ },
-  { concept: 'goal', pattern: /世界波|进球|破门|绝杀|任意球|双响/ },
-  { concept: 'foul_injury', pattern: /踩小腿|踩踏|犯规|红牌|黄牌|受伤|伤退|拉伤|撞伤|伤病/ },
-  { concept: 'fan_support', pattern: /球迷|双向奔赴|加油|应援/ },
-  { concept: 'win_loss', pattern: /击败|战胜|不敌|淘汰|锁定|晋级|出线|夺冠|夺金|取胜|输给|获胜|翻盘/ },
-  { concept: 'award', pattern: /当选|最佳|mvp|MVP|全场最佳/ },
-  { concept: 'record', pattern: /射手王|打破.{0,6}纪录|刷新.{0,6}纪录|创下.{0,6}纪录|队史|加冕|登顶.{0,8}榜/ },
-  { concept: 'response', pattern: /回应|道歉|辟谣|否认|声明|发文|怒喷|吐槽|炮轰/ },
-  { concept: 'mechanism', pattern: /机制|elo|ELO|排位|匹配/ },
-  { concept: 'lineup_schedule', pattern: /训练赛|参赛|名单|阵容|赛程|开赛|首发|分组|抽签/ },
-  { concept: 'stats', pattern: /数据|统计|胜率|场次|年龄|排名|榜单/ },
-  { concept: 'transfer_trade', pattern: /交易|签约|续约|加盟|离队|转会|换来|换走|选秀|签位/ },
-  { concept: 'game_update', pattern: /上线|更新|削弱|加强|改动|版本|皮肤|补丁/ },
-  { concept: 'appearance', pattern: /合照|见面会|献唱|直播|采访|亮相/ }
-];
-
+// v1.3.20's score: rank, heat, matched keywords and list boost, times the source and list
+// weights. Heat reaches its 36-point cap at each source's reference value (heatReference);
+// without one, the v1.3.20 scale applies (the cap near 1,000,000).
 function scoreSignal(signal) {
   const platformWeight = sourceWeight(signal.platform);
   const listTypeWeight = sourceTypeWeight(signal.sourceType);
   const rank = signal.rank || 999;
   const rankScore = Math.max(0, 36 - Math.min(rank, 35)) * 1.25;
-  // v1.3.20 reaches the 36-point cap near 1,000,000 heat (Weibo, Douyin). Other sources count
-  // in other units, so their adapter says which heat should reach the cap.
   const heatReference = sourceHeatReference(signal.platform, signal.sourceType);
   const heatScore = heatReference
     ? Math.min(36, Math.log10((signal.heat || 0) + 10) * (36 / Math.log10(heatReference + 10)))
@@ -59,66 +26,26 @@ function scoreSignal(signal) {
   return Math.round((rankScore + heatScore + keywordBoost + boardBoost) * platformWeight * listTypeWeight);
 }
 
-function chineseBigrams(text) {
-  const chars = text.replace(/[^\u4e00-\u9fa5]/g, '');
-  const grams = [];
-  for (let i = 0; i < chars.length - 1; i++) {
-    grams.push(chars.slice(i, i + 2));
-  }
-  return grams;
-}
-
-// English: the event's own words, i.e. title words without stop words and without the topic
-// keywords the item matched (those say which topic, not which event).
-function englishEventWords(signal) {
+// The event's own words: title words without stop words, years, or the topic keywords the item
+// matched (those say which topic, not which event). v1.3.20 compared Chinese titles by pairs of
+// characters; English titles are compared by these words.
+function eventWords(signal) {
   const topicWords = english.keywordWords(signal.matchedKeywords || []);
   return [...new Set(english.contentWords(signal.title).filter(word => !topicWords.has(word)))].slice(0, 40);
 }
 
 function extractTokens(signal) {
-  if (isEnglish()) return englishEventWords(signal);
-  const normalized = normalizeForCompare(signal.title);
-  const tokens = new Set();
-
-  (signal.matchedKeywords || []).forEach(keyword => {
-    const word = normalizeForCompare(keyword);
-    if (word && !STOP_WORDS.has(word)) tokens.add(word);
-  });
-
-  const englishTokens = normalized.match(/[a-z0-9][a-z0-9_.-]{1,}/gi) || [];
-  englishTokens.forEach(token => {
-    if (!STOP_WORDS.has(token)) tokens.add(token);
-  });
-
-  chineseBigrams(normalized).forEach(token => {
-    if (!STOP_WORDS.has(token)) tokens.add(token);
-  });
-
-  return [...tokens].filter(token => token.length >= 2).slice(0, 40);
+  return eventWords(signal);
 }
 
 function extractEntityTokens(signal) {
-  if (isEnglish()) return englishEventWords(signal).slice(0, 20);
-  const entities = new Set();
-  (signal.matchedKeywords || []).forEach(keyword => {
-    const word = normalizeForCompare(keyword);
-    if (word && !STOP_WORDS.has(word) && !GENERIC_KEYWORDS.has(word)) {
-      entities.add(word);
-    }
-  });
-
-  const englishTokens = normalizeForCompare(signal.title).match(/[a-z0-9][a-z0-9_.-]{1,}/gi) || [];
-  englishTokens.forEach(token => {
-    const word = normalizeForCompare(token);
-    if (word && !GENERIC_KEYWORDS.has(word)) entities.add(word);
-  });
-
-  return [...entities].slice(0, 20);
+  return eventWords(signal).slice(0, 20);
 }
 
+// Kinds of event (lib/lang/en.js), so that a trade and an injury of the same player stay apart.
 function extractEventConcepts(title = '') {
   const concepts = new Set();
-  (isEnglish() ? text().eventConcepts : EVENT_CONCEPT_PATTERNS).forEach(({ concept, pattern }) => {
+  text().eventConcepts.forEach(({ concept, pattern }) => {
     if (pattern.test(title)) concepts.add(concept);
   });
   return [...concepts];
@@ -136,38 +63,9 @@ function jaccard(a, b) {
   return union ? intersection / union : 0;
 }
 
-function sharedStrongKeyword(signal, cluster) {
-  const signalKeywords = new Set((signal.matchedKeywords || []).map(normalizeForCompare).filter(Boolean));
-  const clusterKeywords = new Set((cluster.keywords || []).map(normalizeForCompare).filter(Boolean));
-  for (const keyword of signalKeywords) {
-    if (!clusterKeywords.has(keyword)) continue;
-    if (GENERIC_KEYWORDS.has(keyword)) continue;
-    if (/^[a-z0-9_.-]{3,}$/i.test(keyword)) return keyword;
-    if (/^[\u4e00-\u9fa5]{2,}$/.test(keyword)) return keyword;
-  }
-  return null;
-}
-
-function longestCommonSubstringRatio(a, b) {
-  if (!a || !b) return 0;
-  const shorter = a.length <= b.length ? a : b;
-  const longer = a.length > b.length ? a : b;
-  let best = 0;
-
-  for (let i = 0; i < shorter.length; i++) {
-    for (let j = i + 2; j <= shorter.length; j++) {
-      const piece = shorter.slice(i, j);
-      if (piece.length <= best) continue;
-      if (longer.includes(piece)) best = piece.length;
-    }
-  }
-
-  return best / Math.max(1, Math.min(a.length, b.length));
-}
-
-// How much two English titles share: 1 for the same title, 0.9 when a hashtag joins words of
-// the other title, else the share of the shorter title's event words found in the other.
-function englishTitleOverlap(signal, existing, topicWords) {
+// How much two titles share: 1 for the same title, 0.9 when a hashtag joins words of the other
+// title, else the share of the shorter title's event words found in the other.
+function titleOverlap(signal, existing, topicWords) {
   if (signal.normalizedTitle && signal.normalizedTitle === existing.normalizedTitle) return 1;
   if (english.hashtagJoinsWords(signal.title, existing.title, topicWords) ||
       english.hashtagJoinsWords(existing.title, signal.title, topicWords)) {
@@ -179,56 +77,16 @@ function englishTitleOverlap(signal, existing, topicWords) {
   return own.filter(word => other.includes(word)).length / Math.min(own.length, other.length);
 }
 
-function englishSimilarity(signal, cluster) {
+function similarity(signal, cluster) {
   const topicWords = english.keywordWords([...(signal.matchedKeywords || []), ...(cluster.keywords || [])]);
-  const titleScore = Math.max(...cluster.signals.map(existing => englishTitleOverlap(signal, existing, topicWords)));
+  const titleScore = Math.max(...cluster.signals.map(existing => titleOverlap(signal, existing, topicWords)));
   const tokenScore = jaccard(signal.tokens, cluster.tokens);
   const baseScore = titleScore * 0.6 + tokenScore * 0.4;
   const bothHaveConcepts = (signal.eventConcepts || []).length > 0 && (cluster.eventConcepts || []).length > 0;
-  // Same people or brand, different kinds of event (a trade and an injury): kept apart, as in v1.3.20.
+  // Same people or brand, different kinds of event: kept apart, as in v1.3.20.
   if (bothHaveConcepts && jaccard(signal.eventConcepts, cluster.eventConcepts) === 0 && titleScore < 0.55) {
     return Math.min(baseScore, 0.25);
   }
-  return baseScore;
-}
-
-function similarity(signal, cluster) {
-  if (isEnglish()) return englishSimilarity(signal, cluster);
-  const tokenScore = jaccard(signal.tokens, cluster.tokens);
-  const titleScore = Math.max(...cluster.signals.map(existing =>
-    longestCommonSubstringRatio(signal.normalizedTitle, existing.normalizedTitle)
-  ));
-  const keywordScore = jaccard(signal.matchedKeywords || [], cluster.keywords || []);
-  const entityScore = jaccard(signal.entityTokens || [], cluster.entityTokens || []);
-  const conceptScore = jaccard(signal.eventConcepts || [], cluster.eventConcepts || []);
-  const baseScore = tokenScore * 0.45 + titleScore * 0.45 + keywordScore * 0.1;
-  const strongKeyword = sharedStrongKeyword(signal, cluster);
-  const signalHasConcept = (signal.eventConcepts || []).length > 0;
-  const clusterHasConcept = (cluster.eventConcepts || []).length > 0;
-  const hasEntityOverlap = Boolean(strongKeyword) || entityScore > 0;
-  const hasConceptConflict = hasEntityOverlap &&
-    signalHasConcept &&
-    clusterHasConcept &&
-    conceptScore === 0;
-  const hasAsymmetricConcept = hasEntityOverlap &&
-    signalHasConcept !== clusterHasConcept;
-
-  if (hasConceptConflict && titleScore < 0.55) {
-    return Math.min(baseScore, 0.25);
-  }
-
-  if (hasAsymmetricConcept && titleScore < 0.45 && tokenScore < 0.25) {
-    return Math.min(baseScore, 0.3);
-  }
-
-  if (hasEntityOverlap && conceptScore > 0 && (titleScore >= 0.08 || tokenScore >= 0.05)) {
-    return Math.max(baseScore, 0.62);
-  }
-
-  if (strongKeyword && !signalHasConcept && !clusterHasConcept && (titleScore >= 0.55 || tokenScore >= 0.28)) {
-    return Math.max(baseScore, 0.58);
-  }
-
   return baseScore;
 }
 
@@ -385,7 +243,7 @@ function findPreviousCluster(cluster, previousByKey, candidateKey) {
   return best;
 }
 
-// English: the strongest title written in words, rather than a hashtag, names the event.
+// The strongest title written in words, rather than a hashtag, names the event.
 function readableTitle(signals) {
   return (signals.find(signal => !english.isHashtag(signal.title)) || signals[0]).title;
 }
@@ -395,7 +253,7 @@ function finalizeCluster(cluster, previousByKey, options = {}) {
   cluster.mainSignal = cluster.signals[0];
   cluster.canonicalTitle = options.canonicalTitle ||
     cluster.canonicalTitle ||
-    (isEnglish() ? readableTitle(cluster.signals) : cluster.mainSignal.title);
+    readableTitle(cluster.signals);
   cluster.aliases = [...new Set(cluster.signals.map(signal => signal.title).filter(Boolean))];
   cluster.keywords = [...new Set(cluster.signals.flatMap(signal => signal.matchedKeywords || []))];
   cluster.entityTokens = [...new Set(cluster.signals.flatMap(signal => signal.entityTokens || []))];

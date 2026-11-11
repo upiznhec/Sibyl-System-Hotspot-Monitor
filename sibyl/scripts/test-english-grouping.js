@@ -65,7 +65,7 @@ assert.strictEqual(strongFingerprintMatch(left, { ...right, category: 'Beauty' }
 const prompt = buildPrompt([{ category: 'Football', signals: [{ platformLabel: 'Google Trends', title: 'kirk cousins trade' }], aliases: [], entityTokens: [] }], new Map());
 assert.ok(prompt.includes('Google Trends: kirk cousins trade'));
 assert.ok(prompt.includes('Sharing only the same person, team, brand or game is not enough to merge.'));
-assert.ok(!/[一-龥]/.test(prompt));
+assert.ok(!/[\u4e00-\u9fa5]/.test(prompt));
 
 // Exclude words keep a topic's routine items out of the main briefing.
 const settings = compileTopicSettings({ topics: [{ name: 'Games', keywords: ['game'], briefingExclude: ['patch notes'] }] }, __dirname);

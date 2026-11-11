@@ -1,38 +1,36 @@
 #!/usr/bin/env node
-// These tests use the v1.3.20 wording until they are rewritten for English sources.
-require('./lib/locale').configureLocale({ language: 'zh', timeZone: 'Asia/Shanghai' });
+
+// Briefing layout (v1.3.20, in English): no run statistics in the briefing, main sources in
+// the numbered list, and items seen only on followed sources under "From sources you follow".
 
 const assert = require('assert');
+
+const { configureLocale } = require('./lib/locale');
+configureLocale({ language: 'en', timeZone: 'America/Los_Angeles' });
 const { generateReport } = require('./lib/report-generator');
 
-function cluster(title, platform, score) {
-  const signal = {
-    title,
-    platform,
-    platformLabel: platform === 'douyin' ? '抖音' : '虎扑',
-    rank: 2,
-    heat: 1000000
-  };
+function cluster(title, platform, platformLabel, score) {
+  const signal = { title, platform, platformLabel, sourceType: platform === 'rss' ? 'feed_item' : 'trending_rss', rank: 2, heat: 100000 };
   return {
     mainSignal: signal,
     canonicalTitle: title,
     signals: [signal],
     platformCount: 1,
-    platformSummary: [`${signal.platformLabel}#2 100万`],
+    platformSummary: [`${platformLabel} #2 100K`],
     score,
     status: 'steady',
-    statusLabel: '热度平稳',
+    statusLabel: 'Steady',
     previousScore: score,
-    category: '体育',
-    eventSummary: '测试事件摘要。',
+    category: 'Sports',
+    eventSummary: 'A test summary.',
     aliases: [title],
     keywords: []
   };
 }
 
 const report = generateReport([
-  cluster('主榜体育事件', 'douyin', 100),
-  cluster('社区体育事件', 'hupu', 70)
+  cluster('Main sports event', 'google-trends', 'Google Trends', 100),
+  cluster('Community sports event', 'rss', 'Website', 70)
 ], {
   generatedAt: '2026-07-03T08:00:00.000Z',
   rawSignalCount: 210,
@@ -41,13 +39,13 @@ const report = generateReport([
   topN: 1,
   minScore: 20,
   requireSeedPlatforms: true,
-  seedPlatforms: ['weibo', 'douyin'],
+  seedPlatforms: ['google-trends', 'tiktok-creative-center'],
   communityWatchlistN: 3
 });
 
-assert(!report.includes('本轮采集'));
-assert(!report.includes('本轮播报'));
-assert(!report.includes('新出现'));
-assert(!report.includes('未命中微博/抖音'));
-assert(report.includes('- 体育 ｜ 社区体育事件 ｜ 综合分'));
-console.log('综合播报格式测试通过');
+assert.ok(report.startsWith('# Trend Briefing\n\nGenerated: 2026-07-03 01:00 PDT'));
+assert.ok(report.includes('### 1. ▫️ 👀 Main sports event'));
+assert.ok(!/210|72 signals|collected/i.test(report), 'run statistics stay out of the briefing');
+assert.ok(report.includes('### From sources you follow'));
+assert.ok(report.includes('- Sports | Community sports event | Score '));
+console.log('briefing format tests passed');

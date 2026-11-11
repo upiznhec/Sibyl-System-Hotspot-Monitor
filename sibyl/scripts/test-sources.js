@@ -116,9 +116,10 @@ async function main() {
   // YouTube search builds its query from the topics' keywords ("|" means OR).
   assert.strictEqual(topicQuery(TOPICS), 'sunscreen|skincare|makeup|SPF|football|nfl');
 
-  // Heat scale: each source's reference value reaches the same 36 points as v1.3.20's 1,000,000.
+  // Heat scale: each source's reference value earns the full 36 heat points (v1.3.20's cap);
+  // rank 999 adds 1.25 rank points.
   const signalWith = (platform, sourceType, heat) => makeSignal({ platform, sourceType, title: 'x', rank: 999, heat });
-  assert.strictEqual(scoreSignal(signalWith('google-trends', 'trending_rss', 500000)), scoreSignal(signalWith('weibo', 'hot_search', 999990)));
+  assert.strictEqual(scoreSignal(signalWith('google-trends', 'trending_rss', 500000)), Math.round(1.25 + 36));
   assert.ok(scoreSignal(signalWith('google-trends', 'trending_rss', 2000)) < scoreSignal(signalWith('google-trends', 'trending_rss', 500000)));
   assert.strictEqual(scoreSignal(signalWith('google-trends', 'explore_rising', 5000)), Math.round((1.25 + 36) * 0.85));
 
@@ -152,7 +153,7 @@ async function main() {
   ['**Score: ', '**Signals:** ', '**Summary:** No reliable summary yet.', '[TikTok](https://www.tiktok.com/tag/']
     .forEach(text => assert.ok(report.includes(text), `briefing has ${text}`));
   assert.ok(/\[Google Trends\]\(https:\/\/trends\.google\.com\/trends\/explore\?/.test(report));
-  assert.ok(!/[一-龥]/.test(report), 'no Chinese text in the English briefing');
+  assert.ok(!/[\u4e00-\u9fa5]/.test(report), 'no Chinese text in the English briefing');
   if (process.argv.includes('--print')) console.log(report);
 
   console.log('source tests passed');

@@ -10,10 +10,6 @@
 // Adapters are loaded lazily so that lib/signals.js can ask for labels without a require cycle.
 
 const ADAPTER_LOADERS = {
-  weibo: () => require('../adapters/weibo-adapter'),
-  douyin: () => require('../adapters/douyin-adapter'),
-  tieba: () => require('../adapters/tieba-adapter'),
-  hupu: () => require('../adapters/hupu-adapter'),
   'google-trends': () => require('../adapters/google-trends-adapter'),
   'tiktok-creative-center': () => require('../adapters/tiktok-creative-center-adapter'),
   'x-trends': () => require('../adapters/x-trends-adapter'),
@@ -89,8 +85,7 @@ function defaultSeedPlatforms(platformsConfig = null) {
     .map(source => source.id);
 }
 
-// The default platforms config: each source on or off (defaultEnabled) with its default
-// settings. The v1.3.20 sources are off; the rewrite check switches them on in its config.
+// The default platforms config: each source on or off (defaultEnabled) with its default settings.
 function defaultPlatformsConfig() {
   return Object.fromEntries(allSources().map(source => [
     source.id,

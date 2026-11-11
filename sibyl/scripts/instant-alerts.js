@@ -3,10 +3,6 @@
 const path = require('path');
 
 const { collectSnapshot } = require('./collect-snapshot');
-const {
-  buildDouyinHotListEvidence,
-  retrieveDouyinTopicEvidence
-} = require('./lib/douyin-topic');
 const { classifySignal } = require('./lib/category-classifier');
 const { displayHeat, normalizeForCompare } = require('./lib/signals');
 const {
@@ -50,16 +46,10 @@ const DEFAULT_CONFIG = {
     webhook: '',
     dedupe: 'daily',
     summaries: true,
-    douyinTopic: {
-      enabled: true,
-      directPageEnabled: false,
-      relatedTopicLimit: 8,
-      timeout: 12000,
-      retries: 0
-    },
+    // Optional: a model that can search the web writes summaries for alerts without news links.
     aiSearchSummary: {
       enabled: false,
-      maxChars: 110
+      maxWords: 50
     },
     // Thresholds per main source: an item alerts when its rank is within rankMax or its heat
     // reaches hotMin. The Google Trends and X values are first guesses, to be set in calibration.
@@ -73,16 +63,6 @@ const DEFAULT_CONFIG = {
         enabled: true,
         rankMax: 5,
         hotMin: 50000
-      },
-      weibo: {
-        enabled: true,
-        rankMax: 10,
-        hotMin: 500000
-      },
-      douyin: {
-        enabled: true,
-        rankMax: 10,
-        hotMin: 8000000
       }
     }
   },
@@ -90,21 +70,6 @@ const DEFAULT_CONFIG = {
     webhook: ''
   }
 };
-
-const AI_SEARCH_SUMMARY_PROMPT = `你是热点即时预警摘要助手。请围绕以下热榜话题搜索公开信息，并生成一段简洁摘要。
-
-【必须遵守】
-1. 你必须基于可检索到的公开信息生成摘要；如果当前环境无法联网搜索、没有搜索结果、搜索结果不足或信息不明确，只返回：暂无摘要
-2. 不要凭话题标题猜测，不要编造比赛结果、人物表态、数据、时间、机构结论。
-3. 摘要控制在60-100字，最多不超过{maxChars}字。
-4. 摘要面向用增市场阅读者，重点说明：发生了什么、为什么被讨论、是否适合作为内容入口观察。
-5. 不输出分析过程、来源列表、标题、引号或Markdown，只输出摘要正文。
-6. 如果搜索到的信息显示该话题是商业推广、财经、汽车、手机、电商等非游戏/电竞/体育/AI内容，返回：暂无摘要
-
-话题：{topic}
-平台：{platform}
-
-请直接输出摘要正文。`;
 
 function loadConfig() {
   const dataDir = getDataDir();
@@ -182,12 +147,12 @@ function detailLink(signal) {
 
 function normalizeSummary(summary) {
   const text = String(summary || '').replace(/\s+/g, ' ').trim();
-  if (!text || /^\[商业广告\]/.test(text)) return '';
+  if (!text) return '';
   if (isNoSummary(text)) return '';
   return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }
 
-const EN_AI_SEARCH_SUMMARY_PROMPT = `You write short summaries for trend alerts. Search public information about the trending topic below and summarise it.
+const AI_SEARCH_SUMMARY_PROMPT = `You write short summaries for trend alerts. Search public information about the trending topic below and summarise it.
 
 Rules:
 1. Base the summary on information you found by searching. If you cannot search, find nothing, or the information is unclear, reply only: No summary yet
@@ -202,21 +167,11 @@ Source: {platform}
 
 Reply with the summary only.`;
 
-function isEnglish() {
-  return text().code !== 'zh';
-}
-
 function buildAISearchSummaryPrompt(signal, options = {}) {
-  if (isEnglish()) {
-    return EN_AI_SEARCH_SUMMARY_PROMPT
-      .replace('{topic}', signal.title || 'unknown topic')
-      .replace('{platform}', platformLabel(signal) || 'unknown source')
-      .replace('{maxWords}', String(options.maxWords || 50));
-  }
   return AI_SEARCH_SUMMARY_PROMPT
-    .replace('{topic}', signal.title || '未知话题')
-    .replace('{platform}', platformLabel(signal) || '未知平台')
-    .replace('{maxChars}', String(options.maxChars || 110));
+    .replace('{topic}', signal.title || 'unknown topic')
+    .replace('{platform}', platformLabel(signal) || 'unknown source')
+    .replace('{maxWords}', String(options.maxWords || 50));
 }
 
 async function generateAISearchSummary(signal, context) {
@@ -228,26 +183,18 @@ async function generateAISearchSummary(signal, context) {
 
   const result = await callAIModel(buildAISearchSummaryPrompt(signal, options), modelConfig, 1);
   if (!result.success) {
-    console.log(`⚠️ AI搜索摘要失败: ${signal.title} - ${result.error || 'unknown error'}`);
+    console.log(`⚠️ Search summary failed: ${signal.title} - ${result.error || 'unknown error'}`);
     return '';
   }
 
   const summary = normalizeSummary(result.content);
   if (!summary) return '';
 
-  if (/无法|不能|没有搜索|未找到|不足|不明确|作为AI|无法联网|无法访问/i.test(summary)) {
-    return '';
-  }
-  if (isEnglish()) {
-    if (/cannot|can't|unable to|no (search )?results|not enough information|as an ai/i.test(summary)) return '';
-    const words = summary.split(/\s+/);
-    const maxWords = options.maxWords || 50;
-    return words.length > maxWords ? `${words.slice(0, maxWords).join(' ')}...` : summary;
-  }
-
-  return summary.length > (options.maxChars || 110)
-    ? `${summary.slice(0, (options.maxChars || 110) - 3)}...`
-    : summary;
+  // A reply that says the model could not search is not a summary.
+  if (/cannot|can't|unable to|no (search )?results|not enough information|as an ai/i.test(summary)) return '';
+  const words = summary.split(/\s+/);
+  const maxWords = options.maxWords || 50;
+  return words.length > maxWords ? `${words.slice(0, maxWords).join(' ')}...` : summary;
 }
 
 async function buildAlertSummary(alert, context) {
@@ -258,40 +205,6 @@ async function buildAlertSummary(alert, context) {
 
   if (!context.enableSummaries) return { summary: text().noSummary };
 
-  if (signal.platform === 'douyin') {
-    const douyinOptions = context.config.alerts?.douyinTopic || {};
-    let douyinResult = douyinOptions.enabled === false
-      ? { success: false, failureReason: 'douyin_topic_disabled' }
-      : buildDouyinHotListEvidence(signal, context.snapshotSignals, douyinOptions);
-    if (!douyinResult.success && douyinOptions.directPageEnabled === true) {
-      douyinResult = await retrieveDouyinTopicEvidence(signal, douyinOptions);
-    }
-    if (douyinResult.success) {
-      const elixirResult = await summarizeContent(douyinResult.evidenceText, signal.title, context.modelConfig);
-      if (elixirResult.isCommercial) {
-        return {
-          filtered: true,
-          reason: elixirResult.reason || 'Elixir判定为商业推广或非目标内容'
-        };
-      }
-      const summary = normalizeSummary(elixirResult.summary);
-      if (summary) {
-        context.summaryCache[cacheKey] = {
-          platform: signal.platform,
-          title: signal.title,
-          summary,
-          source: `${douyinResult.source || 'douyin-topic'}-elixir`,
-          sourceUrl: douyinResult.sourceUrl,
-          evidenceCount: douyinResult.itemCount,
-          updatedAt: new Date().toISOString()
-        };
-        return { summary };
-      }
-    } else {
-      console.log(`⚠️ 抖音话题页未生成材料: ${signal.title} - ${douyinResult.failureReason}`);
-    }
-  }
-
   // News links saved with the item (Google Trends gives up to 3 per search).
   const news = evidenceItems([signal]);
   if (news.length) {
@@ -299,7 +212,7 @@ async function buildAlertSummary(alert, context) {
     if (elixirResult.isCommercial) {
       return {
         filtered: true,
-        reason: elixirResult.reason || 'Elixir判定为商业推广或非目标内容'
+        reason: elixirResult.reason || 'judged to be advertising'
       };
     }
     const summary = normalizeSummary(elixirResult.summary);
@@ -349,7 +262,7 @@ async function enrichAlertsWithSummaries(alerts, config, args, snapshotSignals =
   for (const alert of alerts) {
     const result = await buildAlertSummary(alert, context);
     if (result.filtered) {
-      console.log(`🚫 即时预警过滤: ${alert.signal.title} - ${result.reason}`);
+      console.log(`🚫 Alert dropped: ${alert.signal.title} - ${result.reason}`);
       continue;
     }
     enriched.push({
@@ -430,7 +343,7 @@ async function main() {
   const config = loadConfig();
   configureLocale(config);
   if (config.alerts?.enabled === false) {
-    console.log('Sibyl 即时预警已在配置中关闭');
+    console.log('Sibyl instant alerts are turned off in the config');
     return;
   }
   const platforms = parsePlatforms(args, config);
@@ -439,7 +352,7 @@ async function main() {
   const snapshot = await loadSnapshotForAlerts(config, args);
 
   if (!snapshot) {
-    throw new Error('没有可用的Sibyl快照，请先运行 collect-snapshot.js');
+    throw new Error('No recent snapshot: run collect-snapshot.js first');
   }
 
   const state = loadState();
@@ -460,7 +373,7 @@ async function main() {
   const archiveOptions = { dataDir: getDataDir(), capturedAt: snapshot.capturedAt, keepDays: config.archive?.keepDays };
   let savedCount = 0;
 
-  console.log(`Sibyl 即时预警检查完成，候选 ${alerts.length} 个`);
+  console.log(`Sibyl instant alerts checked: ${alerts.length} candidate(s)`);
   let sentCount = 0;
   for (const alert of alerts) {
     const message = buildMessage(alert, snapshot.capturedAt);
@@ -498,17 +411,17 @@ async function main() {
     } else {
       delete state.reported[alert.key];
       saveState(state);
-      console.warn(`⚠️ 即时预警发送失败，已撤销去重记录: ${alert.signal.title}`);
+      console.warn(`⚠️ Alert not delivered; it can alert again: ${alert.signal.title}`);
     }
   }
 
-  console.log(`✅ Sibyl 即时预警完成，推送 ${sentCount}/${alerts.length} 个`);
-  if (saveToFile) console.log(`   未配置推送，已存为文件 ${savedCount} 个（alerts/，保留 7 天）`);
+  console.log(`✅ Sibyl instant alerts done: ${sentCount}/${alerts.length} pushed`);
+  if (saveToFile) console.log(`   No push set: ${savedCount} saved as files (alerts/, kept 7 days)`);
 }
 
 if (require.main === module) {
   main().catch(error => {
-    console.error('❌ Sibyl 即时预警失败:', error.message);
+    console.error('❌ Sibyl instant alerts failed:', error.message);
     process.exit(1);
   });
 }

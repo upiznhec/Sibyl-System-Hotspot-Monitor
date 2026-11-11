@@ -18,7 +18,7 @@ function readJson(file, fallback) {
       return JSON.parse(fs.readFileSync(file, 'utf8'));
     }
   } catch (e) {
-    console.error(`读取JSON失败 ${file}:`, e.message);
+    console.error(`Could not read JSON ${file}:`, e.message);
   }
   return fallback;
 }
