@@ -146,6 +146,8 @@ const source = {
   heatReferences: { explore_rising: 5000 },
   showBoard: false,
   alertSourceTypes: ['trending_rss'],
+  // Lists the agent reads once a day: they do not change within the hour.
+  dailySourceTypes: ['trending_page', 'explore_rising'],
   displayOrder: 0,
   defaultRole: 'seed',
   defaultEnabled: true,

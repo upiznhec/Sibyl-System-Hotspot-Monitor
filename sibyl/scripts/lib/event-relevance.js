@@ -1,5 +1,7 @@
 const { callAIModel } = require('../../../elixir-summarizer/scripts/elixir-summarizer');
 const { resolveModelConfig } = require('./model-config');
+const { keywordMatchesTitle } = require('./keyword-matcher');
+const { text } = require('./locale');
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -164,9 +166,27 @@ function finalDecision(cluster, aiDecision, config) {
   };
 }
 
+// English output: each topic may list words that keep its routine items out of the main
+// briefing (topics[].briefingExclude), in place of v1.3.20's rule for game updates only.
+function applyTopicExcludeWords(clusters, topicSettings) {
+  const wordsByTopic = new Map((topicSettings?.categories || []).map(topic => [topic.name, topic.briefingExclude || []]));
+  clusters.forEach(cluster => {
+    const words = wordsByTopic.get(cluster.category) || [];
+    const titles = clusterText(cluster);
+    const hit = words.find(word => keywordMatchesTitle(titles, word));
+    if (!hit) return;
+    const reason = `contains "${hit}", which the topic "${cluster.category}" keeps out of the briefing`;
+    cluster.relevance = { eventNature: 'topic_exclude_word', filtered: true, filterReason: reason, source: 'topic-exclude-words' };
+    cluster.broadcastFiltered = true;
+    cluster.broadcastFilterReason = reason;
+  });
+  return clusters;
+}
+
 async function applyEventRelevanceFilter(clusters, customConfig = {}, dependencies = {}) {
   const config = { ...DEFAULT_CONFIG, ...customConfig };
   if (config.enabled === false) return clusters;
+  if (text().code !== 'zh') return applyTopicExcludeWords(clusters, config.topicSettings);
   const games = clusters.filter(cluster => cluster.category === '游戏');
   const aiDecisions = await classifyWithAI(games, config, dependencies);
   games.forEach((cluster, index) => {
@@ -179,6 +199,7 @@ async function applyEventRelevanceFilter(clusters, customConfig = {}, dependenci
 
 module.exports = {
   applyEventRelevanceFilter,
+  applyTopicExcludeWords,
   buildPrompt,
   ruleDecision
 };

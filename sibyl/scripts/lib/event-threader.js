@@ -5,7 +5,8 @@ const { resolveModelConfig } = require('./model-config');
 const { rebuildClusterFromSignals } = require('./clusterer');
 const { getDataDir, readJson } = require('./snapshot-store');
 const { normalizeForCompare } = require('./signals');
-const { isNoSummary } = require('./locale');
+const { isNoSummary, text } = require('./locale');
+const { contentWords, isHashtag } = require('./english-words');
 const { defaultSeedPlatforms } = require('./source-registry');
 
 const DEFAULT_CONFIG = {
@@ -68,6 +69,28 @@ const COMPETITION_PATTERNS = [
   ['nba', /\bNBA\b/i]
 ];
 
+// v1.3.20's Chinese rules stay as they are for the rewrite check; English output uses the
+// translated rules in lib/lang/en.js.
+const ZH_RULES = {
+  vagueTitles: VAGUE_TITLE_PATTERNS,
+  vagueAnchors: VAGUE_ANCHOR_PATTERNS,
+  genericEvidence: GENERIC_EVIDENCE_PATTERN,
+  disciplines: DISCIPLINE_PATTERNS,
+  stages: STAGE_PATTERNS,
+  competitions: COMPETITION_PATTERNS,
+  minEvidenceLength: 8,
+  fingerprintReason: '赛事、项目与事实锚点形成同一事件指纹',
+  retitleReason: '多话题事件标题归一'
+};
+
+function isEnglish() {
+  return text().code !== 'zh';
+}
+
+function rules() {
+  return isEnglish() ? text().merge : ZH_RULES;
+}
+
 function loadModelConfig(customConfig = {}) {
   // config.ai or SIBYL_AI_* environment variables; null means rule-based fallback.
   return resolveModelConfig(customConfig);
@@ -118,6 +141,13 @@ function selectPreSummaryCandidates(clusters, config = {}) {
     .slice(0, limit);
 }
 
+// English: the content words of the event's title, summary and search terms.
+function anchorWords(cluster) {
+  return new Set([cluster.canonicalTitle, cluster.eventSummary, ...(cluster.aliases || [])]
+    .filter(Boolean)
+    .flatMap(contentWords));
+}
+
 function anchorBigrams(cluster) {
   const text = [
     cluster.canonicalTitle,
@@ -147,6 +177,14 @@ function firstPattern(text, patterns) {
 
 function anchorPhrases(cluster) {
   const phrases = new Set(cluster.entityTokens || []);
+  if (isEnglish()) {
+    // Pairs of neighbouring words, such as "kirk cousins", from the titles.
+    [cluster.canonicalTitle, ...(cluster.aliases || [])].filter(Boolean).forEach(title => {
+      const words = contentWords(title);
+      for (let index = 0; index < words.length - 1; index++) phrases.add(`${words[index]} ${words[index + 1]}`);
+    });
+    return [...phrases].slice(0, 180);
+  }
   for (const chunk of clusterText(cluster).replace(/\s+/g, '').match(/[\u4e00-\u9fa5]{3,}/g) || []) {
     for (let size = 3; size <= Math.min(6, chunk.length); size++) {
       for (let index = 0; index <= chunk.length - size; index++) {
@@ -161,9 +199,9 @@ function anchorPhrases(cluster) {
 function buildEventFingerprint(cluster) {
   const text = clusterText(cluster);
   return {
-    competition: firstPattern(text, COMPETITION_PATTERNS),
-    stage: firstPattern(text, STAGE_PATTERNS),
-    discipline: firstPattern(text, DISCIPLINE_PATTERNS),
+    competition: firstPattern(text, rules().competitions),
+    stage: firstPattern(text, rules().stages),
+    discipline: firstPattern(text, rules().disciplines),
     anchors: anchorPhrases(cluster).slice(0, 24)
   };
 }
@@ -201,6 +239,10 @@ function likelyRelated(left, right) {
   const leftEntities = new Set(left.entityTokens || []);
   if ((right.entityTokens || []).some(entity => leftEntities.has(entity))) return true;
   if (!left.eventSummary || !right.eventSummary) return false;
+  if (isEnglish()) {
+    const leftWords = anchorWords(left);
+    return [...anchorWords(right)].filter(word => leftWords.has(word)).length >= 3;
+  }
   const leftGrams = anchorBigrams(left);
   let overlap = 0;
   for (const gram of anchorBigrams(right)) {
@@ -244,10 +286,70 @@ function buildCandidateBatches(candidates, config = {}) {
     });
 }
 
+function buildEnglishPrompt(items) {
+  return `You group trending search terms and hashtags from several sources into event threads. Do not use fixed templates for sports, games or any other category; only decide whether different items form one specific, continuous story without gaps in logic.
+
+Merge rules:
+1. Different wordings of the same fact are merged.
+2. Direct causes, results, responses, aftermath and discussion on the same timeline may be merged.
+3. For example, "Player A scores twice as Team B advances" and "Player A goes sightseeing in New York after the game" can be merged, because the second is clearly part of the same game's aftermath.
+4. Sharing only the same person, team, brand or game is not enough to merge.
+5. Split different games, different releases, different incidents, and new independent outcomes such as an official penalty, a trade or an injury diagnosis.
+6. When unsure, keep items apart; do not merge just to make the list shorter.
+7. Never merge items from different categories.
+8. Name one specific shared event anchor. A person, team, club, brand, game or category name on its own is not an event anchor.
+9. For every member, state its direct relation to the shared anchor; "keyword match", "same category" or "same person" is not enough.
+10. Split a career decision from an unrelated personal activity, or a record from an unrelated discussion of rules, when they only share a subject. These are examples of the boundary, not a fixed list of categories.
+
+Relation types (choose one):
+- same_fact: different wordings of the same fact
+- cause_result: a clear cause and its result
+- official_response: an event and an official response to it
+- direct_aftermath: what happened directly after the event
+- direct_discussion: discussion clearly about the same event or release
+
+Title rules:
+- Use only the input items and known summaries; add no outside facts.
+- Write the core fact plus the most telling follow-up.
+- Be specific, in about 6 to 14 words.
+- For example: "Player A sends Team B through, then his New York walk trends".
+- Do not use vague phrases such as "continues to trend", "sparks discussion", "draws attention" or "in the spotlight".
+
+Return the groups to merge. If one candidate already covers several search terms, you may give it a more complete title; single-term events need no new title. JSON format:
+{
+  "groups": [
+    {
+      "memberIds": ["e1", "e2"],
+      "confidence": 0.9,
+      "sharedEventAnchor": "the specific shared event: a game, announcement, release or controversy",
+      "relationType": "same_fact|cause_result|official_response|direct_aftermath|direct_discussion",
+      "memberEvidence": [
+        {"memberId": "e1", "evidence": "how this member relates to the shared event"},
+        {"memberId": "e2", "evidence": "how this member relates to the shared event"}
+      ],
+      "title": "specific event title",
+      "reason": "one sentence on why these belong to one event thread"
+    }
+  ],
+  "titles": [
+    {
+      "memberId": "e3",
+      "confidence": 0.9,
+      "title": "a specific title that covers the event's search terms"
+    }
+  ]
+}
+
+Candidates:
+${JSON.stringify(items, null, 2)}
+
+Reply with valid JSON only.`;
+}
+
 function buildPrompt(candidates, summaries) {
   const items = candidates.map((cluster, index) => {
     const topics = (cluster.signals || []).map(signal =>
-      `${signal.platformLabel || signal.platform}：${signal.title}`
+      `${signal.platformLabel || signal.platform}${isEnglish() ? ': ' : '：'}${signal.title}`
     );
     const knownSummaries = [
       cluster.eventSummary,
@@ -266,6 +368,7 @@ function buildPrompt(candidates, summaries) {
     };
   });
 
+  if (isEnglish()) return buildEnglishPrompt(items);
   return `你负责把多平台热搜整理成“热点事件线”。不要使用固定的体育、电竞或游戏字段模板，只判断不同话题能否组成同一段具体、连贯、没有逻辑跳跃的事件叙述。
 
 合并标准：
@@ -340,7 +443,23 @@ function parseJson(content) {
   }
 }
 
+// English titles keep their spaces; 10 to 100 characters, at least two words.
+function cleanEnglishTitle(title) {
+  const cleaned = String(title || '')
+    .trim()
+    .replace(/^["'“”]+|["'“”]+$/g, '')
+    .replace(/^(event )?title:\s*/i, '')
+    .replace(/^["'“”]+|["'“”]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 100);
+  if (cleaned.length < 10 || cleaned.split(' ').length < 2) return '';
+  if (rules().vagueTitles.some(pattern => pattern.test(cleaned))) return '';
+  return cleaned;
+}
+
 function cleanTitle(title) {
+  if (isEnglish()) return cleanEnglishTitle(title);
   const cleaned = String(title || '')
     .replace(/^["'“”]+|["'“”]+$/g, '')
     .replace(/^事件标题[:：]\s*/, '')
@@ -353,6 +472,16 @@ function cleanTitle(title) {
 }
 
 function fallbackTitle(clusters) {
+  if (isEnglish()) {
+    // A title in words of a readable length, else the longest.
+    return clusters
+      .flatMap(cluster => cluster.aliases || [cluster.mainSignal.title])
+      .filter(Boolean)
+      .sort((a, b) => {
+        const fit = title => (!isHashtag(title) && title.length >= 15 && title.length <= 90 ? 1 : 0);
+        return fit(b) - fit(a) || b.length - a.length;
+      })[0];
+  }
   return clusters
     .flatMap(cluster => cluster.aliases || [cluster.mainSignal.title])
     .filter(Boolean)
@@ -389,6 +518,11 @@ function categorySet(clusters) {
 }
 
 function cleanAnchor(anchor) {
+  if (isEnglish()) {
+    const value = String(anchor || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+    if (value.length < 8) return '';
+    return rules().vagueAnchors.some(pattern => pattern.test(value)) ? '' : value;
+  }
   const value = String(anchor || '').replace(/\s+/g, '').trim().slice(0, 60);
   if (value.length < 6) return '';
   if (VAGUE_ANCHOR_PATTERNS.some(pattern => pattern.test(value))) return '';
@@ -403,7 +537,7 @@ function validMemberEvidence(group, memberIds) {
   ]));
   return memberIds.every(id => {
     const evidence = byId.get(id) || '';
-    return evidence.length >= 8 && !GENERIC_EVIDENCE_PATTERN.test(evidence);
+    return evidence.length >= rules().minEvidenceLength && !rules().genericEvidence.test(evidence);
   });
 }
 
@@ -419,7 +553,7 @@ function validGroup(group, byId, minConfidence) {
   if (!sharedEventAnchor) return null;
   if (!ALLOWED_RELATION_TYPES.has(relationType)) return null;
   if (!validMemberEvidence(group, memberIds)) return null;
-  if (!reason || GENERIC_EVIDENCE_PATTERN.test(reason)) return null;
+  if (!reason || rules().genericEvidence.test(reason)) return null;
   return {
     memberIds,
     members,
@@ -481,7 +615,7 @@ async function applySemanticEventMerge(clusters, previousState = {}, customConfi
         relationType: 'same_fact',
         memberEvidence: [],
         title: fallbackTitle([candidates[left], candidates[right]]),
-        reason: '赛事、项目与事实锚点形成同一事件指纹'
+        reason: rules().fingerprintReason
       });
     }
   }
@@ -544,7 +678,7 @@ async function applySemanticEventMerge(clusters, previousState = {}, customConfi
         eventMerge: cluster.eventMerge || {
           memberClusterIds: [cluster.topicId],
           confidence: null,
-          reason: '多话题事件标题归一',
+          reason: rules().retitleReason,
           memberCount: 1
         }
       });

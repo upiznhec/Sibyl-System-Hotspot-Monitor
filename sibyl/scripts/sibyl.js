@@ -32,9 +32,8 @@ const DEFAULT_CONFIG = {
   filters: {
     minTitleLength: 3
   },
-  cluster: {
-    similarityThreshold: 0.42
-  },
+  // cluster.similarityThreshold: by default the language's own (0.42 for v1.3.20's Chinese titles).
+  cluster: {},
   eventMerge: {
     enabled: true,
     candidateLimit: 36,
@@ -347,7 +346,8 @@ async function main() {
   clusters = await applyEventRelevanceFilter(clusters, {
     ...(config.eventFilter || {}),
     useAI: !args.includes('--no-ai'),
-    ai: config.ai
+    ai: config.ai,
+    topicSettings
   });
   attachSnapshotTrends(clusters, recentSnapshots);
   const selectedForSummary = selectReportClusters(clusters, reportConfig);

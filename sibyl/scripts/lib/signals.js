@@ -21,23 +21,13 @@ function stripHtml(text = '') {
     .trim();
 }
 
+// Title cleaning and comparison keys follow the output language (lib/lang/*.js).
 function normalizeTitle(title = '') {
-  return decodeHtml(title)
-    .replace(/#([^#]+)#/g, '$1')
-    .replace(/\[[^\]]+\]/g, ' ')
-    .replace(/【[^】]+】/g, ' ')
-    .replace(/[“”"']/g, '')
-    .replace(/[|｜·•]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return text().normalizeTitle(title, decodeHtml);
 }
 
 function normalizeForCompare(title = '') {
-  return normalizeTitle(title)
-    .toLowerCase()
-    .replace(/微博|抖音|虎扑|贴吧|热搜|热榜|话题|回应|最新|官方|排名|讨论|冲上/g, '')
-    .replace(/[^\u4e00-\u9fa5a-z0-9]+/gi, '')
-    .trim();
+  return text().normalizeForCompare(normalizeTitle(title));
 }
 
 function parseNumber(value) {

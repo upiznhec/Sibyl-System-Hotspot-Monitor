@@ -98,6 +98,11 @@ function defaultPlatformsConfig() {
   ]));
 }
 
+// True for lists the agent reads once a day (pages.json): no change within an hour to report.
+function isDailyList(id, sourceType) {
+  return Boolean(getSource(id)?.dailySourceTypes?.includes(sourceType));
+}
+
 // Which of a source's lists may raise instant alerts (null = all of them).
 function alertSourceTypes(id) {
   return getSource(id)?.alertSourceTypes || null;
@@ -127,6 +132,7 @@ module.exports = {
   displayOrder,
   getSource,
   isCommunitySource,
+  isDailyList,
   linkSources,
   sourceFetchers,
   sourceHeatReference,

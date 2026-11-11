@@ -49,8 +49,101 @@ function inferTopicTerm(title = '', knownTerms = []) {
   return segments.find(segment => segment.length >= 3 && segment.length <= 60) || text.slice(0, 60);
 }
 
+// Titles keep apostrophes (L'Oréal, women's); straight and curly double quotes are dropped.
+// v1.3.20's #topic# marker is Weibo's, so English "#a #b" hashtags are left alone.
+function normalizeTitle(title, decodeHtml) {
+  return decodeHtml(title)
+    .replace(/\[[^\]]+\]/g, ' ')
+    .replace(/[“”"]/g, '')
+    .replace(/[|｜·•]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// For keys and exact comparison: letters and digits only (accents kept), so that
+// "#SunscreenRecall" and "sunscreen recall" give the same key.
+function normalizeForCompare(normalizedTitle) {
+  return normalizedTitle
+    .toLowerCase()
+    .normalize('NFKC')
+    .replace(/[’']/g, '')
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+// Words that say nothing about which event a title is about.
+const STOP_WORDS = new Set([
+  'a', 'an', 'the', 'and', 'or', 'but', 'of', 'in', 'on', 'at', 'to', 'for', 'from', 'by', 'with',
+  'about', 'as', 'into', 'over', 'after', 'before', 'vs', 'v', 'versus', 'is', 'are', 'was', 'were',
+  'be', 'been', 'it', 'its', 'this', 'that', 'these', 'those', 'how', 'why', 'what', 'who', 'when',
+  'where', 'which', 'will', 'can', 'does', 'do', 'did', 'has', 'have', 'had', 'not', 'no', 'yes',
+  'new', 'latest', 'today', 'tonight', 'tomorrow', 'yesterday', 'now', 'news', 'live', 'update',
+  'updates', 'video', 'videos', 'watch', 'official', 'full', 'best', 'top', 'near', 'me', 'my',
+  'your', 'you', 'we', 'they', 'he', 'she', 'his', 'her', 'their', 'our', 'fyp', 'foryou',
+  'foryoupage', 'viral', 'trending', 'trend', 'trends'
+]);
+
+// Kinds of event, as in v1.3.20's 14 patterns: two titles about the same people but different
+// kinds of event (a trade and an injury) are kept apart.
+const EVENT_CONCEPTS = [
+  { concept: 'hat_trick', pattern: /hat[- ]?trick/i },
+  { concept: 'goal', pattern: /\bgoals?\b|\bscores?\b|\bscored\b|winner|equali[sz]er|free kick|penalty kick/i },
+  { concept: 'foul_injury', pattern: /injur|\bfoul|red card|yellow card|suspen|ejected|concussion|\btorn\b|sprain|\bout for\b/i },
+  { concept: 'fan_support', pattern: /\bfans?\b|supporters|\bcrowd\b|chant/i },
+  { concept: 'win_loss', pattern: /\bwins?\b|\bwon\b|\bbeats?\b|\bloses?\b|\blost\b|defeat|eliminat|advances?|clinch|champions?\b|upset|comeback|victory/i },
+  { concept: 'award', pattern: /award|\bmvp\b|player of the|nominat|honou?red/i },
+  { concept: 'record', pattern: /record|all-time|milestone|career-high|first ever/i },
+  { concept: 'response', pattern: /respond|response|apolog|statement|denies|\bdeny\b|slams|criticiz|clarif|addresses/i },
+  { concept: 'mechanism', pattern: /algorithm|matchmaking|\belo\b|ranked mode|rule change/i },
+  { concept: 'lineup_schedule', pattern: /schedule|lineup|roster|\bdraft\b|fixtures|start time|how to watch|tv channel|tickets/i },
+  { concept: 'stats', pattern: /\bstats?\b|statistics|standings|rankings?\b|leaders\b/i },
+  { concept: 'transfer_trade', pattern: /\btrade[sd]?\b|\bsign(s|ed|ing)?\b|contract|transfer|free agen|waive[sd]?\b/i },
+  { concept: 'release_update', pattern: /\bupdate\b|patch|launch|release|\bdrops?\b|new season|version|collab|collection|restock|recall/i },
+  { concept: 'appearance', pattern: /interview|concert|\btour\b|red carpet|performance|live ?stream|podcast|premiere/i }
+];
+
+// Rules for merging events (lib/event-threader.js), translated from v1.3.20.
+const MERGE_RULES = {
+  vagueTitles: [/continues? to trend/i, /sparks? (discussion|debate)/i, /draws? attention/i,
+    /in the spotlight/i, /latest (news|updates)/i, /related (news|updates|topics)/i],
+  vagueAnchors: [/related (news|events?|topics?)$/i, /recent (news|updates)$/i,
+    /^(the )?same (person|player|team|club|game|brand|company|category)/i,
+    /^(person|player|team|club|game|brand|event) (news|updates)$/i],
+  genericEvidence: /keyword match|same (category|topic|person|player|team|club|game|brand|company)|both (are|mention|relate)/i,
+  disciplines: [
+    ['mixed_doubles', /mixed doubles/i],
+    ['mens_singles', /men'?s singles/i],
+    ['womens_singles', /women'?s singles/i],
+    ['mens_doubles', /men'?s doubles/i],
+    ['womens_doubles', /women'?s doubles/i]
+  ],
+  stages: [
+    ['r16', /round of 16|last 16/i],
+    ['qf', /quarter-?finals?/i],
+    ['sf', /semi-?finals?/i],
+    ['final', /\bfinals?\b|championship game|title game/i]
+  ],
+  competitions: [
+    ['world_cup', /world cup/i],
+    ['champions_league', /champions league/i],
+    ['nba', /\bnba\b/i],
+    ['nfl', /\bnfl\b/i],
+    ['super_bowl', /super bowl/i],
+    ['olympics', /olympic/i]
+  ],
+  minEvidenceLength: 12,
+  fingerprintReason: 'Same competition and stage, with the same people or team',
+  retitleReason: 'One title for the search terms of this event'
+};
+
 module.exports = {
   code: 'en',
+  merge: MERGE_RULES,
+  normalizeTitle,
+  normalizeForCompare,
+  stopWords: STOP_WORDS,
+  eventConcepts: EVENT_CONCEPTS,
+  // Grouping threshold for word-based similarity; to be set in calibration.
+  similarityThreshold: 0.5,
   formatHeat,
   // Sources can give their own heat text (Google Trends: "20K+") and a unit ("views").
   displayHeat: (signal, format, unit) =>

@@ -43,6 +43,8 @@ function compileTopicSettings(raw, baseDir) {
       icon: category.icon || null,
       groups: category.groups || [],
       keywords,
+      // Words that keep an item of this topic out of the main briefing, e.g. "promo code".
+      briefingExclude: Array.isArray(category.briefingExclude) ? category.briefingExclude : [],
       subcategories: (category.subcategories || []).map(sub => ({
         name: sub.name,
         icon: sub.icon || null,

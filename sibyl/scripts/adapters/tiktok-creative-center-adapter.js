@@ -46,6 +46,7 @@ const source = {
   heatUnit: 'views',
   heatReference: 100000000,
   showBoard: false,
+  dailySourceTypes: ['hashtag_ranking'],
   displayOrder: 1,
   defaultRole: 'seed',
   defaultEnabled: true,

@@ -4,6 +4,7 @@ const {
   defaultSeedPlatforms,
   displayOrder,
   isCommunitySource,
+  isDailyList,
   linkSources,
   sourceLabel
 } = require('./source-registry');
@@ -146,6 +147,8 @@ function buildHeatLine(cluster) {
 
 function buildTrendSummary(cluster) {
   const wording = text().trend;
+  // A list read once a day has no hourly movement to describe.
+  if (isDailyList(cluster.mainSignal?.platform, cluster.mainSignal?.sourceType)) return '';
   if (cluster.hourlyTrend?.sampleCount >= 2) {
     const trend = cluster.hourlyTrend;
     const parts = [];

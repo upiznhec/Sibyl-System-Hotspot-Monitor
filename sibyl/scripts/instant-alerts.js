@@ -187,7 +187,32 @@ function normalizeSummary(summary) {
   return text.length > 140 ? `${text.slice(0, 137)}...` : text;
 }
 
+const EN_AI_SEARCH_SUMMARY_PROMPT = `You write short summaries for trend alerts. Search public information about the trending topic below and summarise it.
+
+Rules:
+1. Base the summary on information you found by searching. If you cannot search, find nothing, or the information is unclear, reply only: No summary yet
+2. Do not guess from the title; do not invent results, quotes, numbers, dates or official conclusions.
+3. At most {maxWords} words, in one or two sentences.
+4. Say what happened, why people are talking about it, and whether it looks worth following.
+5. No reasoning steps, source lists, titles, quotes or Markdown; only the summary.
+6. If the topic turns out to be advertising, reply only: No summary yet
+
+Topic: {topic}
+Source: {platform}
+
+Reply with the summary only.`;
+
+function isEnglish() {
+  return text().code !== 'zh';
+}
+
 function buildAISearchSummaryPrompt(signal, options = {}) {
+  if (isEnglish()) {
+    return EN_AI_SEARCH_SUMMARY_PROMPT
+      .replace('{topic}', signal.title || 'unknown topic')
+      .replace('{platform}', platformLabel(signal) || 'unknown source')
+      .replace('{maxWords}', String(options.maxWords || 50));
+  }
   return AI_SEARCH_SUMMARY_PROMPT
     .replace('{topic}', signal.title || '未知话题')
     .replace('{platform}', platformLabel(signal) || '未知平台')
@@ -212,6 +237,12 @@ async function generateAISearchSummary(signal, context) {
 
   if (/无法|不能|没有搜索|未找到|不足|不明确|作为AI|无法联网|无法访问/i.test(summary)) {
     return '';
+  }
+  if (isEnglish()) {
+    if (/cannot|can't|unable to|no (search )?results|not enough information|as an ai/i.test(summary)) return '';
+    const words = summary.split(/\s+/);
+    const maxWords = options.maxWords || 50;
+    return words.length > maxWords ? `${words.slice(0, maxWords).join(' ')}...` : summary;
   }
 
   return summary.length > (options.maxChars || 110)

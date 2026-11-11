@@ -36,6 +36,76 @@ const {
   chatCompletionsPath,
   resolveModelConfig
 } = require('../../sibyl/scripts/lib/model-config');
+// Output language (Sibyl's lib/locale.js). Called as locale.text(): several functions here have a
+// parameter named "text".
+const locale = require('../../sibyl/scripts/lib/locale');
+
+function isEnglish() {
+  return locale.text().code !== 'zh';
+}
+
+// English prompts, following the v1.3.20 rules: facts from the material only, at most two
+// sentences and 50 words, no marketing advice.
+const EN_SUMMARY_PROMPT = `Write a short summary of this trending topic from the material below.
+
+Length: at most two sentences and 50 words.
+
+Rules:
+1. Lead with the newest development (today, yesterday) and who or what it involves.
+2. Use only facts that the material states. Leave out anything the sources do not support, and drop details where sources disagree.
+3. Say what happened and, if the material shows it, why people are searching for it or posting about it.
+4. Do not name the sources, add links or describe how the material was found.
+5. Do not give marketing advice or suggest content to make.
+6. Write plainly; avoid stock phrases such as "sparks discussion" or "goes viral" unless the material says so.
+
+Material:
+{content}
+
+Reply with the summary only, without quotes or explanations.`;
+
+const EN_TRUNCATE_PROMPT = `Shorten this summary to at most 50 words and two sentences. Keep the main fact, who or what it involves, and the key result or number; remove background, lists and adjectives. Add nothing new.
+
+Summary:
+{content}
+
+Reply with the shortened summary only.`;
+
+const EN_COMMERCIAL_PROMPT = `Decide whether this trending topic is advertising or sponsored promotion rather than news or public discussion.
+
+Title: {title}
+Material:
+{content}
+
+Categories:
+- normal: news, events, public discussion, creator or community activity, or brand news that people discuss on their own (for example a recall, a controversy or a widely discussed launch)
+- promotion: an advertisement, sponsored post, coupon, sale or product listing with no news or discussion around it
+
+Reply with JSON only:
+{"isCommercial": true or false, "category": "normal" or "promotion", "reason": "a short reason", "confidence": 0.0 to 1.0}`;
+
+const EN_MAX_WORDS = 50;
+
+function wordCount(value) {
+  return String(value || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+// English summaries: 5 to 50 words; one request to shorten a longer one; up to 60 words accepted.
+async function generateEnglishSummary(content, modelConfig) {
+  const result = await callAIModel(EN_SUMMARY_PROMPT.replace('{content}', content), modelConfig);
+  if (!result.success) return null;
+  const summary = result.content.replace(/^["']|["']$/g, '').trim();
+  const words = wordCount(summary);
+  if (words >= 5 && words <= EN_MAX_WORDS) return summary;
+  if (words > EN_MAX_WORDS) {
+    const shorter = await callAIModel(EN_TRUNCATE_PROMPT.replace('{content}', summary), modelConfig);
+    if (shorter.success) {
+      const shortened = shorter.content.replace(/^["']|["']$/g, '').trim();
+      const shortenedWords = wordCount(shortened);
+      if (shortenedWords >= 5 && shortenedWords <= 60) return shortened;
+    }
+  }
+  return null;
+}
 
 // AI生成摘要提示词模板 - v3.5 多来源核验版
 const AI_SUMMARY_PROMPT = `请根据以下已核验热点材料，生成一个简洁流畅的摘要。材料可能来自微博智搜，也可能来自Agent Reach检索的多个公开来源。
@@ -242,9 +312,11 @@ async function detectCommercialContent(content, title, customConfig = null) {
       .trim()
       .substring(0, 2000);
 
-    const prompt = COMMERCIAL_DETECTION_PROMPT
-      .replace('{title}', title || '未知话题')
-      .replace('{content}', cleanedContent || '暂无内容');
+    const prompt = isEnglish()
+      ? EN_COMMERCIAL_PROMPT.replace('{title}', title || 'unknown topic').replace('{content}', cleanedContent || 'no material')
+      : COMMERCIAL_DETECTION_PROMPT
+        .replace('{title}', title || '未知话题')
+        .replace('{content}', cleanedContent || '暂无内容');
 
     console.log(`🔍 检测商业广告: ${title}`);
     const result = await callAIModel(prompt, modelConfig);
@@ -256,7 +328,8 @@ async function detectCommercialContent(content, title, customConfig = null) {
         if (jsonMatch) {
           const parsed = JSON.parse(jsonMatch[0]);
           const detection = {
-            isCommercial: parsed.isCommercial === true || parsed.category === '商业推广' || parsed.category === '非目标内容',
+            isCommercial: parsed.isCommercial === true || parsed.category === '商业推广' ||
+              parsed.category === '非目标内容' || parsed.category === 'promotion',
             category: parsed.category || '未知',
             subCategory: parsed.subCategory || null,
             reason: parsed.reason || '未说明',
@@ -296,6 +369,8 @@ async function generateAISummary(content, title = '', customConfig = null, retry
       console.log('⚠️ AI模型未配置，无法生成摘要');
       return null;
     }
+
+    if (isEnglish()) return await generateEnglishSummary(content, modelConfig);
 
     const prompt = AI_SUMMARY_PROMPT.replace('{content}', content);
     const result = await callAIModel(prompt, modelConfig);
@@ -383,7 +458,7 @@ async function generateAISummary(content, title = '', customConfig = null, retry
  * 清理摘要文本
  */
 function cleanSummary(text) {
-  if (!text) return '暂无摘要';
+  if (!text) return locale.text().noSummary;
 
   let cleaned = text
     .replace(/```wbCustomBlock[\s\S]*?```/g, '')
@@ -402,7 +477,7 @@ function cleanSummary(text) {
 function extractSummaryFromText(text) {
   const paragraphs = text.split(/\n+/).filter(p => p.trim().length > 20);
 
-  if (paragraphs.length === 0) return '暂无摘要';
+  if (paragraphs.length === 0) return locale.text().noSummary;
 
   let firstPara = paragraphs[0]
     .replace(/\*\*/g, '')
@@ -411,7 +486,7 @@ function extractSummaryFromText(text) {
 
   if (firstPara.length > 150) {
     const truncated = firstPara.substring(0, 150);
-    const lastSentence = truncated.lastIndexOf('。');
+    const lastSentence = truncated.lastIndexOf(isEnglish() ? '.' : '。');
     if (lastSentence > 100) {
       firstPara = truncated.substring(0, lastSentence + 1);
     } else {
@@ -431,7 +506,7 @@ function extractSummaryFromText(text) {
  */
 async function summarizeContent(text, title = '', customConfig = null) {
   if (!text) {
-    return { summary: '暂无摘要', isCommercial: false, category: '未知', reason: '无内容', confidence: 0 };
+    return { summary: locale.text().noSummary, isCommercial: false, category: '未知', reason: '无内容', confidence: 0 };
   }
 
   // 清理文本

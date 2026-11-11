@@ -50,8 +50,30 @@ function inferTopicTerm(title = '', knownTerms = []) {
   return concise || text.slice(0, 18);
 }
 
+function normalizeTitle(title, decodeHtml) {
+  return decodeHtml(title)
+    .replace(/#([^#]+)#/g, '$1')
+    .replace(/\[[^\]]+\]/g, ' ')
+    .replace(/【[^】]+】/g, ' ')
+    .replace(/[“”"']/g, '')
+    .replace(/[|｜·•]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeForCompare(normalizedTitle) {
+  return normalizedTitle
+    .toLowerCase()
+    .replace(/微博|抖音|虎扑|贴吧|热搜|热榜|话题|回应|最新|官方|排名|讨论|冲上/g, '')
+    .replace(/[^\u4e00-\u9fa5a-z0-9]+/gi, '')
+    .trim();
+}
+
 module.exports = {
   code: 'zh',
+  normalizeTitle,
+  normalizeForCompare,
+  similarityThreshold: 0.42,
   formatHeat,
   displayHeat: (signal, format) => format(signal.heat),
   signalBrief: ({ label, board, rank, heat }) =>
