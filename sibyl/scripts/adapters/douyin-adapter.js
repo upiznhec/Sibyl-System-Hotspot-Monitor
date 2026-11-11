@@ -29,6 +29,24 @@ async function fetchDouyinSignals(config = {}) {
   }).filter(signal => signal.title);
 }
 
+const source = {
+  id: 'douyin',
+  label: '抖音',
+  weight: 1.0,
+  sourceTypeWeights: { hot_board: 0.95 },
+  displayOrder: 1,
+  defaultRole: 'seed',
+  fetch: fetchDouyinSignals,
+  link: (cluster, helpers) => helpers.platformSearchLink(
+    cluster,
+    'douyin',
+    '查看抖音话题',
+    '搜索抖音关键词',
+    encoded => `https://www.douyin.com/search/${encoded}`
+  )
+};
+
 module.exports = {
-  fetchDouyinSignals
+  fetchDouyinSignals,
+  source
 };

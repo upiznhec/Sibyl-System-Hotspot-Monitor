@@ -1,12 +1,5 @@
 const crypto = require('crypto');
 
-const PLATFORM_LABELS = {
-  weibo: '微博',
-  douyin: '抖音',
-  tieba: '贴吧',
-  hupu: '虎扑'
-};
-
 function decodeHtml(text = '') {
   return String(text)
     .replace(/&nbsp;/g, ' ')
@@ -72,7 +65,8 @@ function stableHash(input, length = 12) {
 }
 
 function platformLabel(platform) {
-  return PLATFORM_LABELS[platform] || platform;
+  // Required here, not at the top: the registry loads adapters, which load this file.
+  return require('./source-registry').sourceLabel(platform);
 }
 
 function makeSignal(input) {

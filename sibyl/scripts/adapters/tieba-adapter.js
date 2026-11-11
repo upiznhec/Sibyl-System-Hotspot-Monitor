@@ -121,6 +121,17 @@ async function fetchTiebaSignals(config = {}) {
     }));
 }
 
+const source = {
+  id: 'tieba',
+  label: '贴吧',
+  weight: 0.5,
+  sourceTypeWeights: { hot_topic: 0.95 },
+  displayOrder: 3,
+  defaultRole: 'community',
+  fetch: fetchTiebaSignals
+};
+
 module.exports = {
-  fetchTiebaSignals
+  fetchTiebaSignals,
+  source
 };

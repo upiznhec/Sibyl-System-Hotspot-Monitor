@@ -95,7 +95,30 @@ async function fetchHupuSignals(config = {}) {
   return signals.slice(0, config.maxItems || 80);
 }
 
+function hupuLink(cluster, helpers) {
+  const hupuSignal = helpers.bestSignalForPlatform(cluster, 'hupu');
+  if (hupuSignal?.url && /\/\d+\.html(?:[?#].*)?$/.test(hupuSignal.url)) {
+    return `[查看虎扑热帖](${hupuSignal.url})`;
+  }
+
+  const encoded = encodeURIComponent(helpers.fallbackTopicTerm(cluster));
+  return `[搜索虎扑关键词](https://bbs.hupu.com/search?q=${encoded})`;
+}
+
+const source = {
+  id: 'hupu',
+  label: '虎扑',
+  weight: 0.6,
+  sourceTypeWeights: { board_hot: 0.75 },
+  sourceTypeBoosts: { board_hot: 4 },
+  displayOrder: 2,
+  defaultRole: 'community',
+  fetch: fetchHupuSignals,
+  link: hupuLink
+};
+
 module.exports = {
   fetchHupuSignals,
-  DEFAULT_BOARDS
+  DEFAULT_BOARDS,
+  source
 };

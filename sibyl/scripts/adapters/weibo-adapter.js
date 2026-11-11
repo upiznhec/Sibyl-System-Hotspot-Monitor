@@ -32,6 +32,24 @@ async function fetchWeiboSignals(config = {}) {
   }).filter(signal => signal.title);
 }
 
+const source = {
+  id: 'weibo',
+  label: '微博',
+  weight: 1.0,
+  sourceTypeWeights: { hot_search: 1.0 },
+  displayOrder: 0,
+  defaultRole: 'seed',
+  fetch: fetchWeiboSignals,
+  link: (cluster, helpers) => helpers.platformSearchLink(
+    cluster,
+    'weibo',
+    '查看微博话题',
+    '搜索微博关键词',
+    encoded => `https://s.weibo.com/weibo?q=${encoded}`
+  )
+};
+
 module.exports = {
-  fetchWeiboSignals
+  fetchWeiboSignals,
+  source
 };

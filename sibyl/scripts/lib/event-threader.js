@@ -5,6 +5,7 @@ const { callAIModel } = require('../../../elixir-summarizer/scripts/elixir-summa
 const { rebuildClusterFromSignals } = require('./clusterer');
 const { getDataDir, readJson } = require('./snapshot-store');
 const { normalizeForCompare } = require('./signals');
+const { defaultSeedPlatforms } = require('./source-registry');
 
 const DEFAULT_CONFIG = {
   enabled: true,
@@ -105,7 +106,7 @@ function hasSeedPlatform(cluster, seedPlatforms) {
 
 function selectCandidates(clusters, config) {
   const limit = config.candidateLimit || DEFAULT_CONFIG.candidateLimit;
-  const seedPlatforms = config.seedPlatforms || ['weibo', 'douyin'];
+  const seedPlatforms = config.seedPlatforms || defaultSeedPlatforms();
   const seeds = clusters.filter(cluster => hasSeedPlatform(cluster, seedPlatforms));
   const selected = [];
   const seen = new Set();

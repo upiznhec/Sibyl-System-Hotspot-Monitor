@@ -2,6 +2,16 @@
 
 Author: Misaka Studio
 
+> **This is a fork.** Based on [Sibyl System Hotspot Monitor](https://github.com/liray0919/Sibyl-System-Hotspot-Monitor) v1.3.20 by Misaka Studio (MIT License). It is being adapted for the Social Media AI Workflow Library, a non-commercial project, so that users can choose their own topics and sources. The original briefing format and broadcast method stay the same.
+>
+> 本仓库是 fork，基于 Misaka Studio 的 [Sibyl System Hotspot Monitor](https://github.com/liray0919/Sibyl-System-Hotspot-Monitor) v1.3.20（MIT License），为非商业项目 Social Media AI Workflow Library 改造：用户可以自选领域和来源，原版的播报格式和播报方式保持不变。
+>
+> Changes so far:
+>
+> - Each platform adapter declares its own label, weights, display order, role (main or community source) and link rule; `sibyl/scripts/lib/source-registry.js` reads them.
+> - Topic categories, keywords, priority, board hints, icons and noise rules moved from the code into settings (`sibyl/scripts/lib/topic-settings.js`, preset `sibyl/presets/zh-v1.3.20.json`).
+> - `tools/rewrite-check/` confirms that the output is identical to v1.3.20 on the same snapshots.
+
 Choose a language:
 
 - [中文说明](README.zh-CN.md)

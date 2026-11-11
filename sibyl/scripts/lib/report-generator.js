@@ -1,4 +1,12 @@
 const { formatHeat } = require('./signals');
+const {
+  defaultSeedPlatforms,
+  displayOrder,
+  isCommunitySource,
+  linkSources,
+  sourceLabel
+} = require('./source-registry');
+const { defaultTopicSettings } = require('./topic-settings');
 
 const STATUS_ICON = {
   new: '🆕',
@@ -6,32 +14,6 @@ const STATUS_ICON = {
   holding: '⏳',
   steady: '👀',
   cooling: '⬇️'
-};
-
-const CATEGORY_ICON = {
-  游戏: '🕹️',
-  电竞: '🎮',
-  篮球: '🏀',
-  足球: '⚽',
-  体育: '🏅',
-  AI: '🤖'
-};
-
-const BASKETBALL_HINTS = /篮球|NBA|CBA|总决赛|季后赛|湖人|勇士|快船|火箭|马刺|尼克斯|詹姆斯|乔丹|科比|霍华德|文班亚马|哈登|库里|杜兰特|东契奇|约基奇|塔图姆|布朗/i;
-const FOOTBALL_HINTS = /足球|世界杯|欧冠|英超|西甲|意甲|法甲|德甲|葡萄牙|法国队|阿根廷|巴萨|皇马|曼城|利物浦|梅西|C罗|姆巴佩|哈兰德|利瓦科维奇|亨利/i;
-
-const KNOWN_TOPIC_TERMS = [
-  '梅西', 'C罗', '姆巴佩', '哈兰德', '詹姆斯', '乔丹', '科比', '霍华德',
-  '文班亚马', 'Faker', 'BLG', 'T1', 'HLE', 'MSI', 'LNG', 'EDG', 'XLG',
-  'Missing', '英雄联盟', '王者荣耀', 'NBA', '世界杯'
-];
-
-const DEFAULT_BROADCAST_SEED_PLATFORMS = ['weibo', 'douyin'];
-const PLATFORM_LABELS = {
-  weibo: '微博',
-  douyin: '抖音',
-  tieba: '贴吧',
-  hupu: '虎扑'
 };
 
 function formatTime(date = new Date()) {
@@ -64,23 +46,23 @@ function clusterText(cluster) {
   ].filter(Boolean).join(' ');
 }
 
-function visualCategory(cluster) {
+function visualCategory(cluster, settings) {
   const category = pickCategory(cluster);
-  if (category !== '体育') return category;
+  const topic = settings.categories.find(item => item.name === category);
+  if (!topic || topic.subcategories.length === 0) return category;
 
   const text = clusterText(cluster);
-  if (BASKETBALL_HINTS.test(text)) return '篮球';
-  if (FOOTBALL_HINTS.test(text)) return '足球';
-  return '体育';
+  const sub = topic.subcategories.find(item => item.pattern.test(text));
+  return sub ? sub.name : category;
 }
 
-function categoryIcon(cluster) {
-  return CATEGORY_ICON[visualCategory(cluster)] || CATEGORY_ICON[cluster.category] || '▫️';
+function categoryIcon(cluster, settings) {
+  return settings.icons[visualCategory(cluster, settings)] || settings.icons[cluster.category] || '▫️';
 }
 
-function platformNamesForCluster(cluster) {
+function platformNamesForCluster(cluster, seedSet) {
   const names = (cluster.signals || [])
-    .filter(signal => signal.platform === 'weibo' || signal.platform === 'douyin')
+    .filter(signal => seedSet.has(signal.platform))
     .map(signal => signal.platformLabel)
     .filter(Boolean);
   const uniqueNames = [...new Set(names)];
@@ -143,14 +125,8 @@ function formatSignalBrief(signal) {
 }
 
 function signalDisplayOrder(signal) {
-  const platformOrder = {
-    weibo: 0,
-    douyin: 1,
-    hupu: 2,
-    tieba: 3
-  };
   return [
-    platformOrder[signal.platform] ?? 9,
+    displayOrder(signal.platform),
     signal.rank || 999
   ];
 }
@@ -199,9 +175,9 @@ function buildTrendSummary(cluster) {
   return `${basisStatusText(cluster)}，${formatGrowth(cluster)}`;
 }
 
-function buildPerformanceLine(cluster) {
+function buildPerformanceLine(cluster, seedSet) {
   const parts = [buildHeatLine(cluster)];
-  const platformText = platformNamesForCluster(cluster);
+  const platformText = platformNamesForCluster(cluster, seedSet);
   parts.push(cluster.platformCount > 1
     ? `${cluster.platformCount}个平台共同出现`
     : `${platformText}单平台出现`);
@@ -218,25 +194,25 @@ function bestSignalForPlatform(cluster, platform) {
   return (cluster.signals || []).find(signal => signal.platform === platform);
 }
 
-function fallbackTopicTerm(cluster) {
+function fallbackTopicTerm(cluster, settings) {
   const keywords = [...new Set(cluster.keywords || [])]
     .filter(keyword => String(keyword).trim().length >= 2)
     .slice(0, 4);
-  return keywords.length ? keywords.join(' ') : inferTopicTerm(cluster.mainSignal.title);
+  return keywords.length ? keywords.join(' ') : inferTopicTerm(cluster.mainSignal.title, settings.knownTerms);
 }
 
 function includesTerm(text, term) {
   return text.toLowerCase().includes(String(term).toLowerCase());
 }
 
-function inferTopicTerm(title = '') {
+function inferTopicTerm(title = '', knownTerms = []) {
   const text = String(title)
     .replace(/^原创\s*/i, '')
     .replace(/[《》“”"']/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 
-  const entities = KNOWN_TOPIC_TERMS.filter(term => includesTerm(text, term));
+  const entities = knownTerms.filter(term => includesTerm(text, term));
   if (entities.length) return entities.slice(0, 3).join(' ');
 
   const segments = text
@@ -252,46 +228,41 @@ function inferTopicTerm(title = '') {
   return concise || text.slice(0, 18);
 }
 
-function platformTopicTerm(cluster, platform) {
+function platformTopicTerm(cluster, platform, settings) {
   const platformSignal = bestSignalForPlatform(cluster, platform);
-  return platformSignal?.title || fallbackTopicTerm(cluster);
+  return platformSignal?.title || fallbackTopicTerm(cluster, settings);
 }
 
-function platformSearchLink(cluster, platform, directLabel, fallbackLabel, urlBuilder) {
+function platformSearchLink(cluster, platform, directLabel, fallbackLabel, urlBuilder, settings) {
   const platformSignal = bestSignalForPlatform(cluster, platform);
-  const term = platformTopicTerm(cluster, platform);
+  const term = platformTopicTerm(cluster, platform, settings);
   const encoded = encodeURIComponent(term);
   const label = platformSignal ? directLabel : fallbackLabel;
   return `[${label}](${urlBuilder(encoded)})`;
 }
 
-function hupuLink(cluster) {
-  const hupuSignal = bestSignalForPlatform(cluster, 'hupu');
-  if (hupuSignal?.url && /\/\d+\.html(?:[?#].*)?$/.test(hupuSignal.url)) {
-    return `[查看虎扑热帖](${hupuSignal.url})`;
-  }
-
-  const encoded = encodeURIComponent(fallbackTopicTerm(cluster));
-  return `[搜索虎扑关键词](https://bbs.hupu.com/search?q=${encoded})`;
-}
-
-function detailLinks(cluster) {
-  return [
-    platformSearchLink(cluster, 'weibo', '查看微博话题', '搜索微博关键词', encoded => `https://s.weibo.com/weibo?q=${encoded}`),
-    platformSearchLink(cluster, 'douyin', '查看抖音话题', '搜索抖音关键词', encoded => `https://www.douyin.com/search/${encoded}`),
-    hupuLink(cluster)
-  ].join(' ｜ ');
+// Each source builds its own link; the helpers give it the shared lookup rules.
+function detailLinks(cluster, settings) {
+  const helpers = {
+    bestSignalForPlatform,
+    fallbackTopicTerm: item => fallbackTopicTerm(item, settings),
+    platformSearchLink: (item, platform, directLabel, fallbackLabel, urlBuilder) =>
+      platformSearchLink(item, platform, directLabel, fallbackLabel, urlBuilder, settings)
+  };
+  return linkSources()
+    .map(source => source.link(cluster, helpers))
+    .join(' ｜ ');
 }
 
 function seedPlatforms(config = {}) {
   return Array.isArray(config.seedPlatforms) && config.seedPlatforms.length
     ? config.seedPlatforms
-    : DEFAULT_BROADCAST_SEED_PLATFORMS;
+    : defaultSeedPlatforms();
 }
 
 function seedPlatformText(config = {}) {
   return seedPlatforms(config)
-    .map(platform => PLATFORM_LABELS[platform] || platform)
+    .map(sourceLabel)
     .join('或');
 }
 
@@ -311,7 +282,7 @@ function communityOnlyClusters(clusters, config = {}) {
   return clusters
     .filter(cluster => !cluster.broadcastFiltered)
     .filter(cluster => !hasBroadcastSeed(cluster, config))
-    .filter(cluster => (cluster.signals || []).some(signal => signal.platform === 'hupu' || signal.platform === 'tieba'))
+    .filter(cluster => (cluster.signals || []).some(signal => isCommunitySource(signal.platform)))
     .sort((a, b) => b.score - a.score)
     .slice(0, config.communityWatchlistN || 3);
 }
@@ -324,20 +295,20 @@ function selectReportClusters(clusters, config = {}) {
     .slice(0, topN);
 }
 
-function renderCluster(cluster, index) {
+function renderCluster(cluster, index, context) {
   const icon = STATUS_ICON[cluster.status] || '👀';
-  const category = categoryIcon(cluster);
+  const category = categoryIcon(cluster, context.settings);
   const lines = [];
 
   lines.push(`### ${index + 1}. ${category} ${icon} ${cluster.canonicalTitle || cluster.mainSignal.title}`);
   lines.push('');
   lines.push(`**综合分：${formatDisplayScore(cluster.score)}**`);
   lines.push('');
-  lines.push(`**热度表现：** ${buildPerformanceLine(cluster)}`);
+  lines.push(`**热度表现：** ${buildPerformanceLine(cluster, context.seedSet)}`);
   lines.push('');
   lines.push(`**事件摘要：** ${cluster.eventSummary || '暂缺可靠摘要。'}`);
   lines.push('');
-  lines.push(detailLinks(cluster));
+  lines.push(detailLinks(cluster, context.settings));
   lines.push('');
   lines.push('---');
   lines.push('');
@@ -349,6 +320,10 @@ function generateReport(clusters, meta = {}, config = {}) {
   const topN = config.topN || 8;
   const eligibleClusters = eligibleReportClusters(clusters, config);
   const selected = selectReportClusters(clusters, config);
+  const context = {
+    settings: meta.topicSettings || defaultTopicSettings(),
+    seedSet: new Set(seedPlatforms(config))
+  };
 
   const lines = [];
   lines.push('# 热点综合播报');
@@ -365,7 +340,7 @@ function generateReport(clusters, meta = {}, config = {}) {
   lines.push('');
 
   selected.forEach((cluster, index) => {
-    lines.push(renderCluster(cluster, index));
+    lines.push(renderCluster(cluster, index, context));
   });
 
   const watchlist = eligibleClusters.slice(topN, topN + 5);
@@ -384,7 +359,7 @@ function generateReport(clusters, meta = {}, config = {}) {
     lines.push('### 社区观察');
     lines.push('');
     communityWatchlist.forEach(cluster => {
-      const category = visualCategory(cluster);
+      const category = visualCategory(cluster, context.settings);
       const heat = buildHeatLine(cluster);
       lines.push(`- ${category} ｜ ${cluster.canonicalTitle || cluster.mainSignal.title} ｜ 综合分 ${formatDisplayScore(cluster.score)} ｜ ${heat}`);
     });

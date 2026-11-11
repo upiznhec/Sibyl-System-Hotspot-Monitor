@@ -1,25 +1,10 @@
 const { formatHeat, normalizeForCompare, stableHash } = require('./signals');
-
-const PLATFORM_WEIGHTS = {
-  weibo: 1.0,
-  douyin: 1.0,
-  tieba: 0.5,
-  hupu: 0.6
-};
-
-const PLATFORM_LABELS = {
-  weibo: '微博',
-  douyin: '抖音',
-  tieba: '贴吧',
-  hupu: '虎扑'
-};
-
-const SOURCE_TYPE_WEIGHT = {
-  hot_search: 1.0,
-  hot_board: 0.95,
-  hot_topic: 0.95,
-  board_hot: 0.75
-};
+const {
+  sourceLabel,
+  sourceTypeBoost,
+  sourceTypeWeight,
+  sourceWeight
+} = require('./source-registry');
 
 const STOP_WORDS = new Set([
   '热搜', '热榜', '话题', '回应', '官方', '最新', '今天', '今日', '昨日',
@@ -50,14 +35,14 @@ const EVENT_CONCEPT_PATTERNS = [
 ];
 
 function scoreSignal(signal) {
-  const platformWeight = PLATFORM_WEIGHTS[signal.platform] || 0.7;
-  const sourceWeight = SOURCE_TYPE_WEIGHT[signal.sourceType] || 0.8;
+  const platformWeight = sourceWeight(signal.platform);
+  const listTypeWeight = sourceTypeWeight(signal.sourceType);
   const rank = signal.rank || 999;
   const rankScore = Math.max(0, 36 - Math.min(rank, 35)) * 1.25;
   const heatScore = Math.min(36, Math.log10((signal.heat || 0) + 10) * 6);
   const keywordBoost = Math.min(12, (signal.matchedKeywords || []).length * 2.5);
-  const boardBoost = signal.sourceType === 'board_hot' ? 4 : 0;
-  return Math.round((rankScore + heatScore + keywordBoost + boardBoost) * platformWeight * sourceWeight);
+  const boardBoost = sourceTypeBoost(signal.sourceType);
+  return Math.round((rankScore + heatScore + keywordBoost + boardBoost) * platformWeight * listTypeWeight);
 }
 
 function chineseBigrams(text) {
@@ -241,7 +226,7 @@ function statusLabel(status) {
 }
 
 function platformNames(platforms = []) {
-  return platforms.map(platform => PLATFORM_LABELS[platform] || platform).join('、');
+  return platforms.map(sourceLabel).join('、');
 }
 
 function buildBroadcastReasons(cluster, prev) {

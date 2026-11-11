@@ -2,10 +2,7 @@
 
 const path = require('path');
 
-const { fetchWeiboSignals } = require('./adapters/weibo-adapter');
-const { fetchDouyinSignals } = require('./adapters/douyin-adapter');
-const { fetchTiebaSignals } = require('./adapters/tieba-adapter');
-const { fetchHupuSignals } = require('./adapters/hupu-adapter');
+const { sourceFetchers } = require('./lib/source-registry');
 const {
   getDataDir,
   mergeConfig,
@@ -75,12 +72,7 @@ async function collectSnapshot(options = {}) {
   const config = options.config || loadConfig();
   const onlyPlatforms = options.platforms || parsePlatforms(args);
   const platformSet = onlyPlatforms ? new Set(onlyPlatforms) : null;
-  const platformFetchers = [
-    ['weibo', fetchWeiboSignals, config.platforms.weibo],
-    ['douyin', fetchDouyinSignals, config.platforms.douyin],
-    ['tieba', fetchTiebaSignals, config.platforms.tieba],
-    ['hupu', fetchHupuSignals, config.platforms.hupu]
-  ].filter(([name]) => !platformSet || platformSet.has(name));
+  const platformFetchers = sourceFetchers(config.platforms, platformSet);
 
   console.log('开始采集 Sibyl 统一快照...');
   const results = await Promise.all(platformFetchers.map(([name, fetcher, platformConfig]) =>

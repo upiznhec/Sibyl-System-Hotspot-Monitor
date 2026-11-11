@@ -4,10 +4,8 @@ const fs = require('fs');
 const path = require('path');
 const https = require('https');
 
-const { fetchWeiboSignals } = require('./adapters/weibo-adapter');
-const { fetchDouyinSignals } = require('./adapters/douyin-adapter');
-const { fetchTiebaSignals } = require('./adapters/tieba-adapter');
-const { fetchHupuSignals } = require('./adapters/hupu-adapter');
+const { defaultSeedPlatforms, sourceFetchers } = require('./lib/source-registry');
+const { loadTopicSettings } = require('./lib/topic-settings');
 const { clusterSignals, buildNextState } = require('./lib/clusterer');
 const { generateReport, selectReportClusters, hasBroadcastSeed } = require('./lib/report-generator');
 const { classifySignal } = require('./lib/category-classifier');
@@ -74,7 +72,7 @@ const DEFAULT_CONFIG = {
     topN: 10,
     minScore: 20,
     requireSeedPlatforms: true,
-    seedPlatforms: ['weibo', 'douyin'],
+    seedPlatforms: defaultSeedPlatforms(),
     pushWeCom: false,
     webhook: ''
   }
@@ -134,9 +132,9 @@ function loadConfig() {
   return mergeConfig(DEFAULT_CONFIG, fileConfig);
 }
 
-function enrichSignals(signals) {
+function enrichSignals(signals, topicSettings) {
   return signals.map(signal => {
-    const classification = classifySignal(signal);
+    const classification = classifySignal(signal, topicSettings);
     return {
       ...signal,
       category: classification.category,
@@ -372,13 +370,10 @@ async function main() {
   const config = loadConfig();
   const previousState = readJson(STATE_FILE, {});
   const reportConfig = config.report || {};
+  const seedPlatforms = reportConfig.seedPlatforms || defaultSeedPlatforms();
+  const topicSettings = loadTopicSettings(config, CONFIG_FILE);
 
-  const platformFetchers = [
-    ['weibo', fetchWeiboSignals, config.platforms.weibo],
-    ['douyin', fetchDouyinSignals, config.platforms.douyin],
-    ['tieba', fetchTiebaSignals, config.platforms.tieba],
-    ['hupu', fetchHupuSignals, config.platforms.hupu]
-  ];
+  const platformFetchers = sourceFetchers(config.platforms);
 
   let source = 'live';
   let errors = [];
@@ -407,7 +402,7 @@ async function main() {
     platformNames = results.filter(result => !result.skipped).map(result => result.name);
   }
 
-  const signals = filterSignals(enrichSignals(rawSignals), config);
+  const signals = filterSignals(enrichSignals(rawSignals, topicSettings), config);
   let clusters = clusterSignals(signals, previousState, config.cluster || {});
   const eventMergeEnabled = !args.includes('--no-ai') &&
     !args.includes('--no-event-merge') &&
@@ -424,20 +419,20 @@ async function main() {
   if (eventMergeEnabled && !args.includes('--no-summary') && config.eventSummary?.enabled !== false) {
     const mergeCandidates = selectPreSummaryCandidates(clusters, {
       ...(config.eventMerge || {}),
-      seedPlatforms: reportConfig.seedPlatforms || ['weibo', 'douyin']
+      seedPlatforms
     });
     await applyEventSummaries(mergeCandidates, preSummaryConfig);
   }
   clusters = await applySemanticEventMerge(clusters, previousState, {
     ...(config.eventMerge || {}),
     enabled: eventMergeEnabled,
-    seedPlatforms: reportConfig.seedPlatforms || ['weibo', 'douyin'],
+    seedPlatforms,
     ai: config.ai
   });
   if (eventMergeEnabled && !args.includes('--no-summary') && config.eventSummary?.enabled !== false) {
     const relatedCandidates = selectPreSummaryCandidates(clusters, {
       ...(config.eventMerge || {}),
-      seedPlatforms: reportConfig.seedPlatforms || ['weibo', 'douyin']
+      seedPlatforms
     });
     const reportCandidates = selectReportClusters(clusters, {
       ...reportConfig,
@@ -450,7 +445,7 @@ async function main() {
     clusters = await applySemanticEventMerge(clusters, previousState, {
       ...(config.eventMerge || {}),
       enabled: true,
-      seedPlatforms: reportConfig.seedPlatforms || ['weibo', 'douyin'],
+      seedPlatforms,
       ai: config.ai
     });
   }
@@ -470,7 +465,8 @@ async function main() {
     platforms: platformNames,
     rawSignalCount: rawSignals.length,
     signalCount: signals.length,
-    source
+    source,
+    topicSettings
   }, reportConfig);
 
   ensureDir(DATA_DIR);
