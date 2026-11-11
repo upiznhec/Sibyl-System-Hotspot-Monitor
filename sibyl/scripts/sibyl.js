@@ -7,6 +7,7 @@ const { defaultSeedPlatforms, sourceFetchers } = require('./lib/source-registry'
 const { loadTopicSettings } = require('./lib/topic-settings');
 const { configureLocale, text } = require('./lib/locale');
 const { reportTarget, sendInParts } = require('./lib/webhook');
+const { saveBriefing } = require('./lib/briefing-archive');
 const { clusterSignals, buildNextState } = require('./lib/clusterer');
 const { generateReport, selectReportClusters, hasBroadcastSeed } = require('./lib/report-generator');
 const { classifySignal } = require('./lib/category-classifier');
@@ -394,6 +395,11 @@ async function main() {
   writeJson(CLUSTERS_FILE, clusters.map(cluster => compactCluster(cluster, reportConfig)));
   fs.writeFileSync(REPORT_FILE, report);
   writeJson(STATE_FILE, buildNextState(clusters));
+  // A dated copy stays for 7 days (briefings/), so the agent can show it when asked.
+  // --no-push is a dry run and leaves no copy.
+  const savedFile = args.includes('--no-push')
+    ? null
+    : saveBriefing(report, { dataDir: DATA_DIR, generatedAt, keepDays: config.archive?.keepDays });
 
   const pushed = await maybePushReport(report, config, args);
   if (args.includes('--print')) {
@@ -407,6 +413,7 @@ async function main() {
   console.log(`   数据来源: ${source === 'snapshot' ? 'Sibyl快照' : '现场采集'}`);
   console.log(`   报告文件: ${REPORT_FILE}`);
   console.log(`   推送: ${pushed ? '已发送' : '未发送'}`);
+  if (savedFile) console.log(`   播报存档: ${savedFile}`);
   errors.forEach(error => console.warn(`⚠️ ${error.name} 采集异常: ${error.error}`));
 }
 

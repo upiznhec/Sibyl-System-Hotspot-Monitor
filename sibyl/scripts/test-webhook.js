@@ -14,10 +14,13 @@ const {
   reportTarget,
   sendInParts,
   sendMessage,
-  splitMessage
+  splitMessage,
+  telegramUrl,
+  toTelegramHtml
 } = require('./lib/webhook');
 
-['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK'].forEach(key => delete process.env[key]);
+const TELEGRAM_ENV = ['SIBYL_TELEGRAM_BOT_TOKEN', 'SIBYL_TELEGRAM_CHAT_ID', 'SIBYL_TELEGRAM_ALERT_CHAT_ID'];
+['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK', ...TELEGRAM_ENV].forEach(key => delete process.env[key]);
 
 function measure(text, channel) {
   return CHANNELS[channel].unit === 'bytes' ? Buffer.byteLength(text, 'utf8') : text.length;
@@ -167,12 +170,55 @@ async function checkSending() {
   flaky.server.close();
 }
 
+async function checkTelegram() {
+  assert.strictEqual(detectChannel('https://api.telegram.org/bot1:abc/sendMessage?chat_id=42'), 'telegram');
+  assert.strictEqual(
+    toTelegramHtml('### 1. A & <B>\n**Score**\n[x](https://e.test/?a=1&b=2)\n---'),
+    '<b>1. A &amp; &lt;B&gt;</b>\n<b>Score</b>\n<a href="https://e.test/?a=1&amp;b=2">x</a>\n────────'
+  );
+  assert.deepStrictEqual(payloadFor('telegram', '**hi**', { chatId: '42' }), {
+    chat_id: '42',
+    text: '<b>hi</b>',
+    parse_mode: 'HTML',
+    link_preview_options: { is_disabled: true }
+  });
+
+  // A webhook wins; otherwise the Telegram bot, with an optional separate chat for alerts.
+  const config = { telegram: { botToken: '1:abc', chatId: '42', alertChatId: '-100' } };
+  assert.deepStrictEqual(reportTarget(config), { webhook: telegramUrl('1:abc', '42'), channel: 'telegram' });
+  assert.deepStrictEqual(alertTarget(config), { webhook: telegramUrl('1:abc', '-100'), channel: 'telegram' });
+  assert.strictEqual(
+    reportTarget({ ...config, report: { webhook: 'https://hooks.slack.com/services/x' } }).webhook,
+    'https://hooks.slack.com/services/x'
+  );
+  process.env.SIBYL_TELEGRAM_BOT_TOKEN = '2:env';
+  process.env.SIBYL_TELEGRAM_CHAT_ID = '7';
+  assert.strictEqual(reportTarget({}).webhook, telegramUrl('2:env', '7'));
+  assert.strictEqual(alertTarget({}).webhook, telegramUrl('2:env', '7'));
+  TELEGRAM_ENV.forEach(key => delete process.env[key]);
+
+  // The chat moves from the URL into the body; success means {"ok":true}.
+  for (const [status, body, expected] of [[200, '{"ok":true,"result":{}}', true], [400, '{"ok":false,"error_code":400}', false]]) {
+    const { server, received, url } = await startServer(res => {
+      res.statusCode = status;
+      res.end(body);
+    });
+    const sent = await sendMessage(url.replace('/hook?key=test', '/bot1:abc/sendMessage?chat_id=42'), '**hi**', { channel: 'telegram' });
+    server.close();
+    assert.strictEqual(sent, expected);
+    assert.strictEqual(received[0].path, '/bot1:abc/sendMessage');
+    assert.strictEqual(received[0].body.chat_id, '42');
+    assert.strictEqual(received[0].body.text, '<b>hi</b>');
+  }
+}
+
 async function main() {
   checkChannels();
   checkPayloads();
   checkSplitting();
   checkTargets();
   await checkSending();
+  await checkTelegram();
   console.log('webhook tests passed');
 }
 

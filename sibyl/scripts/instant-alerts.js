@@ -21,6 +21,7 @@ const { callAIModel, summarizeContent } = require('../../elixir-summarizer/scrip
 const { resolveModelConfig } = require('./lib/model-config');
 const { defaultSeedPlatforms, getSource } = require('./lib/source-registry');
 const { alertTarget, sendMessage } = require('./lib/webhook');
+const { saveAlert } = require('./lib/briefing-archive');
 const {
   getDataDir,
   loadLatestSnapshot,
@@ -369,9 +370,12 @@ async function main() {
   const { webhook, channel } = alertTarget(config);
   // "pushWeCom" is the v1.3.20 name of the switch and still works.
   const pushEnabled = config.alerts?.push || config.alerts?.pushWeCom;
-  const shouldPush = (pushEnabled || args.includes('--push')) &&
-    !args.includes('--no-push') &&
-    webhook;
+  const dryRun = args.includes('--no-push');
+  const shouldPush = (pushEnabled || args.includes('--push')) && !dryRun && webhook;
+  // No push target, or push switched off: alerts go to alerts/<date>.md for the agent to show.
+  const saveToFile = !dryRun && !shouldPush;
+  const archiveOptions = { dataDir: getDataDir(), capturedAt: snapshot.capturedAt, keepDays: config.archive?.keepDays };
+  let savedCount = 0;
 
   console.log(`Sibyl 即时预警检查完成，候选 ${alerts.length} 个`);
   let sentCount = 0;
@@ -379,6 +383,20 @@ async function main() {
     const message = buildMessage(alert, snapshot.capturedAt);
     console.log('\n' + message + '\n');
 
+    if (saveToFile) {
+      state.reported[alert.key] = {
+        platform: alert.signal.platform,
+        title: alert.signal.title,
+        reportedAt: new Date().toISOString(),
+        capturedAt: snapshot.capturedAt,
+        triggerType: alert.triggerType,
+        savedToFile: true
+      };
+      saveState(state);
+      saveAlert(message, archiveOptions);
+      savedCount++;
+      continue;
+    }
     if (!shouldPush) continue;
 
     state.reported[alert.key] = {
@@ -393,6 +411,7 @@ async function main() {
     const sent = await sendMessage(webhook, message, { channel });
     if (sent) {
       sentCount++;
+      saveAlert(message, archiveOptions);
     } else {
       delete state.reported[alert.key];
       saveState(state);
@@ -401,6 +420,7 @@ async function main() {
   }
 
   console.log(`✅ Sibyl 即时预警完成，推送 ${sentCount}/${alerts.length} 个`);
+  if (saveToFile) console.log(`   未配置推送，已存为文件 ${savedCount} 个（alerts/，保留 7 天）`);
 }
 
 if (require.main === module) {

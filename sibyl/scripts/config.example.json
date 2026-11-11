@@ -112,6 +112,14 @@
     "channel": "",
     "webhook": ""
   },
+  "telegram": {
+    "botToken": "",
+    "chatId": "",
+    "alertChatId": ""
+  },
+  "archive": {
+    "keepDays": 7
+  },
   "ai": {
     "baseUrl": "https://api.openai.com/v1",
     "model": "",

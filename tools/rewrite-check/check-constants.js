@@ -81,17 +81,21 @@ check('display order', () => {
     [0, 1, 2, 3, 9]
   );
 });
+// Only the four v1.3.20 sources are compared; the sources added later have no v1.3.20 values.
+const V1320_SOURCES = new Set(['weibo', 'douyin', 'tieba', 'hupu']);
+const v1320Only = ids => ids.filter(id => V1320_SOURCES.has(id));
+
 check('default main sources', () => {
-  assert.deepStrictEqual(registry.defaultSeedPlatforms(), original.DEFAULT_BROADCAST_SEED_PLATFORMS);
+  assert.deepStrictEqual(v1320Only(registry.defaultSeedPlatforms()), original.DEFAULT_BROADCAST_SEED_PLATFORMS);
 });
 check('community sources', () => {
   assert.deepStrictEqual(
-    registry.SOURCE_ORDER.filter(registry.isCommunitySource),
+    v1320Only(registry.SOURCE_ORDER.filter(registry.isCommunitySource)),
     ['tieba', 'hupu']
   );
 });
 check('link order', () => {
-  assert.deepStrictEqual(registry.linkSources().map(source => source.id), ['weibo', 'douyin', 'hupu']);
+  assert.deepStrictEqual(v1320Only(registry.linkSources().map(source => source.id)), ['weibo', 'douyin', 'hupu']);
 });
 check('category groups and order', () => {
   assert.deepStrictEqual(

@@ -144,7 +144,24 @@ async function main() {
   const flat = text => text.replace(/\s+/g, ' ').trim();
   assert.strictEqual(flat(srv.received.map(item => stripPrefix(item.content)).join('\n')), flat(baselineReport));
   console.log(`E ok: old "pushWeCom" switch works; briefing sent to Discord in ${srv.received.length} message(s)`);
-  console.log('All 5 push checks passed.');
+
+  // F. No push target: alerts and the briefing are saved as files (local date of the snapshot),
+  // the once-a-day rule still holds, and a rerun saves nothing new.
+  dir = dataDir('f-files', baseConfig);
+  result = await run('instant-alerts.js', ['--no-summary'], dir);
+  assert.strictEqual(result.code, 0, result.out);
+  const alertFile = path.join(dir, 'alerts', '2026-11-11.md');
+  assert.strictEqual(fs.readFileSync(alertFile, 'utf8'), `${baselineMessages.join('\n\n')}\n`);
+  const savedState = JSON.parse(fs.readFileSync(path.join(dir, 'alerts-state.json'), 'utf8'));
+  assert.strictEqual(Object.keys(savedState.reported).length, baselineMessages.length);
+  result = await run('instant-alerts.js', ['--no-summary'], dir);
+  assert.ok(result.out.includes('候选 0 个'), 'second run is deduplicated');
+  assert.strictEqual(fs.readFileSync(alertFile, 'utf8'), `${baselineMessages.join('\n\n')}\n`);
+  result = await run('sibyl.js', ['--no-ai', '--no-summary'], dir);
+  assert.strictEqual(result.code, 0, result.out);
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'briefings', '2026-11-11_1030.md'), 'utf8'), baselineReport);
+  console.log('F ok: without a push target, alerts and the briefing are saved as files, once each');
+  console.log('All 6 push checks passed.');
 }
 
 main().catch(error => {

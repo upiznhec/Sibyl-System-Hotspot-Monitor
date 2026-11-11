@@ -16,7 +16,10 @@ and will be removed before release.
 - `push-check.js` covers the push path that the two runs above leave off. It runs
   `instant-alerts.js` and `sibyl.js` with push on against a local HTTP server and checks that
   the WeCom messages equal the v1.3.20 output, that a repeated run sends nothing, that failed
-  sends leave no dedupe record, and that Slack and Discord get their own payloads.
+  sends leave no dedupe record, and that Slack and Discord get their own payloads. Case F
+  checks that, without any push target, alerts and the briefing are saved as files, once each.
+- `check-constants.js` compares registry lists for the four v1.3.20 sources only; sources added
+  later have no v1.3.20 values.
 - `check-constants.js` compares the values moved into the adapters and the preset with the
   constants hard-coded in v1.3.20.
 

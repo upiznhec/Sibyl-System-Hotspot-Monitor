@@ -14,8 +14,16 @@ const {
 const CHANNEL_LABELS = {
   wecom: '企业微信',
   slack: 'Slack',
-  discord: 'Discord'
+  discord: 'Discord',
+  telegram: 'Telegram'
 };
+
+// What a person can ask their agent when briefings are saved as files instead of sent.
+const ASK_EXAMPLES = [
+  'Show me the latest trend briefing',
+  'Any trend alerts today?',
+  'What were the top trends yesterday afternoon?'
+];
 
 function getDataDir() {
   if (process.env.SIBYL_DATA_DIR) return process.env.SIBYL_DATA_DIR;
@@ -77,6 +85,17 @@ function describeTarget(target) {
     return { ok: false, detail: 'webhook 地址无法解析' };
   }
   const channel = detectChannel(target.webhook, target.channel);
+  if (channel === 'telegram') {
+    const url = new URL(target.webhook);
+    const tokenOk = /^\/bot\d+:[\w-]{20,}\/sendMessage$/.test(url.pathname);
+    const chatOk = Boolean(url.searchParams.get('chat_id'));
+    return {
+      ok: tokenOk && chatOk,
+      detail: tokenOk && chatOk
+        ? 'Telegram（机器人和聊天 ID 已设置）'
+        : `Telegram 设置不完整：${tokenOk ? '' : '机器人 token 格式不对；'}${chatOk ? '' : '缺少聊天 ID'}`
+    };
+  }
   const known = Boolean(target.channel) ||
     channel !== 'wecom' ||
     /(^|\.)qyapi\.weixin\.qq\.com$/i.test(host);
@@ -154,7 +173,7 @@ function main() {
   const report = reportTarget(config);
   const taskHasAlertWebhook = commandHasVariable(taskCommands, ['SIBYL_ALERT_WEBHOOK', 'WECOM_WEBHOOK']);
   const taskHasReportWebhook = commandHasVariable(taskCommands, ['SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK']);
-  const taskHint = '如果 webhook 只写在定时任务命令里，手动运行自检时读不到，可在下方人工确认或用 --task-command 传入任务命令。';
+  const taskHint = '设置 webhook（Slack、Discord、企业微信），或用 SIBYL_TELEGRAM_BOT_TOKEN 和 SIBYL_TELEGRAM_CHAT_ID 推送到 Telegram；都不设置时播报存成文件。如果 webhook 只写在定时任务命令里，手动运行自检时读不到，可在下方人工确认或用 --task-command 传入任务命令。';
 
   checkLine(recommended, 'recommended', '当前进程即时预警 webhook', maskStatus(alert.webhook),
     maskStatus(alert.webhook) ? '当前进程/配置可读取' : '当前进程未检测到', taskHint);
@@ -224,6 +243,13 @@ function main() {
     taskCommands ? '已根据传入任务命令做辅助检查' : '未传入任务命令；若 webhook 只写在定时任务里，请以任务配置为准',
     '自检脚本读不到调度工具里的任务配置；可用 --task-command 或 SIBYL_TASK_COMMANDS 辅助检查。');
 
+  const tips = [];
+  if (!maskStatus(alert.webhook) && !maskStatus(report.webhook)) {
+    const keepDays = Number(config.archive?.keepDays) > 0 ? Number(config.archive.keepDays) : 7;
+    tips.push(`未设置推送：播报和即时预警会存成文件（${path.join(dataDir, 'briefings')}、${path.join(dataDir, 'alerts')}，保留 ${keepDays} 天），不会主动发出。`);
+    tips.push(`想看时问你的 agent，例如："${ASK_EXAMPLES.join('"、"')}"。agent 会运行 node scripts/show-briefing.js，只在你问的时候展示。`);
+  }
+
   console.log('# Sibyl System 部署自检');
   console.log(`运行时间：${new Date().toISOString()}`);
   console.log(`数据目录：${dataDir}`);
@@ -233,6 +259,10 @@ function main() {
   printSection('推荐项', recommended);
   printSection('可选增强', optional);
   printSection('人工确认', manual);
+  if (tips.length) {
+    console.log('\n## 使用提示');
+    tips.forEach(tip => console.log(`- ${tip}`));
+  }
 
   const missingRequired = required.filter(item => !item.ok).length;
   const warnings = recommended.filter(item => !item.ok).length + optional.filter(item => !item.ok).length;
