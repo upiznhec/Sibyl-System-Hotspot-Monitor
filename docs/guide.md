@@ -313,11 +313,12 @@ Change the Sibyl briefing so that [it shows 5 events instead of 10]. Keep the ti
 | No briefing in your chat | Push not set; webhook or Telegram details wrong; the scheduled task lacks `--push` | "Run the Sibyl check and fix the push settings." |
 | Alerts show 0 candidates | Nothing in your topics is near the top right now, or the alert limits are too strict | Usually nothing to fix. "Show me today's Google Trends top searches." |
 | The briefing is empty | Topics or keywords too narrow, or the daily pages were not read | "Find out why the Sibyl briefing is empty and suggest a fix." |
-| Unrelated items | A keyword is too broad | "Add an exclude word for [word] in Sibyl." |
+| Unrelated items | A keyword is too broad, or the item came from a list read for your topic (such items normally go to the watch list) | "Add an exclude word for [word] in Sibyl." |
 | The same alert twice | Two scheduled tasks are running | "Check Sibyl's scheduled tasks for duplicates." |
 | No summaries | The item came without news links and no AI model is set | Optional: "Help me add an AI model key to Sibyl." |
 | TikTok or Google pages out of date | Not read today, the login expired, or the page changed | "Read today's trend pages for Sibyl and tell me if any failed." |
 | Every source fails with "ENOTFOUND" | Your agent's commands cannot reach the internet (Codex keeps them offline at first) | "Run the Sibyl check." Your agent tells you how to allow internet access. |
+| Your agent asks you to run a script it wrote | It is working around a problem instead of asking you | Do not run it. "Use Sibyl's own schedule script, as AGENTS.md says." |
 | No briefing ever arrives on a Mac | The Sibyl folder is in Desktop, Documents or Downloads, which scheduled tasks cannot read | "Move Sibyl out of Desktop and set its schedule again." |
 | A YouTube channel error | YouTube's channel feeds sometimes fail for a few hours | Wait; it usually recovers on its own. |
 

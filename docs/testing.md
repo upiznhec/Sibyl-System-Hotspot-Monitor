@@ -46,3 +46,18 @@ Then adjust the source weights, the score levels and the alert limits, and the E
 ## Stage 4: user test
 
 Write the task page from the tested version, with a real briefing as the example output, and run a usability test with 3 to 5 people at level 3 or below.
+
+## Test log
+
+### 2026-11-15: Codex (desktop app), macOS
+
+Setup request: beauty topic, US, America/Los_Angeles, 05:00 to 22:00, no push target, YouTube search and X trends on. The copy tested was the 2026-11-14 download (commit cd38da2).
+
+| What happened | Cause | Fix |
+| --- | --- | --- |
+| Google Trends RSS, YouTube search and X failed with `getaddrinfo ENOTFOUND`. Only the 7 pages the agent read in its browser (47 items) reached the test briefing, and nothing was scheduled. | Codex runs commands in a sandbox with no network unless `sandbox_workspace_write.network_access` is set. | Self-check "Internet access" line; AGENTS.md rule 11 and the Codex steps; Get set up, step 4; task page, "If it goes wrong". |
+| The agent wrote its own setup and schedule scripts (a launchd job in a copy in the home folder) and asked the person to run them. Its job skipped a whole run when one source failed. | No network, the folder on the Desktop, and only cron lines in AGENTS.md. | `scripts/schedule.js`; AGENTS.md rule 10 and "Known problems from testing"; task page, "If it goes wrong". |
+| "sheltered inlets" (Explore, "sunscreen") and #tonguering, #stinkybreath (TikTok, Beauty & Personal Care) were in the top 10. | Items from lists read for a topic counted without a keyword match. | They go to the watch list unless a keyword or a second source confirms them (`report.requireTopicConfirmation`). |
+| Wikipedia was off. | AGENTS.md then named only Google Trends and TikTok as on by default. | Fixed in AGENTS.md (commit a64f34e). |
+
+Fixed from commit 696420e on. Not yet re-tested with Codex.

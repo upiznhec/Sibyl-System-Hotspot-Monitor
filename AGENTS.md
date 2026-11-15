@@ -13,7 +13,7 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 7. **Read each page once a day** (more often only if the person asks). Do not bypass logins, rate limits or bot checks, and do not read pages other than those listed here.
 8. Keep the credit to Misaka Studio in the README and the guide.
 9. **Ask for what you need when you need it**, one thing at a time and in plain words, as described under "Talking to the person".
-10. **Schedule only with `scripts/schedule.js`.** Do not write your own scheduler, wrapper scripts or jobs around the commands, and never stop a run because one source failed: the scripts record that source's error and read the others.
+10. **Schedule only with `scripts/schedule.js`.** Do not write your own scheduler, wrapper scripts or jobs around the commands, and never stop a run because one source failed: the scripts record that source's error and read the others. Never ask the person to run a setup script you wrote.
 11. **If your commands cannot reach the internet, stop and ask.** `getaddrinfo ENOTFOUND`, `EAI_AGAIN` or `Operation not permitted` on every source, or a failed "Internet access" line in the self-check, mean your app keeps your commands offline. Ask the person to allow network access ("What to ask, and when"). Until `collect-snapshot.js` reads the live sources, schedule nothing, and do not hand them scripts to run instead.
 
 ## Talking to the person
@@ -99,6 +99,18 @@ If the key comes with a subscription, such as a coding plan, check that the plan
 
 > I cannot open web pages on a schedule by myself. To keep the TikTok and Google Trends lists fresh, start each day by sending me: "Read today's trend pages for Sibyl."
 
+## Known problems from testing
+
+Seen when Codex set Sibyl up on a Mac (November 2026); expect them in other agents too. Each is yours to handle. The task page tells the person only what they must do themselves.
+
+| What happened | What you do |
+| --- | --- |
+| The commands had no internet (Codex's default), so every source failed with `getaddrinfo ENOTFOUND`, and the agent wrote scripts for the person to run instead | Rule 11: stop, ask the person to allow network access (the Codex steps are under "What to ask, and when"), then run the self-check again. |
+| The agent wrote its own schedule script, which skipped a whole run when one source failed, and asked the person to run it | Rule 10: install the schedule with `scripts/schedule.js`. Never ask the person to run a script you wrote. |
+| The folder was on the Desktop, which scheduled tasks on macOS cannot read | Before installing the schedule, move the folder to the person's home folder with their OK; `schedule.js` refuses Desktop, Documents and Downloads. |
+| Unrelated items led the briefing: "sheltered inlets" from Explore's rising searches for "sunscreen", and oral-care hashtags from TikTok's Beauty & Personal Care | The scripts now keep such items in the watch list unless a keyword or a second source confirms them. After the first briefing, point out anything unrelated that still leads and offer an exclude word. |
+| Wikipedia was switched off, because these instructions then named only Google Trends and TikTok as on by default | Wikipedia is on by default; keep it on unless the person says no. |
+
 ## Where things are
 
 | Path | What |
@@ -131,13 +143,13 @@ Run them from the `sibyl` folder.
 
 ## Setup
 
-1. **Get the files.** Clone `https://github.com/upiznhec/Sibyl-System-Hotspot-Monitor.git` into a folder the person chooses. On macOS, put it in the home folder (for example `~/Sibyl-System-Hotspot-Monitor`), not in Desktop, Documents or Downloads: scheduled tasks cannot read those folders, and `schedule.js` refuses them. Check `node --version` (18 or later); help install Node.js if needed.
+1. **Get the files.** Clone `https://github.com/upiznhec/Sibyl-System-Hotspot-Monitor.git` into a folder the person chooses. On macOS, put it in the home folder (for example `~/Sibyl-System-Hotspot-Monitor`), not in Desktop, Documents or Downloads: scheduled tasks cannot read those folders, and `schedule.js` refuses them. If the person already put it there, ask before you move it. Check `node --version` (18 or later); help install Node.js if needed.
 2. **Create the config.** `mkdir -p sibyl/data` and copy `sibyl/scripts/config.example.json` to `sibyl/data/config.json`. Keys and webhook addresses go in `sibyl/data/.env` (rule 4).
 3. **Map the topics** (next section). Wait for the person's OK, then write `topics` and `dailyPages`.
 4. **Country, time zone and sources.** Set `country` (two-letter code, such as `US`) and `timeZone` (an IANA name, such as `America/New_York`). Under `platforms`, switch the sources on or off as the person chose under "Sources to watch" in the setup request; where a choice is blank or still in brackets, keep the default. Google Trends, TikTok and Wikipedia are on by default; YouTube channels, websites, YouTube search and X are off. What each source needs is under "Sources" below, and how to ask for it under "What to ask, and when".
 5. **Push target** (see "Push targets" below), or none: then briefings are saved as files.
 6. **Logins.** If the person wants to track trends on TikTok (without a login, only the top 3 hashtags show), open TikTok Creative Center (`https://ads.tiktok.com/creative/creativeCenter/trends`) and let them log in to TikTok for Business; the account is free (sign-up: `https://ads.tiktok.com/i18n/signup`). Do the same for Google if the new Explore page asks for a sign-in.
-7. **First run.** Run `check-deploy.js` first; if "Internet access" fails, follow rule 11 before anything else. Then read the daily pages (below), run `collect-snapshot.js`, `instant-alerts.js --no-push` and `sibyl.js --print --no-push`, and show the person the check and the briefing.
+7. **First run.** Run `check-deploy.js` first; if "Internet access" fails, follow rule 11 before anything else. Then read the daily pages (below), run `collect-snapshot.js`, `instant-alerts.js --no-push` and `sibyl.js --print --no-push`, and show the person the check and the briefing. If an item that leads the briefing has nothing to do with their topic, offer an exclude word.
 8. **Schedule** with `node scripts/schedule.js --install --hours=<start>-<end>` (see "Scheduling"), then run `check-deploy.js`: "Scheduled tasks" should be OK.
 9. **Tell the person how to read briefings.** If no push target is set, say that briefings are kept for 7 days and shown only when asked, and give examples: "Show me the latest trend briefing", "Any trend alerts today?", "What were the top trends yesterday afternoon?"
 
