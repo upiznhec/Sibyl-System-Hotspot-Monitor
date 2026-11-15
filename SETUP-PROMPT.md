@@ -4,6 +4,8 @@ Copy the text below, fill in the parts in brackets, and send it to your AI agent
 
 Under "Sources to watch", say yes or no to each source, and paste the links of any YouTube channels and websites you want to follow. Google Trends, TikTok and Wikipedia are on unless you say no; the others stay off unless you add them. The guide explains, in plain words, [what each source needs from you](docs/guide.md#what-each-source-needs-from-you).
 
+For "AI summaries", write none unless you already pay an AI company for an API key. It is not your agent, and a ChatGPT or Claude subscription is not an API key: see [AI summaries](docs/guide.md#ai-summaries-optional).
+
 ```text
 Please set up Sibyl, a trend monitor, for me. Download it from https://github.com/upiznhec/Sibyl-System-Hotspot-Monitor and follow the instructions for agents in its AGENTS.md file.
 
@@ -13,7 +15,7 @@ About me:
 - Time zone: [America/New_York]
 - Hours to watch: [10:00 to 22:00]
 - Where to send briefings: [Slack / Discord / WeCom webhook / Telegram / none, save them as files]
-- AI model for summaries: [none / I will give you an OpenAI-compatible key]
+- AI summaries (optional, paid): [none / I have an API key from an AI company]
 
 Sources to watch:
 - Google Trends: [yes / no]
@@ -25,7 +27,7 @@ Sources to watch:
 - X trends (paid, needs an X developer account): [no / yes]
 
 Before scheduling anything, show me the sources, topics, keywords, exclude words and the category you chose on each platform, and wait for my OK.
-When you need something from me, explain what it is and why in plain words, one step at a time.
+When you need something from me, such as a login, a key or a link, stop and ask me in this chat. Tell me what it is, why it is needed, whether it costs money, and where to get it.
 Never type my passwords. If a page needs a login, open it and let me log in myself.
 When you are done, run the Sibyl check and a test briefing, and show me both.
 ```

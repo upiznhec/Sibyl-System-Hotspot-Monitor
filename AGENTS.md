@@ -12,6 +12,14 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 6. **Check a website's terms before adding its feed.** Some feeds are for personal use only; tell the person and let them decide.
 7. **Read each page once a day** (more often only if the person asks). Do not bypass logins, rate limits or bot checks, and do not read pages other than those listed here.
 8. Keep the credit to Misaka Studio in the README and the guide.
+9. **When you need something from the person, stop and ask in the conversation.** This covers a login, an account, an API key or token, the Wikipedia contact, a link and any choice that is theirs. If your app has a way to ask the person a question (a question box or a form), use it; otherwise ask in a chat message. Ask for one thing at a time and wait for the answer; do not guess, skip it or carry on without it. Say in plain words what it is, why Sibyl needs it, whether it costs money, whether it needs an account, the link where they get it, the steps, and what to send back. For example:
+
+   > I need one thing from you: a YouTube key.
+   > - What it is: a long code from Google that lets Sibyl search YouTube.
+   > - Why: Sibyl uses it to find the most-watched new videos for your keywords.
+   > - Cost: free; Sibyl stays within Google's 100 free searches a day. Account: your Google account.
+   > - Where: https://console.cloud.google.com/apis/credentials (I will tell you what to click).
+   > - Then paste the key here. Keep it private.
 
 ## Where things are
 
@@ -48,7 +56,7 @@ Run them from the `sibyl` folder.
 3. **Map the topics** (next section). Wait for the person's OK, then write `topics` and `dailyPages`.
 4. **Country, time zone and sources.** Set `country` (two-letter code, such as `US`) and `timeZone` (an IANA name, such as `America/New_York`). Under `platforms`, switch the sources on or off as the person chose under "Sources to watch" in the setup request; where a choice is blank or still in brackets, keep the default. Google Trends, TikTok and Wikipedia are on by default; YouTube channels, websites, YouTube search and X are off. What each source needs, and how to ask for it, is under "Sources" below.
 5. **Push target** (see "Push targets" below), or none: then briefings are saved as files.
-6. **Logins.** If the person wants more than TikTok's top 3 hashtags, open TikTok Creative Center and let them log in to TikTok for Business. Do the same for Google if the new Explore page asks for a sign-in.
+6. **Logins.** If the person wants to track more than TikTok's top 3 hashtags, open TikTok Creative Center (`https://ads.tiktok.com/creative/creativeCenter/trends`) and let them log in to TikTok for Business; the account is free (sign-up: `https://ads.tiktok.com/i18n/signup`). Do the same for Google if the new Explore page asks for a sign-in.
 7. **First run.** Read the daily pages (below), then run `check-deploy.js`, `collect-snapshot.js`, `instant-alerts.js --no-push` and `sibyl.js --print --no-push`. Show the person the check and the briefing.
 8. **Schedule** (below), then run `check-deploy.js --task-command="<the task commands>"` to confirm.
 9. **Tell the person how to read briefings.** If no push target is set, say that briefings are kept for 7 days and shown only when asked, and give examples: "Show me the latest trend briefing", "Any trend alerts today?", "What were the top trends yesterday afternoon?"
@@ -116,23 +124,29 @@ The person may never have used a feed or an API key. For each source they chose,
 
 **Websites and blogs.** Ask for each website's address. Find its RSS or Atom feed: a `<link rel="alternate">` of type `application/rss+xml` or `application/atom+xml` in the home page, or a common path such as `/feed`, `/rss` or `/atom.xml`. Open the feed to check that it lists recent posts, and check the site's terms for it (rule 6). Add `{ "url": "<feed address>", "name": "<site name>" }` to `platforms.rss.feeds` and set `enabled: true`. If a site has no feed, tell the person; do not read its pages instead.
 
-**YouTube search.** It is free within Google's daily quota of 10,000 units. Each query is one search (100 units) at most once an hour (`minIntervalMinutes: 60`), and Sibyl runs at most 3 queries, so even 24 hours a day stays within the quota. Open each page and tell the person what to click; they sign in and click themselves:
+**YouTube search.** It is free within Google's default allowance of 100 searches a day (`search.list` calls). Each query is one search at most once an hour (`minIntervalMinutes: 60`), and Sibyl runs at most 3 queries, so even 24 hours a day (72 searches) stays within it. Open each page and tell the person what to click; they sign in and click themselves:
 
 1. `https://console.cloud.google.com/`: they sign in with their Google account. No payment details are needed.
 2. Create a project, for example "Sibyl".
-3. APIs & Services, then Library: find "YouTube Data API v3" and click Enable.
-4. APIs & Services, then Credentials: Create credentials, then API key. Restrict the key to YouTube Data API v3.
+3. `https://console.cloud.google.com/apis/library/youtube.googleapis.com`: click Enable.
+4. `https://console.cloud.google.com/apis/credentials`: Create credentials, then API key. Restrict the key to YouTube Data API v3.
 5. They copy the key and give it to you.
 
 Set `SIBYL_YOUTUBE_API_KEY` in the scheduled tasks' environment (rule 4) and `enabled: true`. Leave `queries` empty to search the topic's first 6 keywords at once, or set up to 3 queries (words joined with `|` match any of them).
 
 **X trends.** First say what it costs and wait for the person's OK (rule 5): about US$0.01 per request, paid in advance as credit. Sibyl asks at most every 30 minutes (`minIntervalMinutes: 30`), about 2 requests an hour; for 10:00 to 22:00 that is about US$0.26 a day, or US$8 a month. Work out the figure for their hours. Then:
 
-1. Open `https://developer.x.com`. They sign in with their X account and buy credit themselves; never enter payment details.
+1. Open the X Developer Console, `https://console.x.com` (prices: `https://docs.x.com/x-api/getting-started/pricing`). They sign in with their X account and buy credit themselves; never enter payment details.
 2. They create an app, copy its Bearer Token and give it to you.
 3. Set `SIBYL_X_BEARER_TOKEN` in the scheduled tasks' environment (rule 4), set `enabled: true`, and add `x-trends` to `report.seedPlatforms`.
 
 The US, the UK, Japan and worldwide are built in; for another country, set `platforms["x-trends"].woeid` from X's documentation. Items in the person's topics that reach X's top 5 or 50K posts also alert (`alerts.platforms["x-trends"]`).
+
+## AI summaries
+
+Optional, and off unless the person has a key. Explain before you ask (rule 9): Sibyl's scripts run on their own every hour, so they need their own API key; your own model access does not count, and a ChatGPT or Claude app subscription is not an API key. Each summary costs money at the AI company. If the person says none or is unsure, leave it off: summaries then use the first news headline.
+
+If they have a key, set `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI) in the scheduled tasks' environment (rule 4), and make one test briefing (`node scripts/sibyl.js --print --no-push`). If the summaries fail, tell the person in plain words what failed, remove the variables, and say that Sibyl works without AI.
 
 ## Reading the daily pages
 
@@ -173,7 +187,7 @@ SIBYL_ALERT_WEBHOOK=<alert webhook>
 
 **Windows (Task Scheduler).** Create two tasks with the same timing (repeat every 10 minutes and every hour, for the person's hours). Action: start `node` with arguments `scripts\collect-snapshot.js` (then a second action `scripts\instant-alerts.js --push`), or `scripts\sibyl.js --push`, starting in the `sibyl` folder. Set the push secrets as user environment variables.
 
-**Your own scheduler.** If you can run tasks on a schedule, you may run the same commands that way, and also schedule the daily page reading. If you cannot, ask the person to start each day with "Read today's trend pages for Sibyl".
+**Your own scheduler.** If you can run tasks on a schedule, you may run the same commands that way, and also schedule the daily page reading. If you cannot, tell the person during setup, in plain words, and ask them to start each day with "Read today's trend pages for Sibyl".
 
 Your scheduler should only run the commands. Do not post their output anywhere: with `--push` the scripts send briefings themselves, and a second post would duplicate them.
 
@@ -206,7 +220,7 @@ Slack, Discord and Telegram are recognised by their address. For any other addre
 | Turn a source on or off | As under "Sources"; keep `report.seedPlatforms` to the main sources that are on. |
 | Number of events in the briefing | `report.topN` (default 10); the minimum score is `report.minScore`. |
 | Another country or time zone | `country`, `timeZone`, the `region` in `dailyPages`, and the scheduled hours. |
-| An AI model for summaries | `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI). Without both, the first news headline is used. |
+| An AI model for summaries | As under "AI summaries": `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI). Without both, the first news headline is used. |
 
 ## Other settings
 

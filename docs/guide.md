@@ -11,6 +11,14 @@ Sibyl watches trend lists for the topics you choose. On a schedule it:
 3. Sends an alert when an item in your topics is near the top of Google Trends.
 4. Every hour, writes a briefing: the strongest trends, grouped into events, each with a score and a short summary. The briefing goes to your chat app, or is saved as a file.
 
+**Words used in this guide**
+
+- **Agent:** an AI app that can work on your computer for you: it runs commands, edits files and opens web pages. Codex, Claude Code and Cursor are examples.
+- **Briefing:** a short report that Sibyl writes every hour during the hours you choose. It lists the trends in your topics that are growing most, strongest first, each with a score out of 100, where it was seen and a one-line summary. It goes to your chat app, or is saved on your computer. Section 1.6 shows an example.
+- **Alert:** a short message that Sibyl sends straight away when something in your topics reaches the top of Google Trends, so you do not have to wait for the next briefing.
+- **Source:** a website that Sibyl reads trends from, such as Google Trends or TikTok (section 1.3).
+- **Topic, keywords, exclude words:** your topic is what you track, such as beauty. Keywords put an item in your topic, such as sunscreen. Exclude words keep out items that only look related, such as promo code.
+
 ### 1.1 At a glance
 
 | When | Who | What |
@@ -49,33 +57,86 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 
 #### What each source needs from you
 
-Your agent does the technical work. This is what it asks you for, source by source.
+Your agent does the technical work. This is what each source costs, whether it needs an account, and what your agent will ask you for.
 
-**Google Trends and TikTok Creative Center: nothing.** Your agent reads them. TikTok shows its top 3 hashtags to everyone. To see more, create a free TikTok for Business account; your agent opens the page, and you log in yourself.
+**Words you will see**
 
-**Wikipedia: a contact.** Wikimedia, the organization that runs Wikipedia, asks programs that read its statistics to say who runs them, so that it can get in touch if a program causes a problem. Your agent asks you for a web address (your website or a social media profile) or an email address, and Sibyl sends it to Wikimedia with each request. If you would rather not give one, say no to Wikipedia; the other sources work without it.
+- **Web address (link):** the text in the bar at the top of your browser. It starts with https://, for example `https://www.youtube.com/@channelname`.
+- **Account:** a sign-in for a website, usually an email address and a password that you create there.
+- **API:** a way for a program like Sibyl to get information from a website, such as YouTube or X, without opening its pages.
+- **API key:** a long code that a website gives you for its API, so it knows the requests come from you. Some websites charge for each request. Keep it secret: anyone who has it can use your access. Give it only to your agent, in the chat.
+- **Token:** X's name for its API key.
+- **Feed (RSS):** a list of a website's newest posts that programs can read. Many news sites and blogs have one.
 
-**YouTube channels: their links.** For each channel, open it on YouTube in a web browser and copy the address from the address bar. It looks like `https://www.youtube.com/@channelname`. In the YouTube app, open the channel, tap the three-dot menu, then Share, then Copy link. Paste the links into the setup request. Your agent finds the code YouTube uses for each channel. No account or key is needed.
+| Source | Costs money? | Needs an account? | What you give |
+| --- | --- | --- | --- |
+| Google Trends | No | No | Nothing |
+| TikTok Creative Center | No | Only to see more than the top 3: a free TikTok for Business account | Nothing |
+| Wikipedia | No | No | A web address or email, for Wikimedia |
+| YouTube channels | No | No | The channels' links |
+| Websites and blogs | No | No | The websites' addresses |
+| YouTube search | No: free up to 100 searches a day, and Sibyl stays under that | Yes, a Google account | An API key from Google |
+| X trends | Yes: about US$8 a month for 10:00 to 22:00 | Yes, an X account | A token from X, after you buy credit |
 
-**Websites and blogs: their addresses.** Paste each site's address, such as `www.example.com`. Your agent looks for the site's feed (RSS): a list of its newest posts that many news sites and blogs publish for apps to read. If a site has no feed, Sibyl cannot follow it. Some sites allow their feed for personal use only; your agent tells you, and you decide.
+**Google Trends: nothing.** Your agent reads it. No account and no cost.
 
-**YouTube search (optional): a free key from Google.** YouTube search finds the most-viewed new videos for your keywords. Sibyl needs a key to use it: a long code, made in your Google account, that lets Sibyl search YouTube. It is free, needs no payment details, and takes about 10 minutes. Your agent opens each page and tells you what to click:
+**TikTok Creative Center: nothing, or a free login.** Without a login it shows the top 3 hashtags in your industry. To track more, log in with a free TikTok for Business account ([create one](https://ads.tiktok.com/i18n/signup)). Your agent opens [Creative Center](https://ads.tiktok.com/creative/creativeCenter/trends), and you log in yourself.
 
-1. Sign in to Google Cloud (console.cloud.google.com) with your Google account.
-2. Create a project, for example "Sibyl".
-3. Turn on "YouTube Data API v3" for the project.
-4. Create an API key, and limit it to YouTube Data API v3.
-5. Copy the key and give it to your agent.
+**Wikipedia: a web address or email.**
 
-Google gives each project a free daily allowance, and Sibyl's settings stay within it. Treat the key as private: give it only to your agent.
+- Why: Wikimedia, the group that runs Wikipedia, asks every program that reads its statistics to say who runs it, so that it can contact that person if the program causes a problem, such as asking too often ([Wikimedia's rule](https://foundation.wikimedia.org/wiki/Policy:Wikimedia_Foundation_User-Agent_Policy)).
+- Costs money: no. Needs an account: no.
+- What to give: a link to a page about you, such as your Instagram or TikTok profile, or an email address. Only Wikimedia sees it: Sibyl sends it with each request to Wikipedia.
+- If you would rather not give one, say no to Wikipedia. The other sources work without it.
 
-**X trends (optional, paid): an X developer account.** X trends shows what is trending on X in your country. X charges for this: about US$0.01 for each request, paid in advance as credit. Sibyl asks at most every 30 minutes, so watching from 10:00 to 22:00 costs about US$0.26 a day, or about US$8 a month. Your agent tells you the cost for your hours and waits for your OK. Then:
+**YouTube channels: their links.**
 
-1. Your agent opens X's developer site. Sign in with your X account and buy credit yourself; your agent never enters payment details.
-2. Create an app there. This gives Sibyl its own access to X.
-3. Copy the app's Bearer Token (a long code) and give it to your agent.
+- Why: Sibyl needs to know exactly which channels to follow, and each channel's link points to that channel only.
+- Costs money: no. Needs an account: no.
+- On a computer: open the channel on [youtube.com](https://www.youtube.com), click the address bar at the top and copy the text. It looks like `https://www.youtube.com/@channelname`.
+- In the YouTube app: open the channel, tap the three dots, tap Share, then Copy link.
+- Your agent turns each link into the code YouTube uses for that channel.
 
-Treat the token as private: give it only to your agent. X trends covers the US, the UK, Japan and worldwide; for other countries, your agent looks up X's code for the place.
+**Websites and blogs: their addresses.**
+
+- Why: Sibyl reads a website's feed, the list of its newest posts. Your agent finds the feed from the website's address.
+- Costs money: no. Needs an account: no.
+- What to give: each website's address, such as `https://www.example.com`. If a website has no feed, Sibyl cannot follow it. Some websites allow their feed for personal use only; your agent tells you, and you decide.
+
+**YouTube search (optional): a free API key from Google, about 10 minutes.**
+
+- Why: to search all of YouTube, Sibyl uses YouTube's API. Google gives out keys so that it knows who is searching and can keep each person within a free daily limit.
+- Costs money: no. Google allows 100 searches a day for free. Sibyl makes at most 3 searches an hour, which is at most 39 a day from 10:00 to 22:00. You do not need to add a payment card.
+- Needs an account: yes, a Google account, such as the one you use for Gmail or YouTube.
+- Your agent opens each page and tells you what to click:
+  1. Open [Google Cloud Console](https://console.cloud.google.com/) and sign in with your Google account.
+  2. Create a project. Any name works, such as "Sibyl".
+  3. Open the [YouTube Data API v3 page](https://console.cloud.google.com/apis/library/youtube.googleapis.com) and click Enable.
+  4. Open the [Credentials page](https://console.cloud.google.com/apis/credentials). Click Create credentials, then API key.
+  5. Limit the key to YouTube Data API v3. Copy it and paste it to your agent in the chat.
+
+**X trends (optional, paid): an X developer account and a token.**
+
+- Why it costs money: X charges for each request to its API. One request for trends costs US$0.01, paid in advance as credit ([X API prices](https://docs.x.com/x-api/getting-started/pricing)).
+- How much: Sibyl asks at most every 30 minutes. From 10:00 to 22:00 that is about 26 requests a day: about US$0.26 a day, or about US$8 a month. Your agent tells you the cost for your hours and waits for your OK.
+- Needs an account: yes, your X account. You use it to sign in to the [X Developer Console](https://console.x.com).
+- Steps:
+  1. Open the X Developer Console and sign in with your X account.
+  2. Buy credit there yourself. Your agent never enters payment details.
+  3. Create an app. This gives Sibyl its own access to X.
+  4. Copy the app's Bearer Token and paste it to your agent in the chat.
+- X trends covers the US, the UK, Japan and worldwide; for other countries, your agent looks up X's code for the place.
+
+#### AI summaries (optional)
+
+The setup request also asks about AI summaries. Most people write none.
+
+- What it is: Sibyl can send each trend to an AI model, which writes a short summary. Without it, the summary is the first news headline about the trend.
+- It is not your agent. Your agent, such as Codex or Claude Code, sets Sibyl up. After that, Sibyl runs on its own every hour, without your agent, so it needs its own key.
+- An app subscription is not an API key. A ChatGPT Plus or Claude Pro plan does not include one. API keys are bought separately, and you pay for what you use.
+- Costs money: yes. You pay the AI company for each summary it writes. The cost of a typical day will be measured during testing.
+- Needs an account: yes, an API account at an AI company. For OpenAI: [create an API key](https://platform.openai.com/api-keys) and [add credit](https://platform.openai.com/settings/organization/billing/overview). Other AI companies whose API works the same way as OpenAI's (called "OpenAI-compatible") also work; your agent can check.
+- If the key does not work, your agent tells you and turns AI summaries off. Sibyl keeps working with headlines.
 
 ### 1.4 Good to know
 
@@ -187,7 +248,7 @@ An event enters the briefing when:
 | Node.js 18 or later | Yes | Your agent can check this and install it. Tested with Node.js 24. |
 | An AI agent | Yes | It must run commands, edit files and use a web browser. One that can also run on a schedule is best. |
 | Somewhere to send briefings | Optional | A Slack, Discord or WeCom webhook, or a Telegram bot. Without one, briefings are saved as files. |
-| An AI model key | Optional | Any OpenAI-compatible API. Without it, summaries use the first news headline. |
+| AI summaries | Optional | A paid API key from an AI company. It is not your agent, and a ChatGPT or Claude subscription is not an API key (section 1.3). Without it, summaries use the first news headline. |
 | Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid). See section 1.3. |
 | A contact for Wikipedia | If Wikipedia is on | A web address or email that Sibyl sends to Wikimedia. See section 1.3. |
 
@@ -201,7 +262,7 @@ Copy the setup request in [SETUP-PROMPT.md](../SETUP-PROMPT.md), fill in the par
 2. Asks what you want to track, and proposes topics, keywords and exclude words, plus the matching category on each platform. It waits for your OK before saving anything.
 3. Sets your country and time zone, switches on the sources you chose, and asks you for what they need (section 1.3).
 4. Sets up where briefings go, or leaves them as files.
-5. Opens TikTok Creative Center (and Google Trends Explore if it needs a sign-in) so that you can log in yourself, if you want more than the top 3 hashtags.
+5. Opens TikTok Creative Center (and Google Trends Explore if it needs a sign-in) so that you can log in yourself, if you want to track more than the top 3 hashtags. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
 6. Reads the pages for the first time, runs the self-check and a first briefing, and shows you the result.
 7. Schedules the work: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose, plus the daily page reading.
 
@@ -253,11 +314,11 @@ After you set up a chat app, ask: "Send one Sibyl briefing now as a test."
 ## 6. Daily use
 
 - **With a chat app:** a briefing arrives every hour during your chosen hours, and alerts arrive when they happen.
-- **Without one:** nothing is sent. Briefings and alerts are saved in the data folder for 7 days. When you want them, ask your agent, for example:
+- **If you chose none:** nothing is sent. Briefings and alerts are saved in the data folder for 7 days. When you want them, ask your agent, for example:
   - "Show me the latest trend briefing."
   - "Any trend alerts today?"
   - "What were the top trends yesterday afternoon?"
-- **Daily pages:** your agent reads the TikTok and Google Trends pages once a day. If your agent cannot run on a schedule, start your day with: "Read today's trend pages for Sibyl."
+- **Daily pages:** your agent reads the TikTok and Google Trends pages once a day. If it cannot do this on its own, it tells you during setup; then start each day with: "Read today's trend pages for Sibyl."
 
 ## 7. Common changes
 
