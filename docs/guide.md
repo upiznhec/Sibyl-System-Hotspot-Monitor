@@ -32,20 +32,50 @@ Sibyl watches trend lists for the topics you choose. On a schedule it:
 
 ### 1.3 Where the trends come from
 
-| Source | What it reads | Read by | What you need |
-| --- | --- | --- | --- |
-| Google Trends | The top searches right now, about 10 per country, each with news links | Script, every 10 minutes | Nothing |
-| Google Trends | Trending searches in your categories, and rising searches for your keywords (Explore) | Your agent, once a day | Nothing for now (see section 1.4) |
-| TikTok Creative Center | Top hashtags by country and industry, with posts and views over 7 days | Your agent, once a day | Nothing for the top 3; a free TikTok for Business login for more |
-| Wikipedia | The most-read pages in your country yesterday | Script | Nothing |
-| YouTube channels | Recent videos of channels you follow, with views | Script | The channels' IDs |
-| Websites and blogs | Recent posts of sites you follow (RSS) | Script | The feed addresses |
-| YouTube search (optional) | The most-viewed new videos for your keywords | YouTube API | A free API key |
-| X (optional) | Trends in your country | X API | A developer account; about US$0.01 per request |
+| Source | What it reads | Read by | What you need | Default |
+| --- | --- | --- | --- | --- |
+| Google Trends | The top searches right now, about 10 per country, each with news links | Script, every 10 minutes | Nothing | On |
+| Google Trends | Trending searches in your categories, and rising searches for your keywords (Explore) | Your agent, once a day | Nothing for now (see section 1.4) | On |
+| TikTok Creative Center | Top hashtags by country and industry, with posts and views over 7 days | Your agent, once a day | Nothing for the top 3; a free TikTok for Business login for more | On |
+| Wikipedia | The most-read pages in your country yesterday | Script | A web address or email, for Wikimedia | On |
+| YouTube channels | New videos from channels you follow, with views | Script | The channels' links | Off |
+| Websites and blogs | New posts from sites you follow | Script | The websites' addresses | Off |
+| YouTube search (optional) | The most-viewed new videos for your keywords | Script, at most once an hour | A free key from Google | Off |
+| X trends (optional) | What is trending on X in your country | Script, at most every 30 minutes | A paid X developer account | Off |
 
-Google Trends and TikTok are the main sources: an event must appear on one of them to enter the briefing. The other sources add weight, or are listed apart under "From sources you follow".
+You choose the sources in the setup request (section 4.1); what each one needs is explained below. Google Trends and TikTok are the main sources: an event must appear on one of them, or on X if you turn it on, to enter the briefing. Wikipedia and YouTube search add weight to those events. New videos and posts from the channels and sites you follow are listed apart under "From sources you follow".
 
 Not included in this version: Instagram, Threads and Facebook have no trend list for outside apps, or need Meta's app review; Reddit's data access needs an approved account since November 2025, and commercial use needs a separate agreement; Google News search is left out because its feed allows personal feed-reader use only.
+
+#### What each source needs from you
+
+Your agent does the technical work. This is what it asks you for, source by source.
+
+**Google Trends and TikTok Creative Center: nothing.** Your agent reads them. TikTok shows its top 3 hashtags to everyone. To see more, create a free TikTok for Business account; your agent opens the page, and you log in yourself.
+
+**Wikipedia: a contact.** Wikimedia, the organization that runs Wikipedia, asks programs that read its statistics to say who runs them, so that it can get in touch if a program causes a problem. Your agent asks you for a web address (your website or a social media profile) or an email address, and Sibyl sends it to Wikimedia with each request. If you would rather not give one, say no to Wikipedia; the other sources work without it.
+
+**YouTube channels: their links.** For each channel, open it on YouTube in a web browser and copy the address from the address bar. It looks like `https://www.youtube.com/@channelname`. In the YouTube app, open the channel, tap the three-dot menu, then Share, then Copy link. Paste the links into the setup request. Your agent finds the code YouTube uses for each channel. No account or key is needed.
+
+**Websites and blogs: their addresses.** Paste each site's address, such as `www.example.com`. Your agent looks for the site's feed (RSS): a list of its newest posts that many news sites and blogs publish for apps to read. If a site has no feed, Sibyl cannot follow it. Some sites allow their feed for personal use only; your agent tells you, and you decide.
+
+**YouTube search (optional): a free key from Google.** YouTube search finds the most-viewed new videos for your keywords. Sibyl needs a key to use it: a long code, made in your Google account, that lets Sibyl search YouTube. It is free, needs no payment details, and takes about 10 minutes. Your agent opens each page and tells you what to click:
+
+1. Sign in to Google Cloud (console.cloud.google.com) with your Google account.
+2. Create a project, for example "Sibyl".
+3. Turn on "YouTube Data API v3" for the project.
+4. Create an API key, and limit it to YouTube Data API v3.
+5. Copy the key and give it to your agent.
+
+Google gives each project a free daily allowance, and Sibyl's settings stay within it. Treat the key as private: give it only to your agent.
+
+**X trends (optional, paid): an X developer account.** X trends shows what is trending on X in your country. X charges for this: about US$0.01 for each request, paid in advance as credit. Sibyl asks at most every 30 minutes, so watching from 10:00 to 22:00 costs about US$0.26 a day, or about US$8 a month. Your agent tells you the cost for your hours and waits for your OK. Then:
+
+1. Your agent opens X's developer site. Sign in with your X account and buy credit yourself; your agent never enters payment details.
+2. Create an app there. This gives Sibyl its own access to X.
+3. Copy the app's Bearer Token (a long code) and give it to your agent.
+
+Treat the token as private: give it only to your agent. X trends covers the US, the UK, Japan and worldwide; for other countries, your agent looks up X's code for the place.
 
 ### 1.4 Good to know
 
@@ -62,7 +92,8 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 - The scripts are free to run.
 - Your agent's usage when it reads the pages once a day, and when you ask it for briefings or changes.
 - Optional: an AI model for summaries and for merging events. You use your own key; nothing is spent without one.
-- Optional: X trends, about US$0.01 per request. By default Sibyl asks at most once every 30 minutes.
+- Optional: YouTube search, free within Google's daily allowance.
+- Optional: X trends, about US$0.01 per request. Sibyl asks at most every 30 minutes, so 10:00 to 22:00 costs about US$0.26 a day (about US$8 a month).
 - The cost of a typical day will be measured during testing and added here.
 
 ### 1.6 What the messages look like
@@ -157,7 +188,8 @@ An event enters the briefing when:
 | An AI agent | Yes | It must run commands, edit files and use a web browser. One that can also run on a schedule is best. |
 | Somewhere to send briefings | Optional | A Slack, Discord or WeCom webhook, or a Telegram bot. Without one, briefings are saved as files. |
 | An AI model key | Optional | Any OpenAI-compatible API. Without it, summaries use the first news headline. |
-| Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; an X developer account (paid); a YouTube API key (free). |
+| Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid). See section 1.3. |
+| A contact for Wikipedia | If Wikipedia is on | A web address or email that Sibyl sends to Wikimedia. See section 1.3. |
 
 ## 4. Setup
 
@@ -167,7 +199,7 @@ Copy the setup request in [SETUP-PROMPT.md](../SETUP-PROMPT.md), fill in the par
 
 1. Downloads the folder and checks Node.js.
 2. Asks what you want to track, and proposes topics, keywords and exclude words, plus the matching category on each platform. It waits for your OK before saving anything.
-3. Asks for your country and time zone, and switches on the sources you choose.
+3. Sets your country and time zone, switches on the sources you chose, and asks you for what they need (section 1.3).
 4. Sets up where briefings go, or leaves them as files.
 5. Opens TikTok Creative Center (and Google Trends Explore if it needs a sign-in) so that you can log in yourself, if you want more than the top 3 hashtags.
 6. Reads the pages for the first time, runs the self-check and a first briefing, and shows you the result.
@@ -177,6 +209,7 @@ What the agent's proposal looks like, for "beauty trends in the US":
 
 | Platform | Proposed setting | Note |
 | --- | --- | --- |
+| Sources | Google Trends, TikTok, Wikipedia | As chosen in your request |
 | TikTok | Industry: Beauty & Personal Care, last 7 days | The closest industry in TikTok's list |
 | Google Trends | Category: Beauty and Fashion, past 24 hours; Explore for "skincare", "makeup", "sunscreen" | The category had only a few trends when checked |
 | Keywords | skincare, makeup, sunscreen, SPF (only next to "sunscreen", "skin" or "UV") | You can add or remove words |
@@ -276,7 +309,7 @@ Make Sibyl collect every [30] minutes instead of every 10. Do not change the bri
 Make Sibyl's alerts [stricter: only the biggest trends]. Tell me which numbers you changed.
 ```
 
-**Follow a channel or a website**
+**Add or remove a source**
 
 ```text
 Add this YouTube channel to Sibyl: [link].
@@ -286,10 +319,14 @@ Add this YouTube channel to Sibyl: [link].
 Add this website's feed to Sibyl: [link]. Check whether the site allows its feed to be used this way first.
 ```
 
+```text
+In Sibyl, stop watching [Wikipedia].
+```
+
 **Turn on an optional source**
 
 ```text
-Turn on [YouTube search / X trends] in Sibyl. Tell me what it costs and what key I need, and wait for my OK.
+Turn on [YouTube search / X trends] in Sibyl. Tell me what it costs and what I need to do, guide me one step at a time, and wait for my OK.
 ```
 
 **Change the briefing layout**
