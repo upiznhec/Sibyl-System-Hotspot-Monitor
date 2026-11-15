@@ -4,7 +4,7 @@ Copy the text below, fill in the parts in brackets, and send it to your AI agent
 
 Under "Sources to watch", say yes or no to each source, and paste the links of any YouTube channels and websites you want to follow. Google Trends, TikTok and Wikipedia are on unless you say no; the others stay off unless you add them. If a source needs something from you, your agent asks you when it gets there.
 
-For "Use AI to explain each trend", write no unless you have an API key. Unless your AI subscription includes one, you buy API credit on the AI company's own website.
+For "Use AI to explain each trend", write no unless you have an API key, a code that lets Sibyl use an AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website.
 
 ```text
 Please set up Sibyl, a trend monitor, for me. Download it from https://github.com/upiznhec/Sibyl-System-Hotspot-Monitor and follow the instructions for agents in its AGENTS.md file.

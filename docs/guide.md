@@ -61,7 +61,7 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 
 - The scripts are free to run.
 - Your agent's usage when it reads the pages once a day, and when you ask it for briefings or changes.
-- Optional: an AI model to explain each trend in one line and to group related trends. It needs an API key: unless your AI subscription includes one, you buy API credit on the AI company's own website. Nothing is spent without one.
+- Optional: an AI to explain each trend in one line and to group related trends. It needs an API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website. Nothing is spent without one.
 - Optional: YouTube search, free within Google's daily allowance.
 - Optional: X trends, about US$0.01 per request. Sibyl asks at most every 30 minutes, so 10:00 to 22:00 costs about US$0.26 a day (about US$8 a month).
 - The cost of a typical day will be measured during testing and added here.
@@ -157,7 +157,7 @@ An event enters the briefing when:
 | Node.js 18 or later | Yes | Your agent can check this and install it. Tested with Node.js 24. |
 | An AI agent | Yes | It must run commands, edit files and use a web browser. One that can also run on a schedule is best. |
 | Somewhere to send briefings | Optional | A Slack, Discord or WeCom webhook, or a Telegram bot. Without one, briefings are saved as files. |
-| An AI model to explain each trend | Optional | An API key. Unless your AI subscription includes one, buy API credit on the AI company's own website. Without it, each trend's line is the first news headline. |
+| AI to explain each trend | Optional | An API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, buy credit on the AI company's website. Without it, each trend's line is copied from a news headline. |
 | Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid). See section 1.3. |
 | A contact for Wikipedia | If Wikipedia is on | A web address or email that Sibyl sends to Wikimedia. See section 1.3. |
 

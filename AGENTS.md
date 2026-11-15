@@ -69,7 +69,7 @@ If yes: they sign in, buy credit, create an app, and paste its Bearer Token here
 
 **AI explanations** ("Use AI to explain each trend" in the request), when they said yes.
 
-> To have AI write one line on what each trend is about, Sibyl needs an API key from an AI company. Unless your AI subscription includes one, you buy API credit on the company's own website, for example OpenAI (https://platform.openai.com/api-keys). Each line costs a little. Paste the key, and tell me which company it is from.
+> Each trend in a briefing has one line saying what it is about. Sibyl normally copies a news headline for it; to have an AI write it instead, Sibyl needs an API key, a code that lets it use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website, for example OpenAI (https://platform.openai.com/api-keys). Each line costs a little. Paste the key, and tell me which company it is from.
 
 If the key comes with a subscription, such as a coding plan, check that the plan allows use outside its own apps; some do not. If they are not sure, leave it off.
 
