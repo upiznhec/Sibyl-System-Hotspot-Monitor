@@ -1,6 +1,6 @@
 # Instructions for AI agents
 
-You are helping a person run Sibyl, a trend monitor. The person may not be technical: explain in plain words, ask before choices that are theirs, and do the technical work yourself. The person-facing guide is [docs/guide.md](docs/guide.md); the setup request people send you is [SETUP-PROMPT.md](SETUP-PROMPT.md).
+You are helping a person run Sibyl, a trend monitor. The person may not be technical: do the technical work yourself, and ask for what only they can give at the moment you need it (see "Talking to the person"). The person-facing guide is [docs/guide.md](docs/guide.md); the setup request people send you is [SETUP-PROMPT.md](SETUP-PROMPT.md).
 
 ## Rules
 
@@ -12,14 +12,78 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 6. **Check a website's terms before adding its feed.** Some feeds are for personal use only; tell the person and let them decide.
 7. **Read each page once a day** (more often only if the person asks). Do not bypass logins, rate limits or bot checks, and do not read pages other than those listed here.
 8. Keep the credit to Misaka Studio in the README and the guide.
-9. **When you need something from the person, stop and ask in the conversation.** This covers a login, an account, an API key or token, the Wikipedia contact, a link and any choice that is theirs. If your app has a way to ask the person a question (a question box or a form), use it; otherwise ask in a chat message. Ask for one thing at a time and wait for the answer; do not guess, skip it or carry on without it. Say in plain words what it is, why Sibyl needs it, whether it costs money, whether it needs an account, the link where they get it, the steps, and what to send back. For example:
+9. **Ask for what you need when you need it**, one thing at a time and in plain words, as described under "Talking to the person".
 
-   > I need one thing from you: a YouTube key.
-   > - What it is: a long code from Google that lets Sibyl search YouTube.
-   > - Why: Sibyl uses it to find the most-watched new videos for your keywords.
-   > - Cost: free; Sibyl stays within Google's 100 free searches a day. Account: your Google account.
-   > - Where: https://console.cloud.google.com/apis/credentials (I will tell you what to click).
-   > - Then paste the key here. Keep it private.
+## Talking to the person
+
+The person has not read the guide and should not have to. Do not expect them to know any term, such as API key, feed, token, webhook or time zone name. Explain each thing only when you need it, in a sentence or two, at the moment you ask.
+
+- **Use a dialog when you can.** If your app can put a question in front of the person (a question tool, a form or a pop-up, such as AskUserQuestion in Claude Code), use it for choices and yes-or-no questions. Ask for things they paste, such as a key or a link, in one short chat message.
+- **One thing at a time.** Ask, wait for the answer, then go on. Do not guess, skip it or carry on without it.
+- **Say what they need to decide:** what it is, why Sibyl needs it, whether it costs money, whether it needs an account, the link, what to send back, and what happens if they say no.
+- **Keep it short.** No list of terms, and nothing they do not need yet.
+
+### What to ask, and when
+
+Adapt the wording; keep the facts.
+
+**Something missing from the setup request** (topic, country, time zone, hours, where briefings go). Ask for that item only. For a time zone, accept a city and work out the name yourself.
+
+**Telegram**, when it is chosen.
+
+> Sibyl sends briefings to Telegram through its own bot, which is free. In Telegram, open @BotFather (it has a blue tick), send /newbot, choose a name and a username ending in "bot", and paste the token it gives you here. Then send your new bot any message, such as "hi", and tell me when you have.
+
+**Slack, Discord or WeCom**, when it is chosen.
+
+> To post briefings in your channel, Sibyl needs the channel's webhook address: a link that lets it post there. It is free. Here is how to make one: [the matching link below]. Paste the address here.
+
+Slack: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/ · Discord (channel settings, Integrations, Webhooks): https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks · WeCom (add a group robot in the group's settings): https://developer.work.weixin.qq.com/document/path/91770
+
+**Wikipedia**, when it is on.
+
+> Wikimedia, which runs Wikipedia, asks programs that read its statistics for a way to contact the person running them. Can you give me a web address, such as your website or a social media profile, or an email? Only Wikimedia sees it. If you would rather not, I will switch Wikipedia off; the other sources still work.
+
+**YouTube channels**, when chosen without links, or when a link does not work.
+
+> Which YouTube channels should Sibyl follow? Open each one on YouTube and copy the address from the address bar (it looks like https://www.youtube.com/@name); in the app, tap the three dots, then Share, then Copy link. Paste the links here.
+
+**Websites**, when chosen without addresses, when a site has no feed, or when its feed is for personal use only.
+
+> Which websites should Sibyl follow? Paste their addresses.
+
+> [Site] has no feed, the list of new posts that Sibyl reads, so Sibyl cannot follow it.
+
+> [Site] says its feed is for personal use only. Do you still want it?
+
+**YouTube search**, when it is chosen.
+
+> YouTube search needs a key from Google: a long code that lets Sibyl search YouTube for you. It is free, because Sibyl stays within Google's 100 free searches a day, and it takes about 10 minutes with your Google account. I will open each page and tell you what to click. Shall we start?
+
+Then take them through the steps under "Sources", one at a time, and end with: "Copy the key and paste it here. Keep it private."
+
+**X trends**, when it is chosen. Work out the cost for their hours first (rule 5).
+
+> X trends costs money: US$0.01 each time Sibyl checks, at most every 30 minutes, so about US$[amount] a day for your hours. You need your X account, and you buy credit yourself at the X Developer Console (https://console.x.com). Do you want to go ahead?
+
+If yes: they sign in, buy credit, create an app, and paste its Bearer Token here.
+
+**AI summaries**, when they said they have a key.
+
+> For summaries, Sibyl needs an API key from an AI company, for example OpenAI (https://platform.openai.com/api-keys). It is not your ChatGPT or Claude subscription, and each summary costs a little money. Paste the key, and tell me which company it is from.
+
+If they are not sure, leave AI summaries off.
+
+**TikTok login**, when they want more than the top 3 hashtags.
+
+> Without a login, TikTok Creative Center shows only the top 3 hashtags. To track more, log in with a free TikTok for Business account (create one at https://ads.tiktok.com/i18n/signup). I have opened the page: click Log in, sign in yourself, and tell me when you are done.
+
+**Google sign-in**, when the new Explore page asks for it.
+
+> Google's new Explore page asks you to sign in. I have opened it: sign in with your Google account yourself, and tell me when you are done.
+
+**Daily pages**, if you cannot run tasks on a schedule. Tell them once, at the end of setup.
+
+> I cannot open web pages on a schedule by myself. To keep the TikTok and Google Trends lists fresh, start each day by sending me: "Read today's trend pages for Sibyl."
 
 ## Where things are
 
@@ -54,7 +118,7 @@ Run them from the `sibyl` folder.
 1. **Get the files.** Clone `https://github.com/upiznhec/Sibyl-System-Hotspot-Monitor.git` into a folder the person chooses. On macOS, avoid Desktop, Documents and Downloads: scheduled tasks (cron) cannot read those folders without extra permission. Check `node --version` (18 or later); help install Node.js if needed.
 2. **Create the config.** `mkdir -p sibyl/data` and copy `sibyl/scripts/config.example.json` to `sibyl/data/config.json`.
 3. **Map the topics** (next section). Wait for the person's OK, then write `topics` and `dailyPages`.
-4. **Country, time zone and sources.** Set `country` (two-letter code, such as `US`) and `timeZone` (an IANA name, such as `America/New_York`). Under `platforms`, switch the sources on or off as the person chose under "Sources to watch" in the setup request; where a choice is blank or still in brackets, keep the default. Google Trends, TikTok and Wikipedia are on by default; YouTube channels, websites, YouTube search and X are off. What each source needs, and how to ask for it, is under "Sources" below.
+4. **Country, time zone and sources.** Set `country` (two-letter code, such as `US`) and `timeZone` (an IANA name, such as `America/New_York`). Under `platforms`, switch the sources on or off as the person chose under "Sources to watch" in the setup request; where a choice is blank or still in brackets, keep the default. Google Trends, TikTok and Wikipedia are on by default; YouTube channels, websites, YouTube search and X are off. What each source needs is under "Sources" below, and how to ask for it under "What to ask, and when".
 5. **Push target** (see "Push targets" below), or none: then briefings are saved as files.
 6. **Logins.** If the person wants to track more than TikTok's top 3 hashtags, open TikTok Creative Center (`https://ads.tiktok.com/creative/creativeCenter/trends`) and let them log in to TikTok for Business; the account is free (sign-up: `https://ads.tiktok.com/i18n/signup`). Do the same for Google if the new Explore page asks for a sign-in.
 7. **First run.** Read the daily pages (below), then run `check-deploy.js`, `collect-snapshot.js`, `instant-alerts.js --no-push` and `sibyl.js --print --no-push`. Show the person the check and the briefing.
@@ -104,7 +168,7 @@ Run them from the `sibyl` folder.
 
 ## Sources
 
-The person may never have used a feed or an API key. For each source they chose, say in plain words what it adds and what you need from them, ask for one thing at a time, and do the technical work yourself. The guide explains the same to them, under "What each source needs from you".
+For each source the person chose, do the technical work yourself, and ask only for what they must give, at the moment you need it (see "What to ask, and when").
 
 | Source | Default | What you need from the person |
 | --- | --- | --- |
@@ -118,11 +182,11 @@ The person may never have used a feed or an API key. For each source they chose,
 
 **Main sources.** An event must appear on a source in `report.seedPlatforms` to enter the briefing. Keep the list to the main sources that are on: Google Trends, TikTok, and X when the person turns it on. If they say no to all three, explain that the briefing would stay empty, and ask them to keep at least one.
 
-**Wikipedia.** Explain that Wikimedia, which runs Wikipedia, asks automated tools to say who runs them, so that it can reach them about a problem. Ask for a web address (their website or a social media profile) or an email address, and set `http.userAgent` to `SibylHotspotMonitor (<contact>)`. If they would rather not give one, switch Wikipedia off.
+**Wikipedia.** Ask for a contact (see "What to ask, and when") and set `http.userAgent` to `SibylHotspotMonitor (<contact>)`. If they would rather not give one, switch Wikipedia off.
 
-**YouTube channels.** Ask for each channel's link, such as `https://www.youtube.com/@name` (in the YouTube app: the channel's three-dot menu, Share, Copy link). Open the channel page and find its ID, which starts with `UC`: it is in the page's RSS link (`channel_id=`) and in the page source (`"externalId"`). Add `{ "id": "UC…", "name": "<channel name>" }` to `platforms["youtube-channels"].channels`, set `enabled: true`, and check that `https://www.youtube.com/feeds/videos.xml?channel_id=<id>` lists videos.
+**YouTube channels.** If the links are not in the request, ask for them. Open each channel page and find its ID, which starts with `UC`: it is in the page's RSS link (`channel_id=`) and in the page source (`"externalId"`). Add `{ "id": "UC…", "name": "<channel name>" }` to `platforms["youtube-channels"].channels`, set `enabled: true`, and check that `https://www.youtube.com/feeds/videos.xml?channel_id=<id>` lists videos.
 
-**Websites and blogs.** Ask for each website's address. Find its RSS or Atom feed: a `<link rel="alternate">` of type `application/rss+xml` or `application/atom+xml` in the home page, or a common path such as `/feed`, `/rss` or `/atom.xml`. Open the feed to check that it lists recent posts, and check the site's terms for it (rule 6). Add `{ "url": "<feed address>", "name": "<site name>" }` to `platforms.rss.feeds` and set `enabled: true`. If a site has no feed, tell the person; do not read its pages instead.
+**Websites and blogs.** If the addresses are not in the request, ask for them. Find each site's RSS or Atom feed: a `<link rel="alternate">` of type `application/rss+xml` or `application/atom+xml` in the home page, or a common path such as `/feed`, `/rss` or `/atom.xml`. Open the feed to check that it lists recent posts, and check the site's terms for it (rule 6). Add `{ "url": "<feed address>", "name": "<site name>" }` to `platforms.rss.feeds` and set `enabled: true`. If a site has no feed, tell the person; do not read its pages instead.
 
 **YouTube search.** It is free within Google's default allowance of 100 searches a day (`search.list` calls). Each query is one search at most once an hour (`minIntervalMinutes: 60`), and Sibyl runs at most 3 queries, so even 24 hours a day (72 searches) stays within it. Open each page and tell the person what to click; they sign in and click themselves:
 
