@@ -2,7 +2,7 @@
 
 Based on [Sibyl System Hotspot Monitor](https://github.com/liray0919/Sibyl-System-Hotspot-Monitor) v1.3.20 by Misaka Studio (MIT License), adapted for the Social Media AI Workflow Library, a non-commercial project.
 
-Sibyl watches trend lists for the topics you choose: Google Trends, TikTok Creative Center, Wikipedia, and YouTube channels and websites you follow. It sends an alert when something in your topics reaches the top of Google Trends, and every hour it writes a briefing of the strongest trends, grouped into events, each with a score and a short summary. Briefings go to Slack, Discord, WeCom or Telegram, or are saved as files that your AI agent shows you when you ask.
+Sibyl watches trend lists for the topics you choose: Google Trends, TikTok Creative Center and Wikipedia, plus YouTube search and X trends if you turn them on. It sends an alert when something in your topics reaches the top of Google Trends, and every hour it writes a briefing of the strongest trends, grouped into events, each with a score and a short summary. Briefings go to Slack, Discord, WeCom or Telegram, or are saved as files that your AI agent shows you when you ask.
 
 ## Start here
 

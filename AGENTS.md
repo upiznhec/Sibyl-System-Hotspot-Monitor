@@ -43,11 +43,11 @@ Slack: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks
 
 > Wikimedia, which runs Wikipedia, asks programs that read its statistics for a way to contact the person running them. Can you give me a web address, such as your website or a social media profile, or an email? Only Wikimedia sees it. If you would rather not, I will switch Wikipedia off; the other sources still work.
 
-**YouTube channels**, when chosen without links, or when a link does not work.
+**YouTube channels**, when the person asks to follow one, or when a link does not work.
 
 > Which YouTube channels should Sibyl follow? Open each one on YouTube and copy the address from the address bar (it looks like https://www.youtube.com/@name); in the app, tap the three dots, then Share, then Copy link. Paste the links here.
 
-**Websites**, when chosen without addresses, when a site has no feed, or when its feed is for personal use only.
+**Websites**, when the person asks to follow one, when a site has no feed, or when its feed is for personal use only.
 
 > Which websites should Sibyl follow? Paste their addresses.
 
@@ -180,13 +180,15 @@ For each source the person chose, do the technical work yourself, and ask only f
 | YouTube search | Off | A free YouTube Data API key, which they create |
 | X trends | Off | Their OK on the cost (rule 5), then a Bearer Token from a paid X developer account |
 
+YouTube channels and websites are not in the setup request: following particular accounts is closer to watching competitors than to finding trends. Set them up only when the person asks.
+
 **Main sources.** An event must appear on a source in `report.seedPlatforms` to enter the briefing. Keep the list to the main sources that are on: Google Trends, TikTok, and X when the person turns it on. If they say no to all three, explain that the briefing would stay empty, and ask them to keep at least one.
 
 **Wikipedia.** Ask for a contact (see "What to ask, and when") and set `http.userAgent` to `SibylHotspotMonitor (<contact>)`. If they would rather not give one, switch Wikipedia off.
 
-**YouTube channels.** If the links are not in the request, ask for them. Open each channel page and find its ID, which starts with `UC`: it is in the page's RSS link (`channel_id=`) and in the page source (`"externalId"`). Add `{ "id": "UC…", "name": "<channel name>" }` to `platforms["youtube-channels"].channels`, set `enabled: true`, and check that `https://www.youtube.com/feeds/videos.xml?channel_id=<id>` lists videos.
+**YouTube channels.** Only when the person asks; ask for the links if they did not give them. Open each channel page and find its ID, which starts with `UC`: it is in the page's RSS link (`channel_id=`) and in the page source (`"externalId"`). Add `{ "id": "UC…", "name": "<channel name>" }` to `platforms["youtube-channels"].channels`, set `enabled: true`, and check that `https://www.youtube.com/feeds/videos.xml?channel_id=<id>` lists videos.
 
-**Websites and blogs.** If the addresses are not in the request, ask for them. Find each site's RSS or Atom feed: a `<link rel="alternate">` of type `application/rss+xml` or `application/atom+xml` in the home page, or a common path such as `/feed`, `/rss` or `/atom.xml`. Open the feed to check that it lists recent posts, and check the site's terms for it (rule 6). Add `{ "url": "<feed address>", "name": "<site name>" }` to `platforms.rss.feeds` and set `enabled: true`. If a site has no feed, tell the person; do not read its pages instead.
+**Websites and blogs.** Only when the person asks; ask for the addresses if they did not give them. Find each site's RSS or Atom feed: a `<link rel="alternate">` of type `application/rss+xml` or `application/atom+xml` in the home page, or a common path such as `/feed`, `/rss` or `/atom.xml`. Open the feed to check that it lists recent posts, and check the site's terms for it (rule 6). Add `{ "url": "<feed address>", "name": "<site name>" }` to `platforms.rss.feeds` and set `enabled: true`. If a site has no feed, tell the person; do not read its pages instead.
 
 **YouTube search.** It is free within Google's default allowance of 100 searches a day (`search.list` calls). Each query is one search at most once an hour (`minIntervalMinutes: 60`), and Sibyl runs at most 3 queries, so even 24 hours a day (72 searches) stays within it. Open each page and tell the person what to click; they sign in and click themselves:
 

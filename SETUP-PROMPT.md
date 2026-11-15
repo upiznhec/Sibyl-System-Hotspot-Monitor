@@ -2,7 +2,7 @@
 
 Copy the text below, fill in the parts in brackets, and send it to your AI agent. The agent needs to be able to run commands, edit files and use a web browser.
 
-Under "Sources to watch", say yes or no to each source, and paste the links of any YouTube channels and websites you want to follow. Google Trends, TikTok and Wikipedia are on unless you say no; the others stay off unless you add them. If a source needs something from you, your agent asks you when it gets there.
+Under "Sources to watch", say yes or no to each source. Google Trends, TikTok and Wikipedia are on unless you say no; YouTube search and X trends stay off unless you say yes. If a source needs something from you, your agent asks you when it gets there.
 
 For "Use AI to explain each trend", write no unless you have an API key, a code that lets Sibyl use an AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website.
 
@@ -21,8 +21,6 @@ Sources to watch:
 - Google Trends: [yes / no]
 - TikTok Creative Center: [yes / no]
 - Wikipedia (needs a web address or email): [yes / no]
-- YouTube channels I follow: [none / their links]
-- Websites and blogs I follow: [none / their addresses]
 - YouTube search (free, needs a Google key): [no / yes]
 - X trends (paid, needs an X developer account): [no / yes]
 

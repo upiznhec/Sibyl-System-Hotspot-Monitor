@@ -38,12 +38,12 @@ Sibyl watches trend lists for the topics you choose. On a schedule it:
 | Google Trends | Trending searches in your categories, and rising searches for your keywords (Explore) | Your agent, once a day | Nothing for now (see section 1.4) | On |
 | TikTok Creative Center | Top hashtags by country and industry, with posts and views over 7 days | Your agent, once a day | Nothing for the top 3; a free TikTok for Business login for more | On |
 | Wikipedia | The most-read pages in your country yesterday | Script | A web address or email, for Wikimedia | On |
-| YouTube channels | New videos from channels you follow, with views | Script | The channels' links | Off |
-| Websites and blogs | New posts from sites you follow | Script | The websites' addresses | Off |
 | YouTube search (optional) | The most-viewed new videos for your keywords | Script, at most once an hour | A free key from Google | Off |
 | X trends (optional) | What is trending on X in your country | Script, at most every 30 minutes | A paid X developer account | Off |
 
-You choose the sources in the setup request (section 4.1). When a source needs something from you, your agent asks at that point, one thing at a time, and tells you what it is, what it costs and where to get it. Google Trends and TikTok are the main sources: an event must appear on one of them, or on X if you turn it on, to enter the briefing. Wikipedia and YouTube search add weight to those events. New videos and posts from the channels and sites you follow are listed apart under "From sources you follow".
+You choose the sources in the setup request (section 4.1). When a source needs something from you, your agent asks at that point, one thing at a time, and tells you what it is, what it costs and where to get it. Google Trends and TikTok are the main sources: an event must appear on one of them, or on X if you turn it on, to enter the briefing. Wikipedia and YouTube search add weight to those events.
+
+Sibyl can also follow particular YouTube channels or websites. That is closer to watching accounts than to finding trends, so it is not in the setup request; if you want it, ask your agent (section 7). Their new videos and posts are then listed apart at the end of the briefing, under "From sources you follow".
 
 Not included in this version: Instagram, Threads and Facebook have no trend list for outside apps, or need Meta's app review; Reddit's data access needs an approved account since November 2025, and commercial use needs a separate agreement; Google News search is left out because its feed allows personal feed-reader use only.
 

@@ -1,6 +1,6 @@
 ---
 name: sibyl
-description: Sibyl trend monitor. Collects trending searches and hashtags (Google Trends, TikTok Creative Center, Wikipedia, and YouTube channels and websites the user follows), keeps those in the user's topics, and sends instant alerts and hourly briefings to Slack, Discord, WeCom or Telegram, or saves them as files. Use it to set Sibyl up, map the user's topics, read its daily pages, show saved briefings when the user asks, or change its topics, sources, schedule or push settings.
+description: Sibyl trend monitor. Collects trending searches and hashtags (Google Trends, TikTok Creative Center and Wikipedia, plus YouTube search and X trends if turned on), keeps those in the user's topics, and sends instant alerts and hourly briefings to Slack, Discord, WeCom or Telegram, or saves them as files. Use it to set Sibyl up, map the user's topics, read its daily pages, show saved briefings when the user asks, or change its topics, sources, schedule or push settings.
 author: Misaka Studio (Sibyl System Hotspot Monitor v1.3.20); adapted for the Social Media AI Workflow Library
 license: MIT
 ---
