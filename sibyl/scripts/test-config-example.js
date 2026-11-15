@@ -39,7 +39,7 @@ assert.deepStrictEqual(
 const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sibyl-config-'));
 try {
   fs.copyFileSync(path.join(__dirname, 'config.example.json'), path.join(dataDir, 'config.json'));
-  const env = { ...process.env, SIBYL_DATA_DIR: dataDir, SIBYL_CONFIG: '' };
+  const env = { ...process.env, SIBYL_DATA_DIR: dataDir, SIBYL_CONFIG: '', SIBYL_SKIP_NETWORK_CHECK: '1' };
   ['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK', 'SIBYL_TELEGRAM_BOT_TOKEN'].forEach(key => delete env[key]);
   const result = spawnSync(process.execPath, [path.join(__dirname, 'check-deploy.js'), '--strict'], { env, encoding: 'utf8' });
   assert.strictEqual(result.status, 0, result.stdout + result.stderr);

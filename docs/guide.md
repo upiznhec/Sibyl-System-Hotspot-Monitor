@@ -130,7 +130,7 @@ Each item alerts at most once a day. TikTok and the other daily pages never aler
 
 An event enters the briefing when:
 
-1. It is in one of your topics: one of the topic's keywords matches, or the list it came from was read for that topic.
+1. It is in one of your topics: one of the topic's keywords matches, or the list it came from was read for that topic. Those lists are wider than your topic, so an item from them that matches none of your keywords, and appears on no other source, goes to the watch list instead.
 2. It does not contain one of the topic's exclude words, such as "promo code".
 3. Its score reaches the minimum.
 4. It appears on a main source, Google Trends or TikTok. Events seen only on sources you follow are listed apart.
@@ -140,6 +140,7 @@ An event enters the briefing when:
 | "mineral sunscreen recall" is #1 on Google Trends with 20K+ searches | Yes | Yes | Main source, top rank, in your topic |
 | "#grwm" is #1 in TikTok's Beauty list, read for your Beauty topic | No | Yes | TikTok is read once a day, so it does not alert |
 | A post about sunscreen on a blog you follow, and nowhere else | No | Only under "From sources you follow" | Followed sources are listed apart |
+| "sheltered inlets" rises in Explore for "sunscreen" and matches none of your keywords | No | Only in the watch list | Read for your topic, but no keyword or second source confirms it |
 | A celebrity search that matches none of your topics | No | No | Not in your topics |
 
 ### 2.3 How the score works
@@ -155,7 +156,7 @@ An event enters the briefing when:
 | --- | --- | --- |
 | This repository | Yes | Your agent downloads it from GitHub. |
 | Node.js 18 or later | Yes | Your agent can check this and install it. Tested with Node.js 24. |
-| An AI agent | Yes | It must run commands, edit files and use a web browser. One that can also run on a schedule is best. |
+| An AI agent | Yes | It must run commands with internet access, edit files and use a web browser. One that can also run on a schedule is best. |
 | Somewhere to send briefings | Optional | A Slack, Discord or WeCom webhook, or a Telegram bot. Without one, briefings are saved as files. |
 | AI to explain each trend | Optional | An API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, buy credit on the AI company's website. Without it, each trend's line is copied from a news headline. |
 | Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid). See section 1.3. |
@@ -173,7 +174,7 @@ Copy the setup request in [SETUP-PROMPT.md](../SETUP-PROMPT.md), fill in the par
 4. Sets up where briefings go, or leaves them as files.
 5. Opens TikTok Creative Center (and Google Trends Explore if it needs a sign-in) so that you can log in yourself, if you want to track trends on TikTok: without a login it shows only the top 3 hashtags. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
 6. Reads the pages for the first time, runs the self-check and a first briefing, and shows you the result.
-7. Schedules the work: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose, plus the daily page reading.
+7. Schedules the work with Sibyl's own scheduling script: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose. It also arranges the daily page reading. On a Mac, the Sibyl folder must not be in Desktop, Documents or Downloads; your agent moves it if needed.
 
 What the agent's proposal looks like, for "beauty trends in the US":
 
@@ -206,13 +207,13 @@ New-Item -ItemType Directory -Force data | Out-Null
 Copy-Item scripts/config.example.json data/config.json
 ```
 
-This runs one test with the example topic and sends nothing. The topics, sources and schedule are easier to set up with your agent.
+This runs one test with the example topic and sends nothing. To keep it running, add `node scripts/schedule.js --install --hours=10-22`. The topics, sources and schedule are easier to set up with your agent.
 
 ## 5. Check that it works
 
 Ask your agent: "Run the Sibyl check and a test briefing, and show me the results." It works when:
 
-- The self-check shows no MISS.
+- The self-check shows no MISS. If "Internet access" fails, your agent's commands cannot reach the internet; your agent tells you how to allow it.
 - Collection ends with "Sibyl snapshot saved".
 - The briefing step ends with "Sibyl briefing done", and the briefing is in `sibyl/data/report-latest.md`.
 
@@ -316,6 +317,8 @@ Change the Sibyl briefing so that [it shows 5 events instead of 10]. Keep the ti
 | The same alert twice | Two scheduled tasks are running | "Check Sibyl's scheduled tasks for duplicates." |
 | No summaries | The item came without news links and no AI model is set | Optional: "Help me add an AI model key to Sibyl." |
 | TikTok or Google pages out of date | Not read today, the login expired, or the page changed | "Read today's trend pages for Sibyl and tell me if any failed." |
+| Every source fails with "ENOTFOUND" | Your agent's commands cannot reach the internet (Codex keeps them offline at first) | "Run the Sibyl check." Your agent tells you how to allow internet access. |
+| No briefing ever arrives on a Mac | The Sibyl folder is in Desktop, Documents or Downloads, which scheduled tasks cannot read | "Move Sibyl out of Desktop and set its schedule again." |
 | A YouTube channel error | YouTube's channel feeds sometimes fail for a few hours | Wait; it usually recovers on its own. |
 
 ## 9. Before you rely on it

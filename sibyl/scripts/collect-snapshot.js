@@ -6,6 +6,7 @@ const { defaultPlatformsConfig, sourceFetchers } = require('./lib/source-registr
 const { configureLocale } = require('./lib/locale');
 const { configureHttp } = require('./lib/http');
 const { loadPages } = require('./lib/pages-file');
+const { loadEnvFile } = require('./lib/env-file');
 const { loadTopicSettings } = require('./lib/topic-settings');
 const {
   getDataDir,
@@ -115,6 +116,7 @@ async function collectSnapshot(options = {}) {
 }
 
 if (require.main === module) {
+  loadEnvFile();
   collectSnapshot({ args: process.argv.slice(2) }).catch(error => {
     console.error('❌ Sibyl snapshot failed:', error.message);
     process.exit(1);

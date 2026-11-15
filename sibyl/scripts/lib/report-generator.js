@@ -252,6 +252,19 @@ function hasBroadcastSeed(cluster, config = {}) {
   return (cluster.signals || []).some(signal => requiredPlatforms.has(signal.platform));
 }
 
+// Lists read for a topic (a Trending Now category, Explore's rising searches, a TikTok industry) are
+// wider than the topic, and their items count for it without matching a keyword. Such an event leads
+// the briefing only when a keyword matches or a second source shows it; otherwise it goes to the watch
+// list. Found in testing: "sheltered inlets" rose in Explore for "sunscreen" and led a beauty briefing.
+function confirmedForTopic(cluster) {
+  const signals = cluster.signals || [];
+  if (signals.length === 0) return true;
+  if (signals.some(signal => !signal.topicHint)) return true;
+  if ((cluster.keywords || []).length > 0) return true;
+  if (signals.some(signal => (signal.matchedKeywords || []).length > 0)) return true;
+  return new Set(signals.map(signal => signal.platform)).size >= 2;
+}
+
 function eligibleReportClusters(clusters, config = {}) {
   const relevant = clusters.filter(cluster => !cluster.broadcastFiltered);
   if (config.requireSeedPlatforms === false) return relevant;
@@ -273,6 +286,7 @@ function selectReportClusters(clusters, config = {}) {
   const minScore = config.minScore || 0;
   return eligibleReportClusters(clusters, config)
     .filter(cluster => cluster.score >= minScore)
+    .filter(cluster => config.requireTopicConfirmation === false || confirmedForTopic(cluster))
     .slice(0, topN);
 }
 
@@ -299,7 +313,6 @@ function renderCluster(cluster, index, context) {
 }
 
 function generateReport(clusters, meta = {}, config = {}) {
-  const topN = config.topN || 8;
   const eligibleClusters = eligibleReportClusters(clusters, config);
   const selected = selectReportClusters(clusters, config);
   const context = {
@@ -318,17 +331,19 @@ function generateReport(clusters, meta = {}, config = {}) {
 
   if (selected.length === 0) {
     lines.push(wording.noItems(seedPlatformText(config)));
-    return lines.join('\n');
+    lines.push('');
+  } else {
+    lines.push('---');
+    lines.push('');
+    selected.forEach((cluster, index) => {
+      lines.push(renderCluster(cluster, index, context));
+    });
   }
 
-  lines.push('---');
-  lines.push('');
-
-  selected.forEach((cluster, index) => {
-    lines.push(renderCluster(cluster, index, context));
-  });
-
-  const watchlist = eligibleClusters.slice(topN, topN + 5);
+  // What else was eligible, in score order: lower scores, and items from lists read for the topic
+  // that no keyword or second source confirmed.
+  const chosen = new Set(selected);
+  const watchlist = eligibleClusters.filter(cluster => !chosen.has(cluster)).slice(0, 5);
   if (watchlist.length > 0) {
     lines.push(wording.watchlistHeading);
     lines.push('');
@@ -360,6 +375,7 @@ function generateReport(clusters, meta = {}, config = {}) {
 }
 
 module.exports = {
+  confirmedForTopic,
   generateReport,
   formatTime,
   selectReportClusters,

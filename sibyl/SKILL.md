@@ -14,6 +14,9 @@ Follow the full instructions in [AGENTS.md](../AGENTS.md) at the repository root
 - Before scheduling anything, show the person the sources, topics, keywords, exclude words and the category chosen on each platform (`dailyPages`), and wait for their OK.
 - Read the pages in `dailyPages` once a day and save them to `sibyl/data/pages.json` (format in `scripts/lib/pages-file.js`).
 - Show saved briefings and alerts only when the person asks: `node scripts/show-briefing.js` (`--list`, `--alerts`).
+- Keys and webhook addresses go in `sibyl/data/.env`, readable only by the person; the scripts read it.
+- Schedule only with `node scripts/schedule.js --install --hours=<start>-<end>`; no wrappers of your own.
+- If your commands cannot reach the internet, stop and ask the person to allow it (AGENTS.md, rule 11).
 - After any change, run `node scripts/check-deploy.js`.
 
 The person-facing guide is [docs/guide.md](../docs/guide.md).

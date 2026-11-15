@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
 // Deployment self-check, kept from v1.3.20 with its four sections (required, recommended,
-// optional, check by hand). It reads the config and the data folder only; it sends nothing.
+// optional, check by hand). It reads the config, the data folder and the crontab, and makes one
+// request to see whether the internet can be reached (SIBYL_SKIP_NETWORK_CHECK=1 skips it); it sends nothing.
 
 const fs = require('fs');
 const path = require('path');
+const https = require('https');
 
 const { readModelSettings } = require('./lib/model-config');
 const { isValidTimeZone, systemTimeZone } = require('./lib/locale');
@@ -22,6 +24,8 @@ const {
   detectChannel,
   reportTarget
 } = require('./lib/webhook');
+const { envFileIsPrivate, envFilePath, loadEnvFile } = require('./lib/env-file');
+const { installedBlock, readCrontab } = require('./schedule');
 
 const CHANNEL_LABELS = {
   wecom: 'WeCom',
@@ -285,8 +289,33 @@ function readTimezone() {
   return result;
 }
 
-function main() {
+// One request to Google Trends shows whether this computer, or the place an agent runs its commands,
+// can reach the internet. Any answer counts; only a network error or no answer fails.
+function checkInternet(host = 'trends.google.com', timeoutMs = 8000) {
+  return new Promise(resolve => {
+    const request = https.request({ host, path: '/', method: 'HEAD', timeout: timeoutMs }, response => {
+      response.resume();
+      resolve({ ok: true, detail: `${host} answered` });
+    });
+    request.on('timeout', () => request.destroy(new Error(`no answer within ${timeoutMs / 1000} seconds`)));
+    request.on('error', error => resolve({ ok: false, detail: `${host}: ${error.message}` }));
+    request.end();
+  });
+}
+
+// The schedule installed by scripts/schedule.js (crontab), or null when there is none or it cannot be read.
+function scheduleStatus() {
+  if (process.platform === 'win32') return null;
+  try {
+    return installedBlock(readCrontab());
+  } catch (error) {
+    return null;
+  }
+}
+
+async function main() {
   const dataDir = getDataDir();
+  loadEnvFile(dataDir);
   const configFile = process.env.SIBYL_CONFIG || path.join(dataDir, 'config.json');
   const config = readJson(configFile, {});
   const taskCommands = taskCommandText(config);
@@ -305,8 +334,22 @@ function main() {
   checkLine(required, 'required', 'Data folder', fs.existsSync(dataDir),
     dataDir, `Create it: mkdir -p ${dataDir}`);
 
+  if (process.env.SIBYL_SKIP_NETWORK_CHECK !== '1') {
+    const internet = await checkInternet();
+    checkLine(required, 'required', 'Internet access', internet.ok, internet.detail,
+      'No source can be read without the internet. If an AI agent runs this, its commands may be kept offline ' +
+      '(Codex does this by default): the agent must ask the person to allow network access, as AGENTS.md says ' +
+      'under "What to ask, and when", and must not schedule anything until a collection succeeds.');
+  }
+
   checkLine(recommended, 'recommended', 'Config file', fs.existsSync(configFile),
     configFile, 'On first setup, copy scripts/config.example.json to the data folder as config.json.');
+
+  const envFile = envFilePath(dataDir);
+  if (fs.existsSync(envFile)) {
+    checkLine(recommended, 'recommended', 'Private settings file', envFileIsPrivate(dataDir),
+      envFile, `Only your account should be able to read it: chmod 600 "${envFile}"`);
+  }
 
   const alert = alertTarget(config);
   const report = reportTarget(config);
@@ -391,9 +434,10 @@ function main() {
   checkLine(manual, 'manual', 'No double pushes', false,
     'check in your scheduler',
     'With --push the scripts call the webhook themselves; the scheduler should only run them on time, not send their output again.');
-  checkLine(manual, 'manual', 'Scheduled tasks', false,
-    'check in crontab or your scheduler',
-    'Within your chosen hours: every 10 minutes run collect-snapshot and instant-alerts; every hour run sibyl.js --push.');
+  const schedule = scheduleStatus();
+  checkLine(manual, 'manual', 'Scheduled tasks', Boolean(schedule),
+    schedule ? 'installed by scripts/schedule.js (crontab)' : 'no schedule from scripts/schedule.js found',
+    'Install it with: node scripts/schedule.js --install --hours=10-22 (the person\'s hours). On Windows it prints the Task Scheduler settings.');
   checkLine(manual, 'manual', 'Daily page reading', false,
     'check that your agent reads the TikTok and Google Trends pages once a day',
     'The agent reads the hashtag list, the category page and Explore, and writes pages.json; when it has not, the scripts use the last saved pages.');
@@ -429,4 +473,7 @@ function main() {
   if (missingRequired > 0 && process.argv.includes('--strict')) process.exit(1);
 }
 
-main();
+main().catch(error => {
+  console.error(`Self-check failed: ${error.message}`);
+  process.exit(1);
+});

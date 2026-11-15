@@ -21,6 +21,7 @@ Changed:
 - **Grouping.** English titles are grouped by the words that describe the event. Sharing only a topic keyword, a person or a brand does not merge two events, and a hashtag matches the words it joins (#sunscreenrecall and "sunscreen recall").
 - **Push.** Slack, Discord and Telegram are added; WeCom stays. With no push target, nothing is sent: briefings and alerts are saved for 7 days and shown when the user asks their agent.
 - **AI model.** Optional, with the user's own OpenAI-compatible key; without one, the rule-based fallback runs, as in v1.3.20. Summaries are written from the news links that come with Google Trends items.
+- **Running.** `scripts/schedule.js` sets up the schedule for every agent the same way (the crontab, or the Task Scheduler settings on Windows); keys and webhook addresses live in `sibyl/data/.env`; the self-check also tests internet access. Items from lists read for a topic lead the briefing only with a keyword match or a second source.
 - **Removed.** The parts that needed OpenClaw or the original team's setup: Weibo intelligent search, the Agent Reach retriever and its health table, and the OpenClaw paths and model settings.
 - **Checked.** Until the Chinese sources were removed, every change was compared with v1.3.20 on saved Weibo, Douyin, Tieba and Hupu snapshots; briefings, alerts and constants stayed identical (last check at commit 62fa3a4). The git history keeps the check tool.
 

@@ -25,6 +25,7 @@ const { loadTopicSettings } = require('./lib/topic-settings');
 const { evidenceItems, evidenceText } = require('./lib/news-evidence');
 const { alertTarget, sendMessage } = require('./lib/webhook');
 const { saveAlert } = require('./lib/briefing-archive');
+const { loadEnvFile } = require('./lib/env-file');
 const {
   getDataDir,
   loadLatestSnapshot,
@@ -340,6 +341,7 @@ async function loadSnapshotForAlerts(config, args) {
 
 async function main() {
   const args = process.argv.slice(2);
+  loadEnvFile();
   const config = loadConfig();
   configureLocale(config);
   if (config.alerts?.enabled === false) {

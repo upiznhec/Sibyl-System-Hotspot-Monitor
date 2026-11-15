@@ -10,6 +10,7 @@ const { loadTopicSettings } = require('./lib/topic-settings');
 const { configureLocale, text } = require('./lib/locale');
 const { reportTarget, sendInParts } = require('./lib/webhook');
 const { saveBriefing } = require('./lib/briefing-archive');
+const { loadEnvFile } = require('./lib/env-file');
 const { clusterSignals, buildNextState } = require('./lib/clusterer');
 const { generateReport, selectReportClusters, hasBroadcastSeed } = require('./lib/report-generator');
 const { classifySignal } = require('./lib/category-classifier');
@@ -255,6 +256,7 @@ async function maybePushReport(report, config, args) {
 
 async function main() {
   const args = process.argv.slice(2);
+  loadEnvFile();
   const config = loadConfig();
   configureLocale(config);
   configureHttp(config.http || {});
