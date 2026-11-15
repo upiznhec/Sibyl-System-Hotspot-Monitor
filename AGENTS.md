@@ -214,7 +214,7 @@ YouTube channels and websites are not in the setup request: following particular
 
 **Main sources.** An event must appear on a source in `report.seedPlatforms` to enter the briefing. Keep the list to the main sources that are on: Google Trends, TikTok, and X when the person turns it on. If they say no to all three, explain that the briefing would stay empty, and ask them to keep at least one.
 
-**Wikipedia.** Ask for a contact (see "What to ask, and when") and set `http.userAgent` to `SibylHotspotMonitor (<contact>)`. If they would rather not give one, switch Wikipedia off.
+**Wikipedia.** Ask for a contact (see "What to ask, and when") and set `http.userAgent` to `SibylHotspotMonitor (<contact>)`. Sibyl sends it only with its requests to Wikimedia; every other site gets a plain name without it. If they would rather not give one, switch Wikipedia off.
 
 **YouTube channels.** Only when the person asks; ask for the links if they did not give them. Open each channel page and find its ID, which starts with `UC`: it is in the page's RSS link (`channel_id=`) and in the page source (`"externalId"`). Add `{ "id": "UC…", "name": "<channel name>" }` to `platforms["youtube-channels"].channels`, set `enabled: true`, and check that `https://www.youtube.com/feeds/videos.xml?channel_id=<id>` lists videos.
 
@@ -328,7 +328,7 @@ Slack, Discord and Telegram are recognised by their address. For any other addre
 | `alerts.platforms` | Google Trends top 3 or 20K+ searches; X top 5 or 50K posts | Alert limits |
 | `pagesMaxAgeHours` | 168 | Saved pages older than this are not used |
 | `report.requireTopicConfirmation` | `true` | Items from lists read for a topic lead the briefing only with a keyword match or a second source; `false` lets them lead as before |
-| `http.userAgent` | a generic name | With Wikipedia on: `SibylHotspotMonitor (<contact>)`, as under "Sources" |
+| `http.userAgent` | empty | With Wikipedia on: `SibylHotspotMonitor (<contact>)`, as under "Sources". Sent to Wikimedia only; other sites get a generic name. |
 | `eventSummary.newsEvidence` | `true` | Use the news links saved with items as summary material |
 
 The alert limits, source weights and score levels are first settings, to be adjusted after testing.

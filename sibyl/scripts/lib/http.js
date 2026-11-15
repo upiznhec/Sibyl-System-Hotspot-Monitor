@@ -2,18 +2,35 @@ const http = require('http');
 const https = require('https');
 
 const DEFAULT_TIMEOUT = 15000;
-// Requests say which tool they come from. Sites such as Wikimedia ask automated clients to add
-// a way to reach the operator: set config.http.userAgent (or SIBYL_USER_AGENT) to do that.
+// Requests say which tool they come from. Wikimedia asks automated clients to add a way to reach
+// the person running them: config.http.userAgent (or SIBYL_USER_AGENT) holds that contact, and it
+// is sent only with requests to Wikimedia. Every other site gets the plain name below.
 const DEFAULT_USER_AGENT = 'SibylHotspotMonitor (fork of liray0919/Sibyl-System-Hotspot-Monitor)';
 const DEFAULT_HEADERS = {
   'User-Agent': DEFAULT_USER_AGENT,
   'Accept': 'application/json,text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
   'Accept-Language': 'en-US,en;q=0.9'
 };
+let contactUserAgent = '';
+
+// wikimedia.org (the pageviews API) and the wikis themselves, such as en.wikipedia.org.
+function isWikimediaHost(hostname) {
+  const host = String(hostname || '').toLowerCase().replace(/\.$/, '');
+  return /(^|\.)(wikimedia|wikipedia)\.org$/.test(host);
+}
+
+function userAgentFor(url) {
+  let hostname = '';
+  try {
+    hostname = new URL(url).hostname;
+  } catch (error) {
+    return DEFAULT_USER_AGENT;
+  }
+  return contactUserAgent && isWikimediaHost(hostname) ? contactUserAgent : DEFAULT_USER_AGENT;
+}
 
 function configureHttp(options = {}) {
-  const userAgent = process.env.SIBYL_USER_AGENT || options.userAgent;
-  if (userAgent) DEFAULT_HEADERS['User-Agent'] = String(userAgent);
+  contactUserAgent = String(process.env.SIBYL_USER_AGENT || options.userAgent || '').trim();
   if (options.acceptLanguage) DEFAULT_HEADERS['Accept-Language'] = String(options.acceptLanguage);
   return { ...DEFAULT_HEADERS };
 }
@@ -40,6 +57,7 @@ function requestText(url, options = {}) {
         path: parsed.pathname + parsed.search,
         headers: {
           ...DEFAULT_HEADERS,
+          'User-Agent': userAgentFor(targetUrl),
           ...headers,
           ...(data ? { 'Content-Length': data.length } : {})
         }
@@ -99,6 +117,8 @@ async function requestJson(url, options = {}) {
 module.exports = {
   DEFAULT_USER_AGENT,
   configureHttp,
+  isWikimediaHost,
   requestText,
-  requestJson
+  requestJson,
+  userAgentFor
 };

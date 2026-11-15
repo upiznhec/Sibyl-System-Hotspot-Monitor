@@ -205,7 +205,7 @@ function checkSources(config, dataDir, recommended, optional) {
       const hasContact = /@|https?:\/\//.test(String(process.env.SIBYL_USER_AGENT || config.http?.userAgent || ''));
       checkLine(optional, 'optional', `${label} request contact`, hasContact,
         hasContact ? 'the user agent includes a contact' : 'the user agent has no contact',
-        'Wikimedia asks automated tools to give a contact in the user agent: add your website or email in http.userAgent (or SIBYL_USER_AGENT).');
+        'Wikimedia asks automated tools to give a contact in the user agent: add your website or email in http.userAgent (or SIBYL_USER_AGENT). Sibyl sends it to Wikimedia only.');
       return;
     }
     if (id === 'youtube-channels' || id === 'rss') {
