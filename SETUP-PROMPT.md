@@ -4,7 +4,7 @@ Copy the text below, fill in the parts in brackets, and send it to your AI agent
 
 Under "Sources to watch", say yes or no to each source, and paste the links of any YouTube channels and websites you want to follow. Google Trends, TikTok and Wikipedia are on unless you say no; the others stay off unless you add them. If a source needs something from you, your agent asks you when it gets there.
 
-For "AI summaries", write none unless you already pay an AI company for an API key (a ChatGPT or Claude subscription is not one).
+For "Use AI to explain each trend", write no unless you have an API key. Unless your AI subscription includes one, you buy API credit on the AI company's own website.
 
 ```text
 Please set up Sibyl, a trend monitor, for me. Download it from https://github.com/upiznhec/Sibyl-System-Hotspot-Monitor and follow the instructions for agents in its AGENTS.md file.
@@ -15,7 +15,7 @@ About me:
 - Time zone: [America/New_York]
 - Hours to watch: [10:00 to 22:00]
 - Where to send briefings: [Slack / Discord / WeCom webhook / Telegram / none, save them as files]
-- AI summaries (optional, paid): [none / I have an API key from an AI company]
+- Use AI to explain each trend in one line (optional, needs a paid API key): [no / yes, I have an API key]
 
 Sources to watch:
 - Google Trends: [yes / no]

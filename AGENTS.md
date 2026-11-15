@@ -67,15 +67,15 @@ Then take them through the steps under "Sources", one at a time, and end with: "
 
 If yes: they sign in, buy credit, create an app, and paste its Bearer Token here.
 
-**AI summaries**, when they said they have a key.
+**AI explanations** ("Use AI to explain each trend" in the request), when they said yes.
 
-> For summaries, Sibyl needs an API key from an AI company, for example OpenAI (https://platform.openai.com/api-keys). It is not your ChatGPT or Claude subscription, and each summary costs a little money. Paste the key, and tell me which company it is from.
+> To have AI write one line on what each trend is about, Sibyl needs an API key from an AI company. Unless your AI subscription includes one, you buy API credit on the company's own website, for example OpenAI (https://platform.openai.com/api-keys). Each line costs a little. Paste the key, and tell me which company it is from.
 
-If they are not sure, leave AI summaries off.
+If the key comes with a subscription, such as a coding plan, check that the plan allows use outside its own apps; some do not. If they are not sure, leave it off.
 
-**TikTok login**, when they want more than the top 3 hashtags.
+**TikTok login**, when they want TikTok trends.
 
-> Without a login, TikTok Creative Center shows only the top 3 hashtags. To track more, log in with a free TikTok for Business account (create one at https://ads.tiktok.com/i18n/signup). I have opened the page: click Log in, sign in yourself, and tell me when you are done.
+> If you want to track trends on TikTok, log in with a free TikTok for Business account (create one at https://ads.tiktok.com/i18n/signup). Without a login, TikTok Creative Center shows only the top 3 hashtags. I have opened the page: click Log in, sign in yourself, and tell me when you are done.
 
 **Google sign-in**, when the new Explore page asks for it.
 
@@ -120,7 +120,7 @@ Run them from the `sibyl` folder.
 3. **Map the topics** (next section). Wait for the person's OK, then write `topics` and `dailyPages`.
 4. **Country, time zone and sources.** Set `country` (two-letter code, such as `US`) and `timeZone` (an IANA name, such as `America/New_York`). Under `platforms`, switch the sources on or off as the person chose under "Sources to watch" in the setup request; where a choice is blank or still in brackets, keep the default. Google Trends, TikTok and Wikipedia are on by default; YouTube channels, websites, YouTube search and X are off. What each source needs is under "Sources" below, and how to ask for it under "What to ask, and when".
 5. **Push target** (see "Push targets" below), or none: then briefings are saved as files.
-6. **Logins.** If the person wants to track more than TikTok's top 3 hashtags, open TikTok Creative Center (`https://ads.tiktok.com/creative/creativeCenter/trends`) and let them log in to TikTok for Business; the account is free (sign-up: `https://ads.tiktok.com/i18n/signup`). Do the same for Google if the new Explore page asks for a sign-in.
+6. **Logins.** If the person wants to track trends on TikTok (without a login, only the top 3 hashtags show), open TikTok Creative Center (`https://ads.tiktok.com/creative/creativeCenter/trends`) and let them log in to TikTok for Business; the account is free (sign-up: `https://ads.tiktok.com/i18n/signup`). Do the same for Google if the new Explore page asks for a sign-in.
 7. **First run.** Read the daily pages (below), then run `check-deploy.js`, `collect-snapshot.js`, `instant-alerts.js --no-push` and `sibyl.js --print --no-push`. Show the person the check and the briefing.
 8. **Schedule** (below), then run `check-deploy.js --task-command="<the task commands>"` to confirm.
 9. **Tell the person how to read briefings.** If no push target is set, say that briefings are kept for 7 days and shown only when asked, and give examples: "Show me the latest trend briefing", "Any trend alerts today?", "What were the top trends yesterday afternoon?"
@@ -206,9 +206,9 @@ Set `SIBYL_YOUTUBE_API_KEY` in the scheduled tasks' environment (rule 4) and `en
 
 The US, the UK, Japan and worldwide are built in; for another country, set `platforms["x-trends"].woeid` from X's documentation. Items in the person's topics that reach X's top 5 or 50K posts also alert (`alerts.platforms["x-trends"]`).
 
-## AI summaries
+## AI explanations (summaries)
 
-Optional, and off unless the person has a key. Explain before you ask (rule 9): Sibyl's scripts run on their own every hour, so they need their own API key; your own model access does not count, and a ChatGPT or Claude app subscription is not an API key. Each summary costs money at the AI company. If the person says none or is unsure, leave it off: summaries then use the first news headline.
+The setup request calls this "Use AI to explain each trend in one line": an AI model writes each event's summary line. Optional, and off unless the person has a key. Sibyl's scripts run on their own every hour, so they need their own API key; your own model access does not count. A chat subscription such as ChatGPT Plus or Claude Pro has no API key; some subscriptions, such as coding plans, include one, but check that their terms allow this use. Each summary costs money at the AI company. If the person says no or is unsure, leave it off: summaries then use the first news headline.
 
 If they have a key, set `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI) in the scheduled tasks' environment (rule 4), and make one test briefing (`node scripts/sibyl.js --print --no-push`). If the summaries fail, tell the person in plain words what failed, remove the variables, and say that Sibyl works without AI.
 
@@ -284,7 +284,7 @@ Slack, Discord and Telegram are recognised by their address. For any other addre
 | Turn a source on or off | As under "Sources"; keep `report.seedPlatforms` to the main sources that are on. |
 | Number of events in the briefing | `report.topN` (default 10); the minimum score is `report.minScore`. |
 | Another country or time zone | `country`, `timeZone`, the `region` in `dailyPages`, and the scheduled hours. |
-| An AI model for summaries | As under "AI summaries": `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI). Without both, the first news headline is used. |
+| An AI model for summaries | As under "AI explanations (summaries)": `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI). Without both, the first news headline is used. |
 
 ## Other settings
 

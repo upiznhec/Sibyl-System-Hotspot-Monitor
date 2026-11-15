@@ -51,7 +51,7 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 
 - It does not catch every trend. Use it alongside your own checks, not instead of them.
 - Scores and counts are a guide. Google Trends gives ranges ("20K+"), and TikTok counts cover the last 7 days.
-- Summaries are taken from news headlines, or written from them by an AI model if you add one. Check the facts before you use them.
+- Each trend's summary, one line on what it is about, is taken from news headlines, or written by an AI model if you add one. Check the facts before you use them.
 - Pages read by the agent can fail: a page may change, need a login, or load slowly. Sibyl then uses the last saved pages and reports how old they are.
 - Google is replacing the classic Explore page; the new one asks you to sign in to a Google account. When that happens, you sign in yourself in your agent's browser. Your agent never types your passwords.
 - Sources can change their pages or terms at any time. If one stops working, the others keep running.
@@ -61,7 +61,7 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 
 - The scripts are free to run.
 - Your agent's usage when it reads the pages once a day, and when you ask it for briefings or changes.
-- Optional: an AI model for summaries and for merging events. You use your own key; nothing is spent without one.
+- Optional: an AI model to explain each trend in one line and to group related trends. It needs an API key: unless your AI subscription includes one, you buy API credit on the AI company's own website. Nothing is spent without one.
 - Optional: YouTube search, free within Google's daily allowance.
 - Optional: X trends, about US$0.01 per request. Sibyl asks at most every 30 minutes, so 10:00 to 22:00 costs about US$0.26 a day (about US$8 a month).
 - The cost of a typical day will be measured during testing and added here.
@@ -157,7 +157,7 @@ An event enters the briefing when:
 | Node.js 18 or later | Yes | Your agent can check this and install it. Tested with Node.js 24. |
 | An AI agent | Yes | It must run commands, edit files and use a web browser. One that can also run on a schedule is best. |
 | Somewhere to send briefings | Optional | A Slack, Discord or WeCom webhook, or a Telegram bot. Without one, briefings are saved as files. |
-| AI summaries | Optional | A paid API key from an AI company. It is not your agent, and a ChatGPT or Claude subscription is not an API key. Without it, summaries use the first news headline. |
+| An AI model to explain each trend | Optional | An API key. Unless your AI subscription includes one, buy API credit on the AI company's own website. Without it, each trend's line is the first news headline. |
 | Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid). See section 1.3. |
 | A contact for Wikipedia | If Wikipedia is on | A web address or email that Sibyl sends to Wikimedia. See section 1.3. |
 
@@ -171,7 +171,7 @@ Copy the setup request in [SETUP-PROMPT.md](../SETUP-PROMPT.md), fill in the par
 2. Asks what you want to track, and proposes topics, keywords and exclude words, plus the matching category on each platform. It waits for your OK before saving anything.
 3. Sets your country and time zone, switches on the sources you chose, and asks you for what they need (section 1.3).
 4. Sets up where briefings go, or leaves them as files.
-5. Opens TikTok Creative Center (and Google Trends Explore if it needs a sign-in) so that you can log in yourself, if you want to track more than the top 3 hashtags. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
+5. Opens TikTok Creative Center (and Google Trends Explore if it needs a sign-in) so that you can log in yourself, if you want to track trends on TikTok: without a login it shows only the top 3 hashtags. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
 6. Reads the pages for the first time, runs the self-check and a first briefing, and shows you the result.
 7. Schedules the work: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose, plus the daily page reading.
 
