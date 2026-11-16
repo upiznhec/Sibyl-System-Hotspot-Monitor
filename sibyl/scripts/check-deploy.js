@@ -11,6 +11,7 @@ const https = require('https');
 const { readModelSettings } = require('./lib/model-config');
 const { isValidTimeZone, systemTimeZone } = require('./lib/locale');
 const { everyText, loadPages, pageEveryHours, pageLateHours } = require('./lib/pages-file');
+const { MAX_HASHTAGS, accountList, hashtagList } = require('./adapters/instagram-adapter');
 const { loadTopicSettings } = require('./lib/topic-settings');
 const {
   defaultPlatformsConfig,
@@ -157,6 +158,34 @@ function pagesDetail(ages) {
     : 'not in pages.json yet';
 }
 
+// Instagram: the token and account, how long the token lasts, and whether the lists fit Meta's
+// limits (30 hashtags per 7 days; about 200 requests an hour, 2 per hashtag and 1 per account).
+function instagramStatus(settings = {}, now = Date.now()) {
+  const fix = 'Run node scripts/instagram-token.js in your own terminal (AGENTS.md, "Instagram").';
+  if (!process.env.SIBYL_IG_ACCESS_TOKEN || !process.env.SIBYL_IG_USER_ID) {
+    return { ok: false, detail: 'on, but no token or Instagram account ID', fix };
+  }
+  const tags = hashtagList(settings.hashtags);
+  const accounts = accountList(settings.accounts);
+  const every = Number(settings.minIntervalMinutes ?? 60) || 60;
+  const perHour = Math.round(((tags.slice(0, MAX_HASHTAGS).length * 2) + accounts.length) * (60 / every));
+  const expires = Date.parse(process.env.SIBYL_IG_TOKEN_EXPIRES || '');
+  const daysLeft = Number.isFinite(expires) ? Math.floor((expires - now) / 86400000) : null;
+  const problems = [];
+  if (!tags.length && !accounts.length) problems.push('no hashtags or accounts to read');
+  if (tags.length > MAX_HASHTAGS) problems.push(`${tags.length} hashtags; Meta allows ${MAX_HASHTAGS} in any 7 days, so the rest are skipped`);
+  if (perHour > 200) problems.push(`about ${perHour} requests an hour, more than the about 200 allowed`);
+  if (daysLeft !== null && daysLeft < 7) problems.push(daysLeft < 0 ? 'the token has expired' : `the token expires in ${daysLeft} day(s)`);
+  const lasts = daysLeft === null ? 'does not expire' : `lasts ${daysLeft} more day(s)`;
+  return {
+    ok: problems.length === 0,
+    detail: problems.length
+      ? problems.join('; ')
+      : `token set (${lasts}); ${Math.min(tags.length, MAX_HASHTAGS)} hashtag(s), ${accounts.length} account(s), about ${perHour} requests an hour`,
+    fix: daysLeft !== null && daysLeft < 7 ? fix : 'Keep at most 30 hashtags, and fewer hashtags and accounts if requests pass 200 an hour.'
+  };
+}
+
 // One line per switched-on source: what it needs and whether that is in place.
 function checkSources(config, dataDir, recommended, optional) {
   const platforms = platformsConfig(config);
@@ -223,6 +252,11 @@ function checkSources(config, dataDir, recommended, optional) {
       checkLine(optional, 'optional', label, hasKey,
         hasKey ? `API key set; searches about every ${settings.minIntervalMinutes ?? 60} minutes` : 'on, but no API key',
         'Set SIBYL_YOUTUBE_API_KEY (a free YouTube Data API v3 key; about 100 searches a day).');
+      return;
+    }
+    if (id === 'instagram') {
+      const status = instagramStatus(settings);
+      checkLine(optional, 'optional', label, status.ok, status.detail, status.fix);
       return;
     }
     if (id === 'x-trends') {

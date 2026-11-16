@@ -14,6 +14,7 @@ const ADAPTER_LOADERS = {
   'tiktok-creative-center': () => require('../adapters/tiktok-creative-center-adapter'),
   'x-trends': () => require('../adapters/x-trends-adapter'),
   'youtube-search': () => require('../adapters/youtube-search-adapter'),
+  instagram: () => require('../adapters/instagram-adapter'),
   wikipedia: () => require('../adapters/wikipedia-adapter'),
   'youtube-channels': () => require('../adapters/youtube-channels-adapter'),
   rss: () => require('../adapters/rss-adapter')

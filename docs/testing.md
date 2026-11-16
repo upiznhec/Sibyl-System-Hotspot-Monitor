@@ -95,3 +95,5 @@ Result: installed, configured and scheduled in about 64 minutes, about 25 of the
 Also found: X was asked about every 40 minutes instead of 30, because a cached result counted as fresh a few seconds too long; the cache now counts from the request's start and is due 2 minutes early.
 
 Afterwards (2026-11-15), the reading intervals were set per page: Google's Trending Now every hour, TikTok and Explore once a day (`everyHours`; `save-pages.js --due`), X every 10 minutes, YouTube search every hour, Wikipedia once a day when Wikimedia publishes the list. TikTok stayed daily because its list was identical in two reads 100 minutes apart (14:35 and 16:14): the same 100 hashtags, ranks and view counts.
+
+After this test Instagram became an optional source: `adapters/instagram-adapter.js` (hashtags and accounts, about once an hour) and `scripts/instagram-token.js` (turns the Explorer's token into a lasting one in `data/.env`). Tested against a fake Graph API (`test-instagram.js`); the first live run is part of the sports test.

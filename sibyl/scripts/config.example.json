@@ -44,6 +44,12 @@
       "queries": [],
       "minIntervalMinutes": 60
     },
+    "instagram": {
+      "enabled": false,
+      "hashtags": [],
+      "accounts": [],
+      "minIntervalMinutes": 60
+    },
     "x-trends": {
       "enabled": false,
       "minIntervalMinutes": 10

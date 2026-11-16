@@ -17,6 +17,7 @@ Follow the full instructions in [AGENTS.md](../AGENTS.md) at the repository root
 - Keys and webhook addresses go in `sibyl/data/.env`, readable only by the person; the scripts read it. The person saves them with `node scripts/save-secret.js <name>` in their own terminal, never in the chat.
 - Schedule only with `node scripts/schedule.js --install --hours=<start>-<end>`; no wrappers of your own.
 - Save the pages you read with `node scripts/save-pages.js` (one file per page in `data/daily-pages/`); never write `pages.json` yourself.
+- Instagram (optional) is read through the person's own Meta app: they do every step on Meta's sites in their own browser, and save the token with `node scripts/instagram-token.js` (AGENTS.md, "Instagram").
 - If your commands cannot reach the internet, stop and ask the person to allow it (AGENTS.md, rule 11).
 - After any change, run `node scripts/check-deploy.js`.
 

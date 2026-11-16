@@ -97,6 +97,12 @@ Then take them through the steps under "Sources", one at a time, and end with th
 
 If yes: in their own browser they sign in, buy credit and create an app, then save its Bearer Token with the save-secret command for `x`.
 
+**Instagram**, when it is chosen.
+
+> Instagram is free to read, through a small app of your own at Meta, and it takes about 10 minutes. You need an Instagram professional account (business or creator) linked to a Facebook Page you manage. You do the clicks on Meta's site in the browser you always use, because Meta may lock an account that a program clicks for; I tell you each step. Shall we start?
+
+Then take them through the steps under "Instagram" in "Sources", one at a time.
+
 **AI explanations** ("Use AI to explain each trend" in the request), when they said yes.
 
 > Each trend in a briefing has one line saying what it is about. Sibyl normally copies a news headline for it; to have an AI write it instead, Sibyl needs an API key, a code that lets it use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website, for example OpenAI (https://platform.openai.com/api-keys). Each line costs a little. Tell me which company your key is from, then save the key by running this in your terminal: [the save-secret command for `ai`].
@@ -127,6 +133,7 @@ Seen when Codex and Claude set Sibyl up on a Mac (November 2026); expect them in
 | The agent wrote its own schedule script, which skipped a whole run when one source failed, and asked the person to run it | Rule 10: install the schedule with `scripts/schedule.js`. Never ask the person to run a script you wrote. |
 | The folder was on the Desktop, which scheduled tasks on macOS cannot read | Before installing the schedule, move the folder to the person's home folder with their OK; `schedule.js` refuses Desktop, Documents and Downloads. |
 | Unrelated items led the briefing: "sheltered inlets" from Explore's rising searches for "sunscreen", and oral-care hashtags from TikTok's Beauty & Personal Care | The scripts now keep such items in the watch list unless a keyword or a second source confirms them. After the first briefing, point out anything unrelated that still leads and offer an exclude word. |
+| Meta logged the person out of Facebook on every device after the agent created their Meta app in its own browser | "Instagram": the person does every step on Meta's sites in their own browser; you only say what to click. |
 | Wikipedia was switched off, because these instructions then named only Google Trends and TikTok as on by default | Wikipedia is on by default; keep it on unless the person says no. |
 | The agent asked the person to paste the YouTube key into the chat, as these instructions then said; the person stopped the setup | Rule 4 and "Keys and logins": give them the `save-secret.js` command. A secret never goes through the chat. |
 | A narrow browser window made Google serve its mobile layout, whose table held the unfiltered list of 660 trends, and the agent wrote its own checker before saving | Read pages in a window at least 1280 px wide, write each page to `data/daily-pages/`, and save with `scripts/save-pages.js`, which refuses such lists. |
@@ -160,6 +167,7 @@ Run them from the `sibyl` folder.
 | `node scripts/sibyl.js --push` | Writes the hourly briefing; pushes it, or saves it to `briefings/`. |
 | `node scripts/sibyl.js --print --no-push` | Writes a test briefing and prints it. It sends nothing, keeps no copy and leaves the history alone, so the next real briefing compares with the last real one. |
 | `node scripts/save-pages.js` | Saves the pages you read (files in `data/daily-pages/`) into `pages.json`, checking each; a page that fails keeps its last saved list. `--due` lists the pages to read now (see "Reading the trend pages"). |
+| `node scripts/instagram-token.js` | For the person to run in their own terminal: turns the token from Graph API Explorer into a lasting one and saves it in `data/.env` (see "Instagram"). |
 | `node scripts/save-secret.js <name>` | For the person to run in their own terminal: saves a key, token or webhook address in `data/.env` (see "Keys and logins"). |
 | `node scripts/show-briefing.js` | Prints the latest saved briefing. `--list` lists them; `--file=2026-11-11_1000` prints one; `--alerts` prints today's alerts; `--alerts --date=2026-11-10` prints another day's. |
 
@@ -233,6 +241,7 @@ For each source the person chose, do the technical work yourself, and ask only f
 | Websites and blogs | Off | The websites' addresses |
 | YouTube search | Off | A free YouTube Data API key, which they create |
 | X trends | Off | Their OK on the cost (rule 5), then a Bearer Token from a paid X developer account |
+| Instagram | Off | An Instagram professional account linked to a Facebook Page, and their own free Meta app; setup under "Instagram" below |
 
 YouTube channels and websites are not in the setup request: following particular accounts is closer to watching competitors than to finding trends. Set them up only when the person asks.
 
@@ -261,6 +270,18 @@ That writes `SIBYL_YOUTUBE_API_KEY` to `sibyl/data/.env`. Check it with `check-d
 3. Check it with `check-deploy.js`, set `enabled: true`, and add `x-trends` to `report.seedPlatforms`.
 
 The US, the UK, Japan and worldwide are built in; for another country, set `platforms["x-trends"].woeid` from X's documentation. Items in the person's topics that reach X's top 5 also alert (`alerts.platforms["x-trends"]`). X's trends endpoint gives names only, with no post counts (tested 2026-11-15), so X items rank by position and the 50K-posts limit does not apply.
+
+**Instagram.** Free, through the person's own Meta app, which stays in development mode: no App Review is needed while only they use it (tested 2026-11-15). About once an hour Sibyl reads the top posts and the newest posts (last 24 hours) under the hashtags in `platforms.instagram.hashtags`, and the recent posts of the public business or creator accounts in `platforms.instagram.accounts`; an account post counts when it has at least twice that account's usual likes and comments. Limits: Meta allows 30 different hashtags per Instagram account in any 7 days, and reading a hashtag's posts uses one; about 200 requests an hour for one person, 2 per hashtag and 1 per account each run. Pick a few broad, steady hashtags from the topic's keywords (for sports, for example `nba`, `nfl`, `premierleague`), and put teams, players and media in `accounts`; changing hashtags often uses up the 30.
+
+They need an Instagram professional account (business or creator) linked to a Facebook Page they manage. The person does every step on Meta's sites in the browser they normally use; you give the link and say what to click, one step at a time. Never open Facebook, Instagram or Meta for Developers in your own browser and never click there for them: in testing, Meta took an agent's clicks for a stolen account and logged the person out on every device until a known device approved the login. Never try to get past a Meta security check.
+
+1. `https://developers.facebook.com/apps`: Create app. Name it (for example "Sibyl"), choose the use case "Manage messaging & content on Instagram", do not connect a business portfolio, and create it; creating it means accepting Meta's terms, which is theirs to do.
+2. In the app: Use cases, Customize, then "Permissions and features". Add `instagram_basic`, `instagram_manage_insights`, `pages_show_list`, `pages_read_engagement` and `business_management`, and the feature "Instagram Public Content Access" (for hashtags). Each should read "Ready for testing". Leave the app in development mode and do not submit it for review.
+3. `https://developers.facebook.com/tools/explorer`: choose their app under Meta App, add the five permissions, and click Generate Access Token. In the pop-up they choose their Page and their Instagram account. If `me/accounts` later comes back empty, the Page was not chosen: generate the token again and choose it.
+4. In their own terminal: `node "<full path>/sibyl/scripts/instagram-token.js"`. It asks for the app ID (App settings, Basic), the app secret (same page, Show; Meta may ask for their password) and the Explorer's token (the copy button next to it), and shows neither the secret nor the token. It saves the token and the Instagram account ID in `sibyl/data/.env`. The token does not expire when Instagram accepts the Page's token; otherwise it lasts about 60 days, the self-check warns a week ahead, and they run the script again.
+5. Set `enabled: true`, the `hashtags` and `accounts` (each may be `{ "tag": "nba", "topic": "Sports" }` or `{ "username": "espn", "topic": "Sports" }`), and add `instagram` to `report.seedPlatforms`. Run `check-deploy.js`: the Instagram line shows the token, the lists and the requests an hour.
+
+Facebook is not a source: reading other Pages needs Meta's App Review (Page Public Content Access), and Facebook has no hashtag search.
 
 ## AI explanations (summaries)
 
@@ -364,7 +385,8 @@ Slack, Discord and Telegram are recognised by their address. For any other addre
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `language` | `en` | Wording of briefings and alerts (English only for now) |
-| `report.seedPlatforms` | Google Trends, TikTok | Main sources: an event must appear on one to enter the briefing. Add `x-trends` when X is on. |
+| `report.seedPlatforms` | Google Trends, TikTok | Main sources: an event must appear on one to enter the briefing. Add `x-trends` when X is on, and `instagram` when Instagram is on. |
+| `platforms.instagram` | off | `hashtags` (at most 30), `accounts`, `minIntervalMinutes` (60), `postsPerHashtag` and `recentPerHashtag` (25), `postsPerAccount` (10) |
 | `alerts.platforms` | Google Trends top 3 or 20K+ searches; X top 5 (X gives no post counts) | Alert limits |
 | `pagesMaxAgeHours` | 168 | Saved pages older than this are not used |
 | `report.requireTopicConfirmation` | `true` | Items from lists read for a topic lead the briefing only with a keyword match or a second source; `false` lets them lead as before |

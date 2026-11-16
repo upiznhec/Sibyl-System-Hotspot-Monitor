@@ -40,12 +40,13 @@ Sibyl watches trend lists for the topics you choose. On a schedule it:
 | Wikipedia | The most-read pages in your country yesterday | Script | A web address or email, for Wikimedia | On |
 | YouTube search (optional) | The most-viewed new videos for your keywords | Script, at most once an hour | A free key from Google | Off |
 | X trends (optional) | What is trending on X in your country | Script, every 10 minutes | A paid X developer account | Off |
+| Instagram (optional) | Top and newest posts under your hashtags (at most 30), and posts taking off on accounts you choose | Script, every hour | An Instagram professional account linked to a Facebook Page, and your own free Meta app | Off |
 
 You choose the sources in the setup request (section 4.1). When a source needs something from you, your agent asks at that point, one thing at a time, and tells you what it is, what it costs and where to get it. Google Trends and TikTok are the main sources: an event must appear on one of them, or on X if you turn it on, to enter the briefing. Wikipedia and YouTube search add weight to those events.
 
 Sibyl can also follow particular YouTube channels or websites. That is closer to watching accounts than to finding trends, so it is not in the setup request; if you want it, ask your agent (section 7). Their new videos and posts are then listed apart at the end of the briefing, under "From sources you follow".
 
-Not included in this version: Instagram, Threads and Facebook have no trend list for outside apps, or need Meta's app review; Reddit's data access needs an approved account since November 2025, and commercial use needs a separate agreement; Google News search is left out because its feed allows personal feed-reader use only.
+Not included in this version: Threads and Facebook (reading other Pages needs Meta's app review, and Facebook has no hashtag search); Reddit's data access needs an approved account since November 2025, and commercial use needs a separate agreement; Google News search is left out because its feed allows personal feed-reader use only.
 
 ### 1.4 Good to know
 
@@ -63,6 +64,7 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 - Your agent's usage when it reads the pages (Google's category list every hour, the others once a day), and when you ask it for briefings or changes.
 - Optional: an AI to explain each trend in one line and to group related trends. It needs an API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website. Nothing is spent without one.
 - Optional: YouTube search, free within Google's daily allowance.
+- Optional: Instagram is free; Meta limits it to 30 hashtags a week and about 200 requests an hour.
 - Optional: X trends, about US$0.01 per request. Sibyl asks every 10 minutes, so 10:00 to 22:00 costs about US$0.78 a day (about US$23 a month).
 - The cost of a typical day will be measured during testing and added here.
 
@@ -159,7 +161,7 @@ An event enters the briefing when:
 | An AI agent | Yes | It must run commands with internet access, edit files and use a web browser. One that can also run on a schedule is best. |
 | Somewhere to send briefings | Optional | A Slack, Discord or WeCom webhook, or a Telegram bot. Without one, briefings are saved as files. |
 | AI to explain each trend | Optional | An API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, buy credit on the AI company's website. Without it, each trend's line is copied from a news headline. |
-| Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid). See section 1.3. |
+| Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid); for Instagram, a professional account linked to a Facebook Page and a free Meta app. See section 1.3. |
 | A contact for Wikipedia | If Wikipedia is on | A web address or email that Sibyl sends to Wikimedia and to no other site. See section 1.3. |
 
 ## 4. Setup

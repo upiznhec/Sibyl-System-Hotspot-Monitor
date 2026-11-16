@@ -23,6 +23,7 @@ Sources to watch:
 - Wikipedia (needs a web address or email): [yes / no]
 - YouTube search (free, needs a Google key): [no / yes]
 - X trends (paid, needs an X developer account): [no / yes]
+- Instagram (free, needs an Instagram professional account linked to a Facebook Page): [no / yes]
 
 Before scheduling anything, show me the sources, topics, keywords, exclude words and the category you chose on each platform, and wait for my OK.
 When you need something from me, such as a login, a key or a link, stop and ask me in this chat. Tell me what it is, why it is needed, whether it costs money, and where to get it.
