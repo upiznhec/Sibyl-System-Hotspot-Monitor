@@ -10,7 +10,7 @@ const https = require('https');
 
 const { readModelSettings } = require('./lib/model-config');
 const { isValidTimeZone, systemTimeZone } = require('./lib/locale');
-const { loadPages } = require('./lib/pages-file');
+const { everyText, loadPages, pageEveryHours, pageLateHours } = require('./lib/pages-file');
 const { loadTopicSettings } = require('./lib/topic-settings');
 const {
   defaultPlatformsConfig,
@@ -34,7 +34,7 @@ const CHANNEL_LABELS = {
   telegram: 'Telegram'
 };
 
-// Saved pages older than this are reported: the agent should read them once a day.
+// Saved pages older than this are reported when there is no reading list (config.dailyPages).
 const PAGES_STALE_HOURS = 30;
 
 // What a person can ask their agent when briefings are saved as files instead of sent.
@@ -138,7 +138,7 @@ function platformsConfig(config) {
   return merged;
 }
 
-// How a page on the daily reading list is named in the check.
+// How a page on the reading list is named in the check.
 function dailyPageName(page) {
   const label = sourceLabel(page.source);
   if (page.industry) return `${label}: ${page.industry}`;
@@ -169,7 +169,7 @@ function checkSources(config, dataDir, recommended, optional) {
     .filter(section => section.source === source && (!view || (section.view || 'trending') === view))
     .map(section => section.ageHours);
   const fresh = ages => ages.length > 0 && Math.min(...ages) <= PAGES_STALE_HOURS;
-  // The agent's daily reading list (config.dailyPages): one line per page when it is set.
+  // The agent's reading list (config.dailyPages): one line per page when it is set.
   const dailyPages = Array.isArray(config.dailyPages) ? config.dailyPages.filter(page => page?.source) : [];
 
   checkLine(recommended, 'recommended', 'Main sources', seeds.length > 0 && seeds.every(id => enabled.includes(id)),
@@ -189,7 +189,7 @@ function checkSources(config, dataDir, recommended, optional) {
         [['trending', `${label} category page`], ['explore', `${label} Explore`]].forEach(([view, name]) => {
           const ages = pageAges(id, view);
           checkLine(recommended, 'recommended', name, fresh(ages), pagesDetail(ages),
-            'Have your agent read this page once a day and save it to pages.json (format in lib/pages-file.js).');
+            'Have your agent read this page and save it with scripts/save-pages.js (see AGENTS.md, "Reading the trend pages").');
         });
       }
       return;
@@ -198,7 +198,7 @@ function checkSources(config, dataDir, recommended, optional) {
       if (dailyPages.length) return;
       const ages = pageAges(id);
       checkLine(recommended, 'recommended', `${label} hashtags`, fresh(ages), pagesDetail(ages),
-        'Have your agent read the Creative Center hashtag list in a browser once a day and save it to pages.json; without a login it shows the top 3.');
+        'Have your agent read the Creative Center hashtag list in a browser once a day and save it with scripts/save-pages.js; without a login it shows the top 3.');
       return;
     }
     if (id === 'wikipedia') {
@@ -229,14 +229,14 @@ function checkSources(config, dataDir, recommended, optional) {
       const hasToken = Boolean(process.env.SIBYL_X_BEARER_TOKEN || settings.bearerToken);
       checkLine(optional, 'optional', label, hasToken,
         hasToken
-          ? `bearer token set; requests about every ${settings.minIntervalMinutes ?? 30} minutes (about US$0.01 each)`
+          ? `bearer token set; requests about every ${settings.minIntervalMinutes ?? 10} minutes (about US$0.01 each)`
           : 'on, but no bearer token',
         'Set SIBYL_X_BEARER_TOKEN. The X developer account needs prepaid credits and is charged per request.');
     }
   });
   if (!dailyPages.length && enabled.some(id => id === 'google-trends' || id === 'tiktok-creative-center')) {
     checkLine(recommended, 'recommended', 'Daily reading list', false, 'dailyPages is not set',
-      'After mapping the topics, write the pages to read each day as config.dailyPages (see AGENTS.md, "Mapping topics").');
+      'After mapping the topics, write the pages to read as config.dailyPages (see AGENTS.md, "Mapping topics").');
   }
   const stalePages = [];
   dailyPages.forEach(page => {
@@ -246,9 +246,11 @@ function checkSources(config, dataDir, recommended, optional) {
       .filter(section => !view || (section.view || 'trending') === view)
       .filter(section => ['industry', 'category', 'keyword'].every(key => !page[key] || sameText(section[key], page[key])))
       .map(section => section.ageHours);
-    if (!fresh(ages)) stalePages.push(dailyPageName(page));
-    checkLine(recommended, 'recommended', dailyPageName(page), fresh(ages), pagesDetail(ages),
-      'Have your agent read this page and save it to pages.json (see AGENTS.md, "Reading the daily pages").');
+    const onTime = ages.length > 0 && Math.min(...ages) <= pageLateHours(page);
+    const every = everyText(pageEveryHours(page));
+    if (!onTime) stalePages.push(`${dailyPageName(page)} (${every})`);
+    checkLine(recommended, 'recommended', dailyPageName(page), onTime, `${pagesDetail(ages)}; read ${every}`,
+      'Have your agent read this page and save it with scripts/save-pages.js (see AGENTS.md, "Reading the trend pages").');
   });
   pages.problems
     .filter(problem => !/^no pages file/.test(problem))
@@ -453,11 +455,11 @@ async function main() {
     schedule ? 'installed by scripts/schedule.js (crontab)' : 'no schedule from scripts/schedule.js found',
     'Install it with: node scripts/schedule.js --install --hours=10-22 (the person\'s hours). On Windows it prints the Task Scheduler settings.');
   if (pageStatus.dailyPageCount > 0) {
-    checkLine(manual, 'manual', 'Daily page reading', pageStatus.stalePages.length === 0,
+    checkLine(manual, 'manual', 'Page reading', pageStatus.stalePages.length === 0,
       pageStatus.stalePages.length === 0
-        ? `every page on the reading list was read in the last ${PAGES_STALE_HOURS} hours`
-        : `not read in the last ${PAGES_STALE_HOURS} hours: ${pageStatus.stalePages.join('; ')}`,
-      'Your agent reads these pages once a day, as a daily task or when you ask: "Read today\'s trend pages for Sibyl." Until then the scripts use the last saved pages.');
+        ? 'every page on the reading list was read on time'
+        : `late: ${pageStatus.stalePages.join('; ')}`,
+      'Your agent reads these pages on a schedule (Google\'s Trending Now every hour during your hours, the others once a day), or when you ask: "Read the trend pages that are due for Sibyl." Outside your hours an hourly page is expected to be late. Until then the scripts use the last saved pages.');
   }
   if (!noPush || taskCommands) {
     checkLine(manual, 'manual', 'Webhooks in scheduled tasks', taskHasAlertWebhook && taskHasReportWebhook,

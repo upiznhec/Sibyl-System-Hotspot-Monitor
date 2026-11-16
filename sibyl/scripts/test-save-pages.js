@@ -9,7 +9,7 @@ const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const { rowsChecksum, savePages } = require('./save-pages');
+const { duePages, rowsChecksum, savePages } = require('./save-pages');
 const { loadPages } = require('./lib/pages-file');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sibyl-pages-'));
@@ -85,10 +85,24 @@ try {
     env: { ...process.env, SIBYL_DATA_DIR: dir, SIBYL_CONFIG: '' }, encoding: 'utf8'
   });
   assert.strictEqual(run.status, 0, run.stdout + run.stderr);
-  assert.match(run.stdout, /3 of 3 pages refreshed/);
+  assert.match(run.stdout, /3 page\(s\) refreshed, 0 kept/);
   pages = saved();
   assert.strictEqual(find(pages, TIKTOK).items[0].title, '#tag new 1');
   assert.strictEqual(fs.readFileSync(path.join(dir, 'daily-pages.log'), 'utf8').trim().split('\n').length, 4);
+
+  // Each page has its own interval: Trending Now is due again after an hour, the others after a day.
+  // A run that reads nothing before then keeps every page without a warning.
+  const later = minutes => Date.now() + minutes * 60000;
+  const quiet = savePages({ dataDir: dir, now: later(30) });
+  assert.deepStrictEqual([quiet.refreshed, quiet.failed], [0, 0]);
+  assert.ok(quiet.results.every(result => result.notDue));
+  const due = minutes => duePages({ dataDir: dir, now: later(minutes) }).filter(item => item.due).map(item => item.name);
+  assert.deepStrictEqual(due(30), []);
+  assert.deepStrictEqual(due(55), ['Google Trending Now: Beauty and Fashion'], 'the hourly page is due 10 minutes early');
+  assert.deepStrictEqual(due(24 * 60), ['TikTok: Beauty & Personal Care', 'Google Trending Now: Beauty and Fashion', 'Google Explore: sunscreen']);
+  const late = savePages({ dataDir: dir, now: later(70) });
+  assert.strictEqual(late.failed, 1, 'a due page that was not read is reported');
+  assert.match(late.results[1].reason, /not read/);
 } finally {
   fs.rmSync(dir, { recursive: true, force: true });
 }

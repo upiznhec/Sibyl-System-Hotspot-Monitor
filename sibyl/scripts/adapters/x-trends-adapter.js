@@ -1,6 +1,6 @@
 // X trends for one place through the official API (Trends by WOEID). It needs an X developer
 // account with prepaid credits and cost US$0.010 per request when checked (2026-11-10), so it
-// is off by default and requested at most every 30 minutes (minIntervalMinutes). The bearer
+// is off by default and requested every 10 minutes, on each scheduled run (minIntervalMinutes). The bearer
 // token comes from SIBYL_X_BEARER_TOKEN (preferred) or platforms["x-trends"].bearerToken.
 // Tested live on 2026-11-15: this endpoint returns trend names only, with no post counts, even when
 // tweet_count is asked for. X items therefore rank by position, and their count stays unknown
@@ -38,7 +38,7 @@ async function fetchXTrendSignals(config = {}, context = {}) {
 
   const { items } = await cached(context.dataDir, 'x-trends', {
     key: `${woeid}:${maxTrends}`,
-    minutes: config.minIntervalMinutes ?? 30
+    minutes: config.minIntervalMinutes ?? 10
   }, async () => {
     const params = new URLSearchParams({ max_trends: String(maxTrends), 'trend.fields': 'trend_name,tweet_count' });
     const data = await requestJson(`${API}${woeid}?${params.toString()}`, {

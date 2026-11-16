@@ -44,15 +44,16 @@ try {
   const result = spawnSync(process.execPath, [path.join(__dirname, 'check-deploy.js'), '--strict'], { env, encoding: 'utf8' });
   assert.strictEqual(result.status, 0, result.stdout + result.stderr);
   assert.ok(result.stdout.includes('[OK] Main sources: Google Trends, TikTok'));
-  assert.ok(result.stdout.includes('[WARN] TikTok: Beauty & Personal Care: not in pages.json yet'));
+  assert.ok(result.stdout.includes('[WARN] TikTok: Beauty & Personal Care: not in pages.json yet; read once a day'));
+  assert.ok(result.stdout.includes('[WARN] Google Trends category: Beauty and Fashion: not in pages.json yet; read every hour'));
   assert.ok(result.stdout.includes('[WARN] Google Trends Explore: sunscreen: not in pages.json yet'));
   assert.ok(result.stdout.includes('## Reading briefings'));
   // Files only is a supported setup: one OK line, no warnings about webhooks.
   assert.ok(result.stdout.includes('[OK] Push target: none: briefings and alerts are saved as files'));
   ['Alert push target', 'Briefing push target', 'Separate alert and briefing webhooks', 'No double pushes', 'Webhooks in scheduled tasks']
     .forEach(text => assert.ok(!result.stdout.includes(text), `no line about ${text} with files only`));
-  // The daily reading line says which pages are out of date instead of always warning.
-  assert.ok(result.stdout.includes('[WARN] Daily page reading: not read in the last 30 hours: TikTok: Beauty & Personal Care'));
+  // The page reading line says which pages are late, each against its own interval.
+  assert.ok(result.stdout.includes('[WARN] Page reading: late: TikTok: Beauty & Personal Care (once a day)'));
 } finally {
   fs.rmSync(dataDir, { recursive: true, force: true });
 }

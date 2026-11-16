@@ -46,13 +46,13 @@
     },
     "x-trends": {
       "enabled": false,
-      "minIntervalMinutes": 30
+      "minIntervalMinutes": 10
     }
   },
   "dailyPages": [
-    { "source": "tiktok-creative-center", "region": "US", "industry": "Beauty & Personal Care", "topic": "Beauty" },
-    { "source": "google-trends", "view": "trending", "region": "US", "category": "Beauty and Fashion", "categoryId": 2, "topic": "Beauty" },
-    { "source": "google-trends", "view": "explore", "region": "US", "keyword": "sunscreen", "topic": "Beauty" }
+    { "source": "tiktok-creative-center", "region": "US", "industry": "Beauty & Personal Care", "topic": "Beauty", "everyHours": 24 },
+    { "source": "google-trends", "view": "trending", "region": "US", "category": "Beauty and Fashion", "categoryId": 2, "topic": "Beauty", "everyHours": 1 },
+    { "source": "google-trends", "view": "explore", "region": "US", "keyword": "sunscreen", "topic": "Beauty", "everyHours": 24 }
   ],
   "pagesMaxAgeHours": 168,
   "filters": {

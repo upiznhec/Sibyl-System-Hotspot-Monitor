@@ -1,10 +1,12 @@
 // Wikipedia: the most-read pages in one country on the previous day, from the Wikimedia
-// pageviews API (no key). The list changes once a day, so it is kept for six hours
-// (cacheMinutes). Wikimedia rounds these per-country counts up ("views_ceil") for privacy.
+// pageviews API (no key). Wikimedia publishes one list a day, about a day after the day ends
+// (UTC). Once the script has yesterday's list it keeps it until the next day; until Wikimedia
+// publishes it, the script looks again every 6 hours (cacheMinutes). Wikimedia rounds these
+// per-country counts up ("views_ceil") for privacy.
 
 const { requestJson } = require('../lib/http');
 const { makeSignal } = require('../lib/signals');
-const { cached } = require('../lib/source-cache');
+const { cached, peekCache } = require('../lib/source-cache');
 
 const API = 'https://wikimedia.org/api/rest_v1/metrics/pageviews/top-per-country';
 // The main page, search page and other non-article pages are left out.
@@ -49,14 +51,21 @@ async function loadTopPages(country, project, maxItems) {
   throw lastError;
 }
 
+// One new list a day: keep yesterday's list until the next day once it is saved; look again every
+// retryMinutes while only an older list is available.
+function wikipediaCacheMinutes(previous, key, expectedDate, retryMinutes = 360) {
+  return previous && previous.key === key && previous.items?.date === expectedDate ? 24 * 60 : retryMinutes;
+}
+
 async function fetchWikipediaSignals(config = {}, context = {}) {
   const country = String(config.country || context.config?.country || 'US').toUpperCase();
   const project = config.project || 'en.wikipedia';
   const maxItems = Number(config.maxItems) || 50;
-  const { items: top } = await cached(context.dataDir, 'wikipedia', {
-    key: `${country}:${project}:${maxItems}`,
-    minutes: config.cacheMinutes ?? 360
-  }, () => loadTopPages(country, project, maxItems));
+  const expected = utcDay(1).label;
+  const key = `${country}:${project}:${maxItems}:${expected}`;
+  const minutes = wikipediaCacheMinutes(peekCache(context.dataDir, 'wikipedia'), key, expected, config.cacheMinutes ?? 360);
+  const { items: top } = await cached(context.dataDir, 'wikipedia', { key, minutes },
+    () => loadTopPages(country, project, maxItems));
   const host = /^[a-z-]+\.wikipedia$/.test(project) ? `${project}.org` : 'en.wikipedia.org';
   return (top?.items || []).map(item => makeSignal({
     platform: 'wikipedia',
@@ -92,5 +101,6 @@ const source = {
 module.exports = {
   articleItems,
   fetchWikipediaSignals,
-  source
+  source,
+  wikipediaCacheMinutes
 };

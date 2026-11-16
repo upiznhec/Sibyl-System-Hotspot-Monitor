@@ -1,4 +1,4 @@
-// Lists that only a browser can read are read by the user's agent once a day and saved as
+// Lists that only a browser can read are read by the user's agent (each at its interval) and saved as
 // pages.json in the data folder. This file reads them for the adapters. One section per page:
 //
 // TikTok Creative Center hashtags (top 3 without login; more after the user logs in):
@@ -23,6 +23,11 @@
 //
 // A bare array of sections also works. When the agent has not read the pages again, the last
 // file is used and its age is logged; sections older than maxAgeHours are skipped.
+//
+// Each page on the reading list (config.dailyPages) has its own interval, "everyHours". Without
+// one, Google's Trending Now by category is read every hour (it changes about every 10 minutes)
+// and the others once a day (TikTok's ranking and Explore count 7 days; TikTok's list did not
+// change between two reads 100 minutes apart in testing).
 
 const fs = require('fs');
 const path = require('path');
@@ -93,13 +98,35 @@ function loadPages(config = {}, dataDir, now = Date.now()) {
   return result;
 }
 
+function pageEveryHours(page = {}) {
+  const set = Number(page.everyHours);
+  if (set > 0) return set;
+  return page.source === 'google-trends' && (page.view || 'trending') === 'trending' ? 1 : 24;
+}
+
+// A page is late once it is older than its interval plus a margin: 3 hours for an hourly page,
+// 30 hours for a daily one.
+function pageLateHours(page = {}) {
+  const every = pageEveryHours(page);
+  return every + Math.max(2, every / 4);
+}
+
+function everyText(hours) {
+  if (hours === 1) return 'every hour';
+  if (hours === 24) return 'once a day';
+  return `every ${hours} hours`;
+}
+
 function sectionsFor(pages, sourceId) {
   return (pages?.sections || []).filter(section => section.source === sourceId);
 }
 
 module.exports = {
   DEFAULT_MAX_AGE_HOURS,
+  everyText,
   loadPages,
+  pageEveryHours,
+  pageLateHours,
   pagesFilePath,
   sectionsFor
 };

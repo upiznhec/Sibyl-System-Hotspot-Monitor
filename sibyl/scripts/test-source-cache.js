@@ -9,6 +9,7 @@ const os = require('os');
 const path = require('path');
 
 const { cached } = require('./lib/source-cache');
+const { wikipediaCacheMinutes } = require('./adapters/wikipedia-adapter');
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'sibyl-cache-'));
 const file = path.join(dir, 'source-cache', 'x-trends.json');
@@ -40,6 +41,14 @@ async function main() {
   await cached(dir, 'x-trends', options, load);
   const savedAt = Date.parse(JSON.parse(fs.readFileSync(file, 'utf8')).savedAt);
   assert.ok(savedAt >= before && savedAt < before + 25, 'saved with the start time, not the end time');
+
+  // Wikipedia: one new list a day. Yesterday's list is kept until the next day; an older list
+  // (Wikimedia has not published yesterday's yet) is looked at again after 6 hours.
+  const key = 'US:en.wikipedia:50:2026-11-14';
+  assert.strictEqual(wikipediaCacheMinutes({ key, items: { date: '2026-11-14' } }, key, '2026-11-14'), 24 * 60);
+  assert.strictEqual(wikipediaCacheMinutes({ key, items: { date: '2026-11-13' } }, key, '2026-11-14'), 360);
+  assert.strictEqual(wikipediaCacheMinutes({ key: 'US:en.wikipedia:50:2026-11-13', items: { date: '2026-11-13' } }, key, '2026-11-14'), 360);
+  assert.strictEqual(wikipediaCacheMinutes(null, key, '2026-11-14'), 360);
 }
 
 main()

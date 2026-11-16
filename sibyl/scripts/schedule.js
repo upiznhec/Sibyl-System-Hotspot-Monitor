@@ -201,7 +201,7 @@ function main(argv = process.argv.slice(2)) {
     console.log(`Sibyl schedule installed: collection and alerts every ${every} minutes, and a briefing every hour, ` +
       `from ${hours.start}:00 through hour ${hours.end} (this computer's clock).`);
     if (note) console.log(note);
-    console.log('Daily page reading is not part of this schedule: the agent does it (AGENTS.md, "Reading the daily pages").');
+    console.log('Page reading is not part of this schedule: the agent does it (AGENTS.md, "Reading the trend pages").');
     return 0;
   }
 

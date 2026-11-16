@@ -302,7 +302,7 @@ function selectAlerts(snapshot, config, state, platforms, topicSettings = loadTo
 
   for (const signal of snapshotToSignals(snapshot)) {
     if (!platformSet.has(signal.platform)) continue;
-    // Lists read once a day by the agent (pages.json) do not raise instant alerts.
+    // Lists read by the agent (pages.json) do not raise instant alerts.
     const alertTypes = alertSourceTypes(signal.platform);
     if (alertTypes && !alertTypes.includes(signal.sourceType)) continue;
     const platformConfig = config.alerts?.platforms?.[signal.platform];

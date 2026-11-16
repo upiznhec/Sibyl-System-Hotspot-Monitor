@@ -1,5 +1,5 @@
 // Keeps the last result of a source in the data folder, so that sources which change slowly
-// (Wikipedia: once a day) or cost money per request (X) are not requested on every 10-minute run.
+// (Wikipedia: once a day) or have a daily quota (YouTube search) are not requested on every 10-minute run.
 
 const fs = require('fs');
 const path = require('path');
@@ -45,6 +45,12 @@ async function cached(dataDir, sourceId, { key, minutes }, load) {
   return { items, fromCache: false, savedAt: startedAt };
 }
 
+// The last saved result as stored ({ key, savedAt, items }), or null.
+function peekCache(dataDir, sourceId) {
+  return dataDir ? readCache(dataDir, sourceId) : null;
+}
+
 module.exports = {
-  cached
+  cached,
+  peekCache
 };

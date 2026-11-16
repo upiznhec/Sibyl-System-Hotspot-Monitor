@@ -19,16 +19,23 @@
 // - "checksum", if given, equals rowsChecksum(items) computed in the browser: a row mistyped on the
 //   way from the page to the file fails it.
 //
-// Usage: node scripts/save-pages.js
-// Exit: 0 every page refreshed; 3 some pages kept from before (see the output); 1 nothing written.
+// Each page has its own interval (everyHours in config.dailyPages; see lib/pages-file.js). A page
+// whose last list is younger than its interval is not due: it is kept without a warning, so an
+// hourly run that reads only the hourly page is a full success.
+//
+// Usage: node scripts/save-pages.js --due   lists the pages to read now
+//        node scripts/save-pages.js         saves the pages read
+// Exit: 0 every due page saved; 3 some due pages kept from before (see the output); 1 nothing written.
 
 const fs = require('fs');
 const path = require('path');
 
 const { getDataDir } = require('./lib/snapshot-store');
-const { DEFAULT_MAX_AGE_HOURS, loadPages, pagesFilePath } = require('./lib/pages-file');
+const { DEFAULT_MAX_AGE_HOURS, everyText, loadPages, pageEveryHours, pagesFilePath } = require('./lib/pages-file');
 
 const MAX_AGE_MS = 3 * 3600000;
+// A scheduled run can start a few minutes early or late, so a page is due 10 minutes before its time.
+const DUE_EARLY_MS = 10 * 60000;
 const MAX_CATEGORY_ROWS = 100;
 const HELPER_FIELDS = ['shown', 'total', 'checksum', 'noData', 'loggedIn'];
 
@@ -59,6 +66,45 @@ function pageName(page) {
   if (page.category) return `Google Trending Now: ${page.category}`;
   if (page.keyword) return `Google Explore: ${page.keyword}`;
   return page.source;
+}
+
+function lastReadMs(section) {
+  const readAt = Date.parse(section?.readAt || '');
+  return Number.isFinite(readAt) ? readAt : null;
+}
+
+function isDue(page, old, now) {
+  const readAt = lastReadMs(old);
+  return readAt === null || now - readAt >= pageEveryHours(page) * 3600000 - DUE_EARLY_MS;
+}
+
+function readSetup(dataDir, configFile) {
+  const config = JSON.parse(fs.readFileSync(configFile || path.join(dataDir, 'config.json'), 'utf8'));
+  const dailyPages = (Array.isArray(config.dailyPages) ? config.dailyPages : []).filter(page => page?.source);
+  if (!dailyPages.length) throw new Error('config.dailyPages is empty: there are no pages to save');
+  const pagesFile = pagesFilePath(config, dataDir);
+  let previous = [];
+  if (fs.existsSync(pagesFile)) {
+    const data = JSON.parse(fs.readFileSync(pagesFile, 'utf8'));
+    previous = Array.isArray(data) ? data : (Array.isArray(data?.pages) ? data.pages : []);
+  }
+  return { config, dailyPages, pagesFile, previous };
+}
+
+// The pages to read now, with when each was last read.
+function duePages({ dataDir = getDataDir(), configFile = process.env.SIBYL_CONFIG || '', now = Date.now() } = {}) {
+  const { dailyPages, previous } = readSetup(dataDir, configFile);
+  return dailyPages.map(page => {
+    const old = previous.find(section => pageMatches(page, section));
+    const readAt = lastReadMs(old);
+    return {
+      page,
+      name: pageName(page),
+      every: everyText(pageEveryHours(page)),
+      lastReadHours: readAt === null ? null : Number(((now - readAt) / 3600000).toFixed(1)),
+      due: isDue(page, old, now)
+    };
+  });
 }
 
 // Why a staged section cannot be used, or null when it can.
@@ -118,15 +164,7 @@ function localIso(date = new Date()) {
 }
 
 function savePages({ dataDir = getDataDir(), configFile = process.env.SIBYL_CONFIG || '', now = Date.now() } = {}) {
-  const config = JSON.parse(fs.readFileSync(configFile || path.join(dataDir, 'config.json'), 'utf8'));
-  const dailyPages = (Array.isArray(config.dailyPages) ? config.dailyPages : []).filter(page => page?.source);
-  if (!dailyPages.length) throw new Error('config.dailyPages is empty: there are no pages to save');
-  const pagesFile = pagesFilePath(config, dataDir);
-  let previous = [];
-  if (fs.existsSync(pagesFile)) {
-    const data = JSON.parse(fs.readFileSync(pagesFile, 'utf8'));
-    previous = Array.isArray(data) ? data : (Array.isArray(data?.pages) ? data.pages : []);
-  }
+  const { config, dailyPages, pagesFile, previous } = readSetup(dataDir, configFile);
 
   const stagingDir = path.join(dataDir, 'daily-pages');
   const staged = readStaged(stagingDir);
@@ -136,7 +174,7 @@ function savePages({ dataDir = getDataDir(), configFile = process.env.SIBYL_CONF
     const old = previous.find(section => pageMatches(page, section));
     const candidates = staged.filter(entry => entry.section && pageMatches(page, entry.section));
     let saved = null;
-    let reason = candidates.length ? null : 'not read today';
+    let reason = candidates.length ? null : 'not read';
     candidates.forEach(entry => {
       if (saved) return;
       reason = problemWith(page, entry.section, old, now);
@@ -148,6 +186,9 @@ function savePages({ dataDir = getDataDir(), configFile = process.env.SIBYL_CONF
       if (!section.topic) delete section.topic;
       sections.push(section);
       results.push({ page: pageName(page), ok: true, rows: section.items.length });
+    } else if (!candidates.length && !isDue(page, old, now)) {
+      sections.push(old);
+      results.push({ page: pageName(page), ok: true, notDue: true, every: everyText(pageEveryHours(page)) });
     } else {
       if (old) sections.push(old);
       results.push({ page: pageName(page), ok: false, reason, kept: Boolean(old) });
@@ -171,16 +212,34 @@ function savePages({ dataDir = getDataDir(), configFile = process.env.SIBYL_CONF
   fs.renameSync(temp, pagesFile);
   staged.forEach(entry => fs.rmSync(entry.file, { force: true }));
 
-  const refreshed = results.filter(result => result.ok).length;
-  const line = [`${localIso(new Date(now))} | REFRESHED ${refreshed} of ${dailyPages.length} pages`,
-    ...results.map(result => (result.ok
-      ? `${result.page}: OK ${result.rows} rows`
-      : `${result.page}: ${result.kept ? 'KEPT the last saved list' : 'NOT SAVED'} (${result.reason})`))].join(' | ');
+  const refreshed = results.filter(result => result.ok && !result.notDue).length;
+  const failed = results.filter(result => !result.ok).length;
+  const line = [`${localIso(new Date(now))} | SAVED ${refreshed}, KEPT ${failed}`,
+    ...results.map(result => {
+      if (result.notDue) return `${result.page}: not due (read ${result.every})`;
+      return result.ok
+        ? `${result.page}: OK ${result.rows} rows`
+        : `${result.page}: ${result.kept ? 'KEPT the last saved list' : 'NOT SAVED'} (${result.reason})`;
+    })].join(' | ');
   fs.appendFileSync(path.join(dataDir, 'daily-pages.log'), `${line}\n`);
-  return { refreshed, total: dailyPages.length, results, file: pagesFile };
+  return { refreshed, failed, results, file: pagesFile };
 }
 
 function main() {
+  if (process.argv.includes('--due')) {
+    let pages;
+    try {
+      pages = duePages();
+    } catch (error) {
+      console.log(`Cannot list the pages: ${error.message}`);
+      process.exit(1);
+    }
+    const due = pages.filter(item => item.due);
+    console.log(due.length ? 'Read these pages now, then run node scripts/save-pages.js:' : 'No page is due now.');
+    pages.forEach(item => console.log(`- [${item.due ? 'DUE' : 'not due'}] ${item.name}: read ${item.every}; ` +
+      (item.lastReadHours === null ? 'never read' : `last read ${item.lastReadHours} hours ago`)));
+    process.exit(0);
+  }
   let outcome;
   try {
     outcome = savePages();
@@ -188,13 +247,15 @@ function main() {
     console.log(`Nothing was written: ${error.message}`);
     process.exit(1);
   }
-  console.log(`Saved ${outcome.file}: ${outcome.refreshed} of ${outcome.total} pages refreshed.`);
-  outcome.results.forEach(result => console.log(result.ok
-    ? `- [OK] ${result.page}: ${result.rows} rows`
-    : `- [KEPT] ${result.page}: ${result.reason}${result.kept ? '; the last saved list stays in use' : ''}`));
-  process.exit(outcome.refreshed === outcome.total ? 0 : 3);
+  console.log(`Saved ${outcome.file}: ${outcome.refreshed} page(s) refreshed, ${outcome.failed} kept from before.`);
+  outcome.results.forEach(result => {
+    if (result.notDue) console.log(`- [NOT DUE] ${result.page}: read ${result.every}`);
+    else if (result.ok) console.log(`- [OK] ${result.page}: ${result.rows} rows`);
+    else console.log(`- [KEPT] ${result.page}: ${result.reason}${result.kept ? '; the last saved list stays in use' : ''}`);
+  });
+  process.exit(outcome.failed ? 3 : 0);
 }
 
 if (require.main === module) main();
 
-module.exports = { rowsChecksum, savePages };
+module.exports = { duePages, rowsChecksum, savePages };

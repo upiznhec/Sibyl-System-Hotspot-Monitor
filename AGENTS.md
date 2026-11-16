@@ -10,7 +10,7 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 4. **Keep secrets in `sibyl/data/.env`.** Webhook addresses, bot tokens and API keys go there, one `NAME=value` per line, and only the person's account may read it (`chmod 600`; git does not upload the data folder). Every script reads it when it starts, so neither `config.json` nor the schedule holds a secret. Never ask the person to paste a secret into the chat, and never print one: they save it with `scripts/save-secret.js` in their own terminal (see "Keys and logins").
 5. **Ask before anything that costs money** (X trends, a paid model) and say what it costs.
 6. **Check a website's terms before adding its feed.** Some feeds are for personal use only; tell the person and let them decide.
-7. **Read each page once a day** (more often only if the person asks). Do not bypass logins, rate limits or bot checks, and do not read pages other than those listed here.
+7. **Read each page at its interval** (`everyHours` in `dailyPages`: Google's Trending Now every hour, the others once a day), not more often unless the person asks. Do not bypass logins, rate limits or bot checks, and do not read pages other than those listed here.
 8. Keep the credit to Misaka Studio in the README and the guide.
 9. **Ask for what you need when you need it**, one thing at a time and in plain words, as described under "Talking to the person".
 10. **Schedule only with `scripts/schedule.js`.** Do not write your own scheduler, wrapper scripts or jobs around the commands, and never stop a run because one source failed: the scripts record that source's error and read the others. Never ask the person to run a setup script you wrote.
@@ -93,7 +93,7 @@ Then take them through the steps under "Sources", one at a time, and end with th
 
 **X trends**, when it is chosen. Work out the cost for their hours first (rule 5).
 
-> X trends costs money: US$0.01 each time Sibyl checks, about every 30 minutes, so about US$[amount] a day for your hours. You need your X account, and you buy credit yourself at the X Developer Console (https://console.x.com). Do you want to go ahead?
+> X trends costs money: US$0.01 each time Sibyl checks, every 10 minutes, so about US$[amount] a day for your hours. You need your X account, and you buy credit yourself at the X Developer Console (https://console.x.com). Do you want to go ahead?
 
 If yes: in their own browser they sign in, buy credit and create an app, then save its Bearer Token with the save-secret command for `x`.
 
@@ -111,9 +111,11 @@ If the key comes with a subscription, such as a coding plan, check that the plan
 
 > Google's new Explore page asks you to sign in. [As for TikTok: your own browser, bringing the sign-in over, or signing in once in mine.] If you would rather not sign in to Google this way, I will leave Explore out; the other lists still work.
 
-**Daily pages**, if you cannot run tasks on a schedule. Tell them once, at the end of setup.
+**Page reading**, if you cannot run tasks on a schedule. Tell them once, at the end of setup.
 
-> I cannot open web pages on a schedule by myself. To keep the TikTok and Google Trends lists fresh, start each day by sending me: "Read today's trend pages for Sibyl."
+> I cannot open web pages on a schedule by myself, so Google's category list will be updated once a day instead of every hour. To keep the TikTok and Google Trends lists fresh, start each day by sending me: "Read today's trend pages for Sibyl."
+
+Then set `everyHours: 24` for every page in `dailyPages`.
 
 ## Known problems from testing
 
@@ -157,7 +159,7 @@ Run them from the `sibyl` folder.
 | `node scripts/instant-alerts.js --no-push` | The same check without sending or saving (a dry run). |
 | `node scripts/sibyl.js --push` | Writes the hourly briefing; pushes it, or saves it to `briefings/`. |
 | `node scripts/sibyl.js --print --no-push` | Writes a test briefing and prints it. It sends nothing, keeps no copy and leaves the history alone, so the next real briefing compares with the last real one. |
-| `node scripts/save-pages.js` | Saves the pages you read today (files in `data/daily-pages/`) into `pages.json`, checking each; a page that fails keeps its last saved list (see "Reading the daily pages"). |
+| `node scripts/save-pages.js` | Saves the pages you read (files in `data/daily-pages/`) into `pages.json`, checking each; a page that fails keeps its last saved list. `--due` lists the pages to read now (see "Reading the trend pages"). |
 | `node scripts/save-secret.js <name>` | For the person to run in their own terminal: saves a key, token or webhook address in `data/.env` (see "Keys and logins"). |
 | `node scripts/show-briefing.js` | Prints the latest saved briefing. `--list` lists them; `--file=2026-11-11_1000` prints one; `--alerts` prints today's alerts; `--alerts --date=2026-11-10` prints another day's. |
 
@@ -171,7 +173,7 @@ Run them from the `sibyl` folder.
 4. **Country, time zone and sources.** Set `country` (two-letter code, such as `US`) and `timeZone` (an IANA name, such as `America/New_York`). Under `platforms`, switch the sources on or off as the person chose under "Sources to watch" in the setup request; where a choice is blank or still in brackets, keep the default. Google Trends, TikTok and Wikipedia are on by default; YouTube channels, websites, YouTube search and X are off. What each source needs is under "Sources" below, and how to ask for it under "What to ask, and when".
 5. **Push target** (see "Push targets" below), or none: then briefings are saved as files.
 6. **Logins.** If the person wants to track trends on TikTok (without a login, only the top 3 hashtags show), they need a free TikTok for Business account (sign-up: `https://ads.tiktok.com/i18n/signup`) signed in where you read TikTok Creative Center (`https://ads.tiktok.com/creative/creativeCenter/trends`). Follow "Keys and logins": their own browser first, then bringing the sign-in over, then one sign-in in your browser. The same goes for Google if the new Explore page asks for a sign-in.
-7. **First run.** Run `check-deploy.js` first; if "Internet access" fails, follow rule 11 before anything else. Then read the daily pages (below), run `collect-snapshot.js`, `instant-alerts.js --no-push` and `sibyl.js --print --no-push`, and show the person the check and the briefing. If an item that leads the briefing has nothing to do with their topic, offer an exclude word.
+7. **First run.** Run `check-deploy.js` first; if "Internet access" fails, follow rule 11 before anything else. Then read the trend pages (below), run `collect-snapshot.js`, `instant-alerts.js --no-push` and `sibyl.js --print --no-push`, and show the person the check and the briefing. If an item that leads the briefing has nothing to do with their topic, offer an exclude word.
 8. **Schedule** with `node scripts/schedule.js --install --hours=<start>-<end>` (see "Scheduling"), then run `check-deploy.js`: "Scheduled tasks" should be OK.
 9. **Tell the person how to read briefings.** If no push target is set, say that briefings are kept for 7 days and shown only when asked, and give examples: "Show me the latest trend briefing", "Any trend alerts today?", "What were the top trends yesterday afternoon?"
 
@@ -210,13 +212,13 @@ Run them from the `sibyl` folder.
 
    ```json
    "dailyPages": [
-     { "source": "tiktok-creative-center", "region": "US", "industry": "Beauty & Personal Care", "topic": "Beauty" },
-     { "source": "google-trends", "view": "trending", "region": "US", "category": "Beauty and Fashion", "categoryId": 2, "topic": "Beauty" },
-     { "source": "google-trends", "view": "explore", "region": "US", "keyword": "sunscreen", "topic": "Beauty" }
+     { "source": "tiktok-creative-center", "region": "US", "industry": "Beauty & Personal Care", "topic": "Beauty", "everyHours": 24 },
+     { "source": "google-trends", "view": "trending", "region": "US", "category": "Beauty and Fashion", "categoryId": 2, "topic": "Beauty", "everyHours": 1 },
+     { "source": "google-trends", "view": "explore", "region": "US", "keyword": "sunscreen", "topic": "Beauty", "everyHours": 24 }
    ]
    ```
 
-   The scripts do not read `dailyPages`; it is the list you read each day, and the self-check reports any page on it that is missing or older than 30 hours.
+   The scripts do not read `dailyPages`; it is the list you read, each page at its interval. `everyHours` is 1 for Google's Trending Now, which changes about every 10 minutes, and 24 for TikTok and Explore, which count 7 days (TikTok's list did not change between two reads 100 minutes apart in testing). If you cannot run a task every hour, set 24 for every page. The self-check reports any page that is missing or late.
 
 ## Sources
 
@@ -252,7 +254,7 @@ YouTube channels and websites are not in the setup request: following particular
 
 That writes `SIBYL_YOUTUBE_API_KEY` to `sibyl/data/.env`. Check it with `check-deploy.js`, then set `enabled: true`. Leave `queries` empty to search the topic's first 6 keywords at once, or set up to 3 queries (words joined with `|` match any of them).
 
-**X trends.** First say what it costs and wait for the person's OK (rule 5): about US$0.01 per request, paid in advance as credit. Sibyl asks about every 30 minutes (`minIntervalMinutes: 30`), 2 requests an hour; for 10:00 to 22:00 that is about US$0.26 a day, or US$8 a month. Work out the figure for their hours. Then:
+**X trends.** First say what it costs and wait for the person's OK (rule 5): about US$0.01 per request, paid in advance as credit. Sibyl asks every 10 minutes, on each scheduled run (`minIntervalMinutes: 10`), 6 requests an hour; for 10:00 to 22:00 (the last run is at 22:50) that is 78 requests, about US$0.78 a day or US$23 a month. Work out the figure for their hours. If that is too much for them, offer `minIntervalMinutes: 30`, about a third of the cost. Then:
 
 1. Give them the X Developer Console, `https://console.x.com` (prices: `https://docs.x.com/x-api/getting-started/pricing`), to open in their own browser. They sign in with their X account and buy credit themselves; never enter payment details.
 2. They create an app, copy its Bearer Token and save it with `node scripts/save-secret.js x`.
@@ -266,9 +268,9 @@ The setup request calls this "Use AI to explain each trend in one line": an AI m
 
 If they have a key, they save it with `node scripts/save-secret.js ai`; you add `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI), which are not secret, to `sibyl/data/.env`, and make one test briefing (`node scripts/sibyl.js --print --no-push`). If the summaries fail, tell the person in plain words what failed, remove the variables, and say that Sibyl works without AI.
 
-## Reading the daily pages
+## Reading the trend pages
 
-Once a day (before the person's first hour, or when asked: "Read today's trend pages for Sibyl"), read every page in `dailyPages` in a browser. Write each page you read as one JSON file in `sibyl/data/daily-pages/` (any name ending in `.json`): a section in the format in the header of `sibyl/scripts/lib/pages-file.js`, with the page's `source`, `view`, `region` and `industry` / `category` / `keyword` copied from `dailyPages`, `readAt` (the time you read it, with time zone), `url` and the items. Then run `node scripts/save-pages.js`. It saves every page that passes its checks into `pages.json` in one step and keeps the last saved list for any page that does not. Never write `pages.json` yourself: the scheduled runs read it every 10 minutes and could catch it half written.
+Each page in `dailyPages` is read at its own interval (`everyHours`): Google's Trending Now every hour during the person's hours, TikTok and Explore once a day, before the person's first hour. `node scripts/save-pages.js --due` lists the pages due now; read those in a browser (or all of them when asked: "Read today's trend pages for Sibyl"). Write each page you read as one JSON file in `sibyl/data/daily-pages/` (any name ending in `.json`): a section in the format in the header of `sibyl/scripts/lib/pages-file.js`, with the page's `source`, `view`, `region` and `industry` / `category` / `keyword` copied from `dailyPages`, `readAt` (the time you read it, with time zone), `url` and the items. Then run `node scripts/save-pages.js`. It saves every page that passes its checks into `pages.json` in one step and keeps the last saved list for any page that does not. Never write `pages.json` yourself: the scheduled runs read it every 10 minutes and could catch it half written.
 
 Add these fields when you can, so that the checks can catch a bad read:
 
@@ -322,7 +324,7 @@ node scripts/schedule.js --remove
 - **Windows:** it prints the two Task Scheduler tasks to create, with the paths filled in.
 - **No secrets:** keys come from `sibyl/data/.env`, so the schedule holds none.
 
-**The daily page reading** needs you and a browser, so it is not part of this schedule. If you can run tasks on a schedule yourself, schedule "Read today's trend pages for Sibyl" each morning. Such a task usually runs as a new session that does not remember this one, so its instructions must hold everything: the pages, the steps under "Reading the daily pages" and `save-pages.js`. In the Claude app, a scheduled task runs only while the app is open and the computer is awake, may start a few minutes late, and keeps the permission mode of the session that made it; tell the person. If you cannot, tell the person during setup, in plain words, and ask them to start each day with that request.
+**The page reading** needs you and a browser, so it is not part of this schedule. If you can run tasks on a schedule yourself, schedule one task every hour during the person's hours: "Read the Sibyl trend pages that are due." Each run starts with `save-pages.js --due` and reads only those pages, which most hours is Google's Trending Now alone. Each run uses the person's AI usage: in testing, a run that read all six pages took about 6 minutes and 1.7M tokens, most of them cached; a run for one page takes less. Tell the person before you schedule it, and offer once a day instead (`everyHours: 24` for every page) if they would rather save usage. Such a task usually runs as a new session that does not remember this one, so its instructions must hold everything: the pages, the steps under "Reading the trend pages" and `save-pages.js`. In the Claude app, a scheduled task runs only while the app is open and the computer is awake, may start a few minutes late, and keeps the permission mode of the session that made it; tell the person. If you cannot, tell the person during setup, in plain words, and ask them to start each day with that request.
 
 Nothing else should post the scripts' output: with `--push` they send briefings themselves, and a second post would duplicate them.
 

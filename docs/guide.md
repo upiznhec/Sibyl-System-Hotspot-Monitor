@@ -35,11 +35,11 @@ Sibyl watches trend lists for the topics you choose. On a schedule it:
 | Source | What it reads | Read by | What you need | Default |
 | --- | --- | --- | --- | --- |
 | Google Trends | The top searches right now, about 10 per country, each with news links | Script, every 10 minutes | Nothing | On |
-| Google Trends | Trending searches in your categories, and rising searches for your keywords (Explore) | Your agent, once a day | Nothing for now (see section 1.4) | On |
+| Google Trends | Trending searches in your categories, and rising searches for your keywords (Explore) | Your agent: the categories every hour, Explore once a day | Nothing for now (see section 1.4) | On |
 | TikTok Creative Center | Top hashtags by country and industry, with posts and views over 7 days | Your agent, once a day | Nothing for the top 3; a free TikTok for Business login for more | On |
 | Wikipedia | The most-read pages in your country yesterday | Script | A web address or email, for Wikimedia | On |
 | YouTube search (optional) | The most-viewed new videos for your keywords | Script, at most once an hour | A free key from Google | Off |
-| X trends (optional) | What is trending on X in your country | Script, about every 30 minutes | A paid X developer account | Off |
+| X trends (optional) | What is trending on X in your country | Script, every 10 minutes | A paid X developer account | Off |
 
 You choose the sources in the setup request (section 4.1). When a source needs something from you, your agent asks at that point, one thing at a time, and tells you what it is, what it costs and where to get it. Google Trends and TikTok are the main sources: an event must appear on one of them, or on X if you turn it on, to enter the briefing. Wikipedia and YouTube search add weight to those events.
 
@@ -60,10 +60,10 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 ### 1.5 Cost
 
 - The scripts are free to run.
-- Your agent's usage when it reads the pages once a day, and when you ask it for briefings or changes.
+- Your agent's usage when it reads the pages (Google's category list every hour, the others once a day), and when you ask it for briefings or changes.
 - Optional: an AI to explain each trend in one line and to group related trends. It needs an API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website. Nothing is spent without one.
 - Optional: YouTube search, free within Google's daily allowance.
-- Optional: X trends, about US$0.01 per request. Sibyl asks about every 30 minutes, so 10:00 to 22:00 costs about US$0.26 a day (about US$8 a month).
+- Optional: X trends, about US$0.01 per request. Sibyl asks every 10 minutes, so 10:00 to 22:00 costs about US$0.78 a day (about US$23 a month).
 - The cost of a typical day will be measured during testing and added here.
 
 ### 1.6 What the messages look like
@@ -124,7 +124,7 @@ Alerts come only from lists the script reads every 10 minutes: Google Trends' to
 | Google Trends | It is in the top 3, or has at least 20,000 searches ("20K+") |
 | X (optional) | It is in the top 5, or has at least 50,000 posts |
 
-Each item alerts at most once a day. TikTok and the other daily pages never alert; they appear in the hourly briefing.
+Each item alerts at most once a day. TikTok and the other pages your agent reads never alert; they appear in the hourly briefing.
 
 ### 2.2 The hourly briefing
 
@@ -174,7 +174,7 @@ Copy the setup request in [SETUP-PROMPT.md](../SETUP-PROMPT.md), fill in the par
 4. Sets up where briefings go, or leaves them as files.
 5. If you want to track trends on TikTok, gets you logged in to TikTok Creative Center once: through your own browser if it can use it or bring your login over, otherwise in its own browser. Without a login it shows only the top 3 hashtags. The same goes for Google Trends Explore if it asks for a sign-in. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
 6. Reads the pages for the first time, runs the self-check and a first briefing, and shows you the result.
-7. Schedules the work with Sibyl's own scheduling script: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose. It also arranges the daily page reading. On a Mac, the Sibyl folder must not be in Desktop, Documents or Downloads; your agent moves it if needed.
+7. Schedules the work with Sibyl's own scheduling script: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose. It also arranges the page reading: Google's category list every hour, TikTok and Explore once a day. On a Mac, the Sibyl folder must not be in Desktop, Documents or Downloads; your agent moves it if needed.
 
 What the agent's proposal looks like, for "beauty trends in the US":
 
@@ -228,7 +228,7 @@ After you set up a chat app, ask: "Send one Sibyl briefing now as a test."
   - "Show me the latest trend briefing."
   - "Any trend alerts today?"
   - "What were the top trends yesterday afternoon?"
-- **Daily pages:** your agent reads the TikTok and Google Trends pages once a day. If it cannot do this on its own, it tells you during setup; then start each day with: "Read today's trend pages for Sibyl."
+- **Pages:** your agent reads Google's category list every hour and the TikTok and Explore pages once a day. Each reading uses some of your agent's usage. If it cannot do this on its own, it tells you during setup; then start each day with: "Read today's trend pages for Sibyl."
 
 ## 7. Common changes
 
@@ -312,7 +312,7 @@ Change the Sibyl briefing so that [it shows 5 events instead of 10]. Keep the ti
 | --- | --- | --- |
 | No briefing in your chat | Push not set; webhook or Telegram details wrong; the scheduled task lacks `--push` | "Run the Sibyl check and fix the push settings." |
 | Alerts show 0 candidates | Nothing in your topics is near the top right now, or the alert limits are too strict | Usually nothing to fix. "Show me today's Google Trends top searches." |
-| The briefing is empty | Topics or keywords too narrow, or the daily pages were not read | "Find out why the Sibyl briefing is empty and suggest a fix." |
+| The briefing is empty | Topics or keywords too narrow, or the trend pages were not read | "Find out why the Sibyl briefing is empty and suggest a fix." |
 | Unrelated items | A keyword is too broad, or the item came from a list read for your topic (such items normally go to the watch list) | "Add an exclude word for [word] in Sibyl." |
 | The same alert twice | Two scheduled tasks are running | "Check Sibyl's scheduled tasks for duplicates." |
 | No summaries | The item came without news links and no AI model is set | Optional: "Help me add an AI model key to Sibyl." |
