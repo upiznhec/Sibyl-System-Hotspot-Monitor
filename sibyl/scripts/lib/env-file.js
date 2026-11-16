@@ -24,6 +24,17 @@ function parseEnvText(text) {
   return values;
 }
 
+// Sets NAME=value, replacing any earlier line for NAME (with or without "export") and keeping the rest.
+function setEnvValue(text, name, value) {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(name))) throw new Error(`Not a variable name: ${name}`);
+  if (/[\r\n]/.test(String(value))) throw new Error('The value must be one line.');
+  const earlier = new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=`);
+  const kept = String(text || '').split(/\r?\n/).filter(line => !earlier.test(line));
+  while (kept.length && kept[kept.length - 1].trim() === '') kept.pop();
+  kept.push(`${name}=${value}`);
+  return `${kept.join('\n')}\n`;
+}
+
 function envFilePath(dataDir = getDataDir()) {
   return path.join(dataDir, ENV_FILE);
 }
@@ -46,6 +57,24 @@ function loadEnvFile(dataDir = getDataDir()) {
   return { file, exists: true, loaded };
 }
 
+// Writes NAME=value into the .env file in one step (cron never reads half a file), readable only by
+// the owner. Used by save-secret.js, which the person runs so that a key never passes through a chat.
+function writeEnvValue(dataDir, name, value) {
+  fs.mkdirSync(dataDir, { recursive: true });
+  const file = envFilePath(dataDir);
+  let text = '';
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    text = '';
+  }
+  const temp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(temp, setEnvValue(text, name, value), { mode: 0o600 });
+  fs.renameSync(temp, file);
+  if (process.platform !== 'win32') fs.chmodSync(file, 0o600);
+  return file;
+}
+
 // True when only the owner can read the file (mode 600 or stricter), or when there is no file.
 // Windows has no such mode bits, so it is always true there.
 function envFileIsPrivate(dataDir = getDataDir()) {
@@ -62,5 +91,7 @@ module.exports = {
   envFileIsPrivate,
   envFilePath,
   loadEnvFile,
-  parseEnvText
+  parseEnvText,
+  setEnvValue,
+  writeEnvValue
 };
