@@ -381,6 +381,8 @@ Slack, Discord and Telegram are recognised by their address. For any other addre
 | Number of events in the briefing | `report.topN` (default 10); the minimum score is `report.minScore`. |
 | Another country or time zone | `country`, `timeZone`, the `region` in `dailyPages`, and the schedule (`schedule.js --install`). |
 | An AI model for summaries | As under "AI explanations (summaries)": `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI). Without both, the first news headline is used. |
+| Update Sibyl | In the Sibyl folder, `git pull` (if it was downloaded as a ZIP, download the new one and copy `sibyl/data/` across). Settings and keys in `sibyl/data/` are kept. Then run `check-deploy.js` and a test briefing. |
+| Stop Sibyl | `node scripts/schedule.js --remove`, and remove the page-reading task you scheduled. Keep `sibyl/data/`, so that `schedule.js --install` turns it on again. |
 
 ## Other settings
 

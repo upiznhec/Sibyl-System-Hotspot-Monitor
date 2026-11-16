@@ -303,13 +303,25 @@ In Sibyl, stop watching [Wikipedia].
 **Turn on an optional source**
 
 ```text
-Turn on [YouTube search / X trends] in Sibyl. Tell me what it costs and what I need to do, guide me one step at a time, and wait for my OK.
+Turn on [YouTube search / X trends / Instagram] in Sibyl. Tell me what it costs and what I need to do, guide me one step at a time, and wait for my OK.
 ```
 
 **Change the briefing layout**
 
 ```text
 Change the Sibyl briefing so that [it shows 5 events instead of 10]. Keep the title, score, signals and summary lines.
+```
+
+**Update Sibyl**
+
+```text
+Update Sibyl to the latest version from GitHub. Keep my settings and keys, then run the Sibyl check and a test briefing.
+```
+
+**Stop Sibyl**
+
+```text
+Stop Sibyl: remove its schedule and the page-reading task. Keep my settings, so that I can turn it on again.
 ```
 
 ## 8. Problems and fixes
@@ -329,6 +341,12 @@ Change the Sibyl briefing so that [it shows 5 events instead of 10]. Keep the ti
 | Your agent asks you to run a script it wrote | It is working around a problem instead of asking you | Do not run it. "Use Sibyl's own schedule script, as AGENTS.md says." |
 | No briefing ever arrives on a Mac | The Sibyl folder is in Desktop, Documents or Downloads, which scheduled tasks cannot read | "Move Sibyl out of Desktop and set its schedule again." |
 | A YouTube channel error | YouTube's channel feeds sometimes fail for a few hours | Wait; it usually recovers on its own. |
+| Your agent says a key you pasted is not saved | Return was not pressed at the save prompt, or nothing arrived | Go back to the terminal: the line under the question counts the characters received. Press Return there, or paste again. |
+| Your agent cannot find your Telegram chat | No message was sent to the bot (pressing Start was not enough in testing) | Send your bot a message such as "hi", then tell your agent. |
+| Facebook logs you out during the Instagram setup | Your agent opened Meta's developer pages in its own browser | Log in again on your phone, then do the Meta steps in your own browser while your agent tells you what to click. |
+| Your agent cannot find your Instagram account | The Page and Instagram account were not chosen in the token's pop-up, or the account is not a professional account linked to the Page | "Tell me how to make a new Instagram token with my Page and account chosen." |
+| Briefings arrive at the wrong times | The time zone or the hours are wrong | "Check Sibyl's time zone and hours: I am in [city], and I want [10:00 to 22:00]." |
+| The same trend in every briefing | It is still trending; its mark shows whether it is rising, steady or cooling | Nothing to fix. To leave it out: "Add an exclude word for [trend] in Sibyl." |
 
 ## 9. Before you rely on it
 
