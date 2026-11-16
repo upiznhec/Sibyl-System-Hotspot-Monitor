@@ -19,7 +19,7 @@ Changed:
 - **Topics.** The fixed games, esports, sports and AI keywords are replaced by topics the user sets with their agent, with keywords, exclude words and the matching category on each platform.
 - **Language and time.** Briefings and alerts are in English; times follow the user's time zone; counts use K, M and B.
 - **Grouping.** English titles are grouped by the words that describe the event. Sharing only a topic keyword, a person or a brand does not merge two events, and a hashtag matches the words it joins (#sunscreenrecall and "sunscreen recall").
-- **Push.** Slack, Discord and Telegram are added; WeCom stays. With no push target, nothing is sent: briefings and alerts are saved for 7 days and shown when the user asks their agent.
+- **Push.** Slack, Discord and Telegram are added; WeCom stays. Briefings and alerts go to every place set up, alerts optionally to a separate one. With no push target, nothing is sent: briefings and alerts are saved for 7 days and shown when the user asks their agent.
 - **AI model.** Optional, with the user's own OpenAI-compatible key; without one, the rule-based fallback runs, as in v1.3.20. Summaries are written from the news links that come with Google Trends items.
 - **Running.** `scripts/schedule.js` sets up the schedule for every agent the same way (the crontab, or the Task Scheduler settings on Windows); keys and webhook addresses live in `sibyl/data/.env`; the self-check also tests internet access. Items from lists read for a topic lead the briefing only with a keyword match or a second source.
 - **Removed.** The parts that needed OpenClaw or the original team's setup: Weibo intelligent search, the Agent Reach retriever and its health table, and the OpenClaw paths and model settings.

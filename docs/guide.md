@@ -159,7 +159,7 @@ An event enters the briefing when:
 | This repository | Yes | Your agent downloads it from GitHub. |
 | Node.js 18 or later | Yes | Your agent can check this and install it. Tested with Node.js 24. |
 | An AI agent | Yes | It must run commands with internet access, edit files and use a web browser. One that can also run on a schedule is best. |
-| Somewhere to send briefings | Optional | A Slack, Discord or WeCom webhook, or a Telegram bot. Without one, briefings are saved as files. |
+| Places to send briefings | Optional | Slack, Discord or WeCom webhooks, or a Telegram bot; briefings go to every one you set up. Without any, briefings are saved as files. |
 | AI to explain each trend | Optional | An API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, buy credit on the AI company's website. Without it, each trend's line is copied from a news headline. |
 | Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid); for Instagram, a professional account linked to a Facebook Page and a free Meta app. See section 1.3. |
 | A contact for Wikipedia | If Wikipedia is on | A web address or email that Sibyl sends to Wikimedia and to no other site. See section 1.3. |
@@ -257,7 +257,11 @@ In Sibyl, keep items containing "[promo code]" out of the [Beauty] briefing.
 **Change where briefings go**
 
 ```text
-Send Sibyl's hourly briefing to a [Slack] channel. Give me the command to save its webhook address on my computer, keep the alerts where they are now, then run the Sibyl check.
+Also send Sibyl's briefings and alerts to a [Slack] channel. Give me the command to save its webhook address on my computer, then run the Sibyl check and send a test briefing.
+```
+
+```text
+Stop sending Sibyl's briefings to [Discord].
 ```
 
 ```text

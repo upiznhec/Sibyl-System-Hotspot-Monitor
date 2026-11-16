@@ -1,6 +1,10 @@
 // Push for briefings and instant alerts.
 // Channels: WeCom (WeChat Work, the original), Slack and Discord incoming webhooks, and Telegram
 // (a bot that messages one chat, for people who do not use a work chat app).
+// Briefings go to every place that is set: SIBYL_SLACK_WEBHOOK, SIBYL_DISCORD_WEBHOOK,
+// SIBYL_REPORT_WEBHOOK (any service, such as WeCom or a relay; config report.webhook) and the
+// Telegram bot. Alerts go to SIBYL_ALERT_WEBHOOK (config alerts.webhook) when it is set, and
+// otherwise to the same places, using Telegram's alert chat if one is set.
 // The channel is read from the webhook host, or set explicitly with config "channel".
 // Unknown hosts get the WeCom payload, as v1.3.20 sent to every webhook.
 // Telegram can be set as a URL (https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>)
@@ -16,6 +20,16 @@ const CHANNELS = {
   // Telegram allows 4,096 characters per message after formatting is applied.
   telegram: { limit: 3800, unit: 'chars' }
 };
+
+const CHANNEL_LABELS = {
+  wecom: 'WeCom',
+  slack: 'Slack',
+  discord: 'Discord',
+  telegram: 'Telegram'
+};
+
+// A drawn line for the briefing's "---", which Slack, Telegram and Discord do not draw themselves.
+const SEPARATOR = '────────';
 
 function detectChannel(webhookUrl, explicitChannel = '') {
   if (explicitChannel && CHANNELS[explicitChannel]) return explicitChannel;
@@ -81,7 +95,16 @@ function toSlackMarkup(markdown) {
       .replace(/^#{1,6}\s+(.*)$/, '*$1*')
       .replace(/\*\*([^*]+)\*\*/g, '*$1*')
       .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<$2|$1>')
-      .replace(/^-{3,}$/, '────────'))
+      .replace(/^-{3,}$/, SEPARATOR))
+    .join('\n');
+}
+
+// Discord reads headings, **bold** and links as written, but shows "---" as three dashes (tested
+// 2026-11-16), so the separator becomes a drawn line.
+function toDiscordMarkdown(markdown) {
+  return markdown
+    .split('\n')
+    .map(line => line.replace(/^-{3,}$/, SEPARATOR))
     .join('\n');
 }
 
@@ -97,13 +120,15 @@ function toTelegramHtml(markdown) {
       .replace(/^#{1,6}\s+(.*)$/, '<b>$1</b>')
       .replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>')
       .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (match, label, url) => `<a href="${url.replace(/"/g, '&quot;')}">${label}</a>`)
-      .replace(/^-{3,}$/, '────────'))
+      .replace(/^-{3,}$/, SEPARATOR))
     .join('\n');
 }
 
 function payloadFor(channel, content, options = {}) {
   if (channel === 'slack') return { text: toSlackMarkup(content), mrkdwn: true };
-  if (channel === 'discord') return { content };
+  // flags 4 (SUPPRESS_EMBEDS): no link preview cards, which Discord adds under a webhook message
+  // by default; allowed_mentions: a trend title such as "@everyone" notifies nobody.
+  if (channel === 'discord') return { content: toDiscordMarkdown(content), flags: 4, allowed_mentions: { parse: [] } };
   if (channel === 'telegram') {
     return {
       chat_id: options.chatId,
@@ -187,35 +212,54 @@ function sendMessage(webhookUrl, content, options = {}) {
   });
 }
 
-// Where the hourly briefing goes. Environment variables win over config, as in v1.3.20.
-function reportTarget(config = {}) {
+// Every place the hourly briefing goes, each once: the Slack and Discord webhooks, the general
+// webhook (SIBYL_REPORT_WEBHOOK, then the shared WECOM_WEBHOOK, then config report.webhook, with
+// report.channel) and the Telegram bot. Environment variables win over config, as in v1.3.20.
+// kind 'alert' uses Telegram's alert chat when one is set.
+function reportTargets(config = {}, kind = 'report') {
   const report = config.report || {};
-  const webhook = process.env.SIBYL_REPORT_WEBHOOK || process.env.WECOM_WEBHOOK || report.webhook || '';
-  if (webhook) return { webhook, channel: report.channel || '' };
-  // No webhook: a Telegram bot, if one is set.
-  const telegram = telegramTarget(config, 'report');
-  return { webhook: telegram, channel: telegram ? 'telegram' : '' };
+  const targets = [];
+  const add = (webhook, channel = '') => {
+    if (webhook && !targets.some(target => target.webhook === webhook)) targets.push({ webhook, channel });
+  };
+  add(process.env.SIBYL_SLACK_WEBHOOK || '');
+  add(process.env.SIBYL_DISCORD_WEBHOOK || '');
+  add(process.env.SIBYL_REPORT_WEBHOOK || process.env.WECOM_WEBHOOK || report.webhook || '', report.channel || '');
+  add(telegramTarget(config, kind), 'telegram');
+  return targets;
 }
 
-// Where instant alerts go. Falls back to the briefing webhook, as in v1.3.20.
-// An explicit "channel" belongs to the webhook it is written next to.
-function alertTarget(config = {}) {
+// Where instant alerts go: a separate place when SIBYL_ALERT_WEBHOOK (or config alerts.webhook,
+// with alerts.channel) is set, otherwise wherever briefings go.
+function alertTargets(config = {}) {
   const alerts = config.alerts || {};
-  const report = config.report || {};
-  const webhook = process.env.SIBYL_ALERT_WEBHOOK ||
-    process.env.WECOM_WEBHOOK ||
-    alerts.webhook ||
-    report.webhook ||
-    '';
-  if (!webhook) {
-    const telegram = telegramTarget(config, 'alert');
-    return { webhook: telegram, channel: telegram ? 'telegram' : '' };
+  const separate = process.env.SIBYL_ALERT_WEBHOOK || alerts.webhook || '';
+  if (separate) return [{ webhook: separate, channel: alerts.channel || '' }];
+  return reportTargets(config, 'alert');
+}
+
+// The first place of each list, for callers that need only one.
+function reportTarget(config = {}) {
+  return reportTargets(config)[0] || { webhook: '', channel: '' };
+}
+
+function alertTarget(config = {}) {
+  return alertTargets(config)[0] || { webhook: '', channel: '' };
+}
+
+// "Slack", "Discord", "WeCom" or "Telegram", for messages to the person.
+function channelLabel(target) {
+  return CHANNEL_LABELS[detectChannel(target.webhook, target.channel)];
+}
+
+// Sends a briefing to every place; returns [{ label, sent }] in the same order.
+async function sendToTargets(targets, text, options = {}) {
+  const results = [];
+  for (const target of targets) {
+    const sent = await sendInParts(target.webhook, text, { ...options, channel: target.channel });
+    results.push({ label: channelLabel(target), sent });
   }
-  const usesReportWebhook = !alerts.webhook && webhook === report.webhook;
-  return {
-    webhook,
-    channel: alerts.channel || (usesReportWebhook ? report.channel || '' : '')
-  };
+  return results;
 }
 
 // Sends a long message in parts, prefixing "<title> (i/n)" when it needs more than one.
@@ -236,15 +280,21 @@ async function sendInParts(webhookUrl, text, options = {}) {
 
 module.exports = {
   CHANNELS,
+  CHANNEL_LABELS,
   alertTarget,
+  alertTargets,
+  channelLabel,
   detectChannel,
   payloadFor,
   reportTarget,
+  reportTargets,
   sendInParts,
   sendMessage,
+  sendToTargets,
   splitMessage,
   telegramTarget,
   telegramUrl,
+  toDiscordMarkdown,
   toSlackMarkup,
   toTelegramHtml
 };

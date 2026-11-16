@@ -8,7 +8,7 @@ const { configureHttp } = require('./lib/http');
 const { collectContext, collectPlatform } = require('./collect-snapshot');
 const { loadTopicSettings } = require('./lib/topic-settings');
 const { configureLocale, text } = require('./lib/locale');
-const { reportTarget, sendInParts } = require('./lib/webhook');
+const { reportTargets, sendToTargets } = require('./lib/webhook');
 const { saveBriefing } = require('./lib/briefing-archive');
 const { loadEnvFile } = require('./lib/env-file');
 const { clusterSignals, buildNextState } = require('./lib/clusterer');
@@ -243,15 +243,23 @@ function attachSnapshotTrends(clusters, snapshots) {
   return clusters;
 }
 
+// Sends the briefing to every place that is set; returns [{ label, sent }], empty when not pushed.
 async function maybePushReport(report, config, args) {
   const reportConfig = config.report || {};
-  const { webhook, channel } = reportTarget(config);
+  const targets = reportTargets(config);
   // "pushWeCom" is the v1.3.20 name of the switch and still works.
   const pushEnabled = reportConfig.push || reportConfig.pushWeCom;
-  const shouldPush = (pushEnabled || args.includes('--push')) && !args.includes('--no-push') && webhook;
-  if (!shouldPush) return false;
+  const shouldPush = (pushEnabled || args.includes('--push')) && !args.includes('--no-push') && targets.length > 0;
+  if (!shouldPush) return [];
 
-  return sendInParts(webhook, report, { channel, title: text().report.pushTitle });
+  return sendToTargets(targets, report, { title: text().report.pushTitle });
+}
+
+// "yes (Slack, Telegram)", "Slack yes, Telegram failed" or "no".
+function pushSummary(results) {
+  if (!results.length) return 'no';
+  if (results.every(result => result.sent)) return `yes (${results.map(result => result.label).join(', ')})`;
+  return results.map(result => `${result.label} ${result.sent ? 'yes' : 'failed'}`).join(', ');
 }
 
 async function main() {
@@ -390,7 +398,7 @@ async function main() {
   console.log(`   Events: ${clusters.length}`);
   console.log(`   Data: ${source === 'snapshot' ? 'latest snapshot' : 'collected now'}`);
   console.log(`   Briefing file: ${REPORT_FILE}`);
-  console.log(`   Pushed: ${pushed ? 'yes' : 'no'}`);
+  console.log(`   Pushed: ${pushSummary(pushed)}`);
   if (savedFile) console.log(`   Saved copy: ${savedFile}`);
   errors.forEach(error => console.warn(`⚠️ ${error.name} could not be read: ${error.error}`));
 }

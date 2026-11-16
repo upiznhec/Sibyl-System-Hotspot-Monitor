@@ -9,18 +9,23 @@ const http = require('http');
 const {
   CHANNELS,
   alertTarget,
+  alertTargets,
+  channelLabel,
   detectChannel,
   payloadFor,
   reportTarget,
+  reportTargets,
   sendInParts,
   sendMessage,
+  sendToTargets,
   splitMessage,
   telegramUrl,
   toTelegramHtml
 } = require('./lib/webhook');
 
 const TELEGRAM_ENV = ['SIBYL_TELEGRAM_BOT_TOKEN', 'SIBYL_TELEGRAM_CHAT_ID', 'SIBYL_TELEGRAM_ALERT_CHAT_ID'];
-['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK', ...TELEGRAM_ENV].forEach(key => delete process.env[key]);
+const WEBHOOK_ENV = ['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'SIBYL_SLACK_WEBHOOK', 'SIBYL_DISCORD_WEBHOOK', 'WECOM_WEBHOOK'];
+[...WEBHOOK_ENV, ...TELEGRAM_ENV].forEach(key => delete process.env[key]);
 
 function measure(text, channel) {
   return CHANNELS[channel].unit === 'bytes' ? Buffer.byteLength(text, 'utf8') : text.length;
@@ -66,7 +71,10 @@ function checkChannels() {
 
 function checkPayloads() {
   assert.deepStrictEqual(payloadFor('wecom', 'x'), { msgtype: 'markdown', markdown: { content: 'x' } });
-  assert.deepStrictEqual(payloadFor('discord', 'x'), { content: 'x' });
+  // Discord: no link preview cards, no @everyone pings, and a drawn line for "---".
+  assert.deepStrictEqual(payloadFor('discord', 'x'), { content: 'x', flags: 4, allowed_mentions: { parse: [] } });
+  assert.strictEqual(payloadFor('discord', '# Trend Briefing\n---\n### 1. **A**\n[Wikipedia](https://e.test/a)').content,
+    '# Trend Briefing\n────────\n### 1. **A**\n[Wikipedia](https://e.test/a)');
   assert.deepStrictEqual(payloadFor('slack', '### 1. Title\n**Source**: [View](https://example.test/a)\n---'), {
     text: '*1. Title*\n*Source*: <https://example.test/a|View>\n────────',
     mrkdwn: true
@@ -107,9 +115,11 @@ function checkTargets() {
   assert.strictEqual(alertTarget(config).channel, 'discord');
   assert.deepStrictEqual(reportTarget(config), { webhook: 'https://relay.example.test/report', channel: 'slack' });
 
-  // Environment variables win over config, as in v1.3.20.
+  // Environment variables win over config, as in v1.3.20. The shared WECOM_WEBHOOK stands in for
+  // the general briefing webhook; a separate alert webhook (config or environment) comes first.
   process.env.WECOM_WEBHOOK = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=shared';
-  assert.strictEqual(alertTarget(config).webhook, process.env.WECOM_WEBHOOK);
+  assert.strictEqual(alertTarget(config).webhook, 'https://discord.com/api/webhooks/1/abc');
+  assert.strictEqual(alertTarget({ alerts: {} }).webhook, process.env.WECOM_WEBHOOK);
   assert.strictEqual(reportTarget(config).webhook, process.env.WECOM_WEBHOOK);
   process.env.SIBYL_ALERT_WEBHOOK = 'https://hooks.slack.com/services/alert';
   process.env.SIBYL_REPORT_WEBHOOK = 'https://hooks.slack.com/services/report';
@@ -118,6 +128,25 @@ function checkTargets() {
   ['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK'].forEach(key => delete process.env[key]);
 
   assert.deepStrictEqual(alertTarget({}), { webhook: '', channel: '' });
+  assert.deepStrictEqual(reportTargets({}), []);
+
+  // Briefings go to every place that is set, each once; alerts go there too unless a separate
+  // alert webhook is set (tested with Slack, Discord and Telegram on 2026-11-16).
+  process.env.SIBYL_SLACK_WEBHOOK = 'https://hooks.slack.com/services/T/B/x';
+  process.env.SIBYL_DISCORD_WEBHOOK = 'https://discord.com/api/webhooks/2/y';
+  process.env.SIBYL_REPORT_WEBHOOK = 'https://hooks.slack.com/services/T/B/x';
+  const telegram = { telegram: { botToken: '1:abc', chatId: '42', alertChatId: '-100' } };
+  assert.deepStrictEqual(reportTargets(telegram).map(channelLabel), ['Slack', 'Discord', 'Telegram']);
+  assert.deepStrictEqual(alertTargets(telegram).map(target => target.webhook), [
+    'https://hooks.slack.com/services/T/B/x',
+    'https://discord.com/api/webhooks/2/y',
+    telegramUrl('1:abc', '-100')
+  ]);
+  process.env.SIBYL_ALERT_WEBHOOK = 'https://discord.com/api/webhooks/3/z';
+  assert.deepStrictEqual(alertTargets(telegram), [{ webhook: 'https://discord.com/api/webhooks/3/z', channel: '' }]);
+  ['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'SIBYL_SLACK_WEBHOOK', 'SIBYL_DISCORD_WEBHOOK'].forEach(key => delete process.env[key]);
+  assert.strictEqual(channelLabel({ webhook: 'https://relay.example.test/hook', channel: 'slack' }), 'Slack');
+  assert.strictEqual(channelLabel({ webhook: 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=x', channel: '' }), 'WeCom');
 }
 
 async function checkSending() {
@@ -168,6 +197,25 @@ async function checkSending() {
   });
   assert.strictEqual(await sendInParts(flaky.url, briefing(30, 400), { title: 'Trend Briefing', delayMs: 0 }), false);
   flaky.server.close();
+
+  // Several places: each gets the briefing, and each result is reported on its own.
+  const good = await startServer(res => {
+    res.statusCode = 200;
+    res.end('ok');
+  });
+  const bad = await startServer(res => {
+    res.statusCode = 404;
+    res.end('{"message":"Unknown Webhook"}');
+  });
+  const results = await sendToTargets([
+    { webhook: good.url, channel: 'slack' },
+    { webhook: bad.url, channel: 'discord' }
+  ], '# Trend Briefing\n---', { title: 'Trend Briefing', delayMs: 0 });
+  good.server.close();
+  bad.server.close();
+  assert.deepStrictEqual(results, [{ label: 'Slack', sent: true }, { label: 'Discord', sent: false }]);
+  assert.strictEqual(good.received[0].body.text, '*Trend Briefing*\n────────');
+  assert.strictEqual(bad.received[0].body.content, '# Trend Briefing\n────────');
 }
 
 async function checkTelegram() {
@@ -183,13 +231,13 @@ async function checkTelegram() {
     link_preview_options: { is_disabled: true }
   });
 
-  // A webhook wins; otherwise the Telegram bot, with an optional separate chat for alerts.
+  // The Telegram bot, with an optional separate chat for alerts; a webhook is used as well.
   const config = { telegram: { botToken: '1:abc', chatId: '42', alertChatId: '-100' } };
   assert.deepStrictEqual(reportTarget(config), { webhook: telegramUrl('1:abc', '42'), channel: 'telegram' });
   assert.deepStrictEqual(alertTarget(config), { webhook: telegramUrl('1:abc', '-100'), channel: 'telegram' });
-  assert.strictEqual(
-    reportTarget({ ...config, report: { webhook: 'https://hooks.slack.com/services/x' } }).webhook,
-    'https://hooks.slack.com/services/x'
+  assert.deepStrictEqual(
+    reportTargets({ ...config, report: { webhook: 'https://hooks.slack.com/services/x' } }).map(target => target.webhook),
+    ['https://hooks.slack.com/services/x', telegramUrl('1:abc', '42')]
   );
   process.env.SIBYL_TELEGRAM_BOT_TOKEN = '2:env';
   process.env.SIBYL_TELEGRAM_CHAT_ID = '7';

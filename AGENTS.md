@@ -33,11 +33,11 @@ The person has not read the guide and should not have to. Do not expect them to 
 node "<full path>/sibyl/scripts/save-secret.js" youtube
 ```
 
-The last word is `youtube`, `x`, `ai`, `telegram`, `webhook` (briefings) or `alert-webhook` (alerts in another channel). The command asks them to paste the value, shows nothing as they paste, and writes it to `sibyl/data/.env`, which only their account can read; running it again replaces the old value. If your app can run a command in a terminal at the person's click, offer that; otherwise tell them how to open one (macOS: Terminal, in Applications, Utilities; Windows: PowerShell). Do not run it yourself: it needs them to paste, and it refuses to run without a terminal. When they say it is saved, run `check-deploy.js`, which shows whether the value is set without showing it. If they paste a secret into the chat anyway, do not repeat it, and suggest they make a new one and save that with the command, because the chat keeps a copy.
+The last word is `youtube`, `x`, `ai`, `slack`, `discord`, `telegram`, `webhook` (WeCom, or any other address) or `alert-webhook` (alerts in a separate place). The command asks them to paste the value and press Return. It never shows the value, only a line counting the characters received, and writes it to `sibyl/data/.env`, which only their account can read. Running it again replaces the old value, except that a value which does not look right does not replace one that does unless they confirm. Give the command each time a value is to be saved, even if an earlier one may still be waiting in their terminal. If your app can run a command in a terminal at the person's click, offer that; otherwise tell them how to open one (macOS: Terminal, in Applications, Utilities; Windows: PowerShell). Do not run it yourself: it needs them to paste, and it refuses to run without a terminal. When they say it is saved, run `check-deploy.js`, which shows whether the value is set without showing it. To delete a saved value, for example to stop sending to a place, run the same command with `--remove` at the end; you may run that yourself, since it asks for nothing. If they paste a secret into the chat anyway, do not repeat it, and suggest they make a new one and save that with the command, because the chat keeps a copy.
 
 **Logins and browsers.** Use the browser the person already uses wherever you can. Signing in again in another browser is tiring, and some people will not sign in to Google there.
 
-- **One-time account steps**, such as making the YouTube key, buying X credit or making a Telegram bot or a webhook, happen in their own browser. Give the link and what to click, one step at a time. Do not open these pages in your browser.
+- **One-time account steps**, such as making the YouTube key, buying X credit or making a Telegram bot or a webhook, happen in their own browser (for Telegram and Discord, in their own app). Give the link and what to click, one step at a time. Do not open these pages in your browser.
 - **Pages you read every day** (TikTok Creative Center, and Google's Explore if it asks for a sign-in) need the sign-in in the browser you read them with. First, if you can work in their own browser, where they are already signed in (for example with Claude's Chrome extension), use it. Second, if your browser can bring one site's sign-in over from theirs (in the Claude app, the browser pane's ⋮ menu offers this when it can), ask them to do that for that site only. Otherwise ask them to sign in once in your browser. A sign-in usually stays: ask again only when the page shows they are signed out.
 - **If they cannot or would rather not sign in**, go on without it and say what they lose (TikTok: the top 3 hashtags only).
 
@@ -63,11 +63,11 @@ In other apps, look for network or internet access in their permission or sandbo
 
 > Sibyl sends briefings to Telegram through its own bot, which is free. In Telegram, open @BotFather (it has a blue tick), send /newbot, and choose a name and a username ending in "bot". It gives you a token, a code that lets Sibyl post as the bot. Do not send it to me; save it by running this in your terminal: [the save-secret command for `telegram`]. Then send your new bot any message, such as "hi", and tell me when you have.
 
-**Slack, Discord or WeCom**, when it is chosen.
+**Slack, Discord or WeCom**, when it is chosen. Ask about each place the person named, one at a time; briefings go to all of them.
 
-> To post briefings in your channel, Sibyl needs the channel's webhook address: a link that lets it post there. It is free. Here is how to make one: [the matching link below]. Anyone with the address can post in your channel, so do not send it to me; save it by running this in your terminal: [the save-secret command for `webhook`].
+> To post briefings in your channel, Sibyl needs the channel's webhook address: a link that lets it post there. It is free. Here is how to make one: [the matching steps below]. Anyone with the address can post in your channel, so do not send it to me; save it by running this in your terminal: [the save-secret command for `slack`, `discord` or, for WeCom, `webhook`].
 
-Slack: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/ · Discord (channel settings, Integrations, Webhooks): https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks · WeCom (add a group robot in the group's settings): https://developer.work.weixin.qq.com/document/path/91770
+Slack: a webhook needs a Slack app, made on api.slack.com in a browser (the Slack app cannot make one): Create an App, from scratch (in 2026: "Pick features"), with only the `incoming-webhook` scope; then, on the app's Incoming Webhooks page, Add New Webhook, choose the channel, Allow, and Copy next to the new address. In testing, "Create and Install" on the last step of making the app did not finish; Add New Webhook did. Guide: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/ · Discord, in the app: the channel's settings (gear icon), Integrations, Webhooks, Create Webhook, then Copy Webhook URL (the address is not shown): https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks · WeCom (add a group robot in the group's settings): https://developer.work.weixin.qq.com/document/path/91770
 
 **Wikipedia**, when it is on.
 
@@ -168,7 +168,7 @@ Run them from the `sibyl` folder.
 | `node scripts/sibyl.js --print --no-push` | Writes a test briefing and prints it. It sends nothing, keeps no copy and leaves the history alone, so the next real briefing compares with the last real one. |
 | `node scripts/save-pages.js` | Saves the pages you read (files in `data/daily-pages/`) into `pages.json`, checking each; a page that fails keeps its last saved list. `--due` lists the pages to read now (see "Reading the trend pages"). |
 | `node scripts/instagram-token.js` | For the person to run in their own terminal: turns the token from Graph API Explorer into a lasting one and saves it in `data/.env` (see "Instagram"). |
-| `node scripts/save-secret.js <name>` | For the person to run in their own terminal: saves a key, token or webhook address in `data/.env` (see "Keys and logins"). |
+| `node scripts/save-secret.js <name>` | For the person to run in their own terminal: saves a key, token or webhook address in `data/.env` (see "Keys and logins"). With `--remove` it deletes one, and you may run it yourself. |
 | `node scripts/show-briefing.js` | Prints the latest saved briefing. `--list` lists them; `--file=2026-11-11_1000` prints one; `--alerts` prints today's alerts; `--alerts --date=2026-11-10` prints another day's. |
 
 `--no-ai` skips the AI model; `--no-summary` skips summaries.
@@ -353,15 +353,17 @@ Nothing else should post the scripts' output: with `--push` they send briefings 
 
 | Target | What to set |
 | --- | --- |
-| Slack | An incoming webhook: `SIBYL_REPORT_WEBHOOK` (and `SIBYL_ALERT_WEBHOOK` for alerts elsewhere) in `sibyl/data/.env`, saved by the person with `save-secret.js webhook` (and `alert-webhook`). |
-| Discord | A channel webhook (channel settings, Integrations, Webhooks); the same variables. |
-| WeCom | A group robot webhook; the same variables. |
-| Telegram | `SIBYL_TELEGRAM_BOT_TOKEN` and `SIBYL_TELEGRAM_CHAT_ID` (optional `SIBYL_TELEGRAM_ALERT_CHAT_ID`) in `sibyl/data/.env`. |
+| Slack | An incoming webhook: `SIBYL_SLACK_WEBHOOK` in `sibyl/data/.env`, saved by the person with `save-secret.js slack`. |
+| Discord | A channel webhook: `SIBYL_DISCORD_WEBHOOK`, saved with `save-secret.js discord`. |
+| WeCom | A group robot webhook, or any other address: `SIBYL_REPORT_WEBHOOK`, saved with `save-secret.js webhook`. |
+| Telegram | `SIBYL_TELEGRAM_BOT_TOKEN` (saved with `save-secret.js telegram`) and `SIBYL_TELEGRAM_CHAT_ID` (optional `SIBYL_TELEGRAM_ALERT_CHAT_ID`) in `sibyl/data/.env`. |
 | None | Nothing: briefings and alerts are saved to `briefings/` and `alerts/` and deleted after 7 days (`archive.keepDays`). |
 
-For Telegram: the person messages @BotFather in Telegram, sends `/newbot`, and saves the bot token with `node scripts/save-secret.js telegram`. They then send any message to their new bot; you read the chat ID from `https://api.telegram.org/bot<token>/getUpdates` (`result[].message.chat.id`), taking the token from `sibyl/data/.env` inside your command so that it is never shown.
+Briefings go to every place that is saved. Alerts go to the same places, unless the person saves a separate place for them with `save-secret.js alert-webhook` (`SIBYL_ALERT_WEBHOOK`). To stop sending to a place, run its save command with `--remove`.
 
-Slack, Discord and Telegram are recognised by their address. For any other address, such as a relay, set `report.channel` or `alerts.channel` to `wecom`, `slack`, `discord` or `telegram`. After any change, run `check-deploy.js`, then send one test with `node scripts/sibyl.js --push`.
+For Telegram: the person messages @BotFather in Telegram, sends `/newbot`, and saves the bot token with `node scripts/save-secret.js telegram`. They then send any message to their new bot, such as "hi" (in testing, the /start sent by the bot's Start button was not returned); you read the chat ID from `https://api.telegram.org/bot<token>/getUpdates` (`result[].message.chat.id`), taking the token from `sibyl/data/.env` inside your command so that it is never shown, and save it as `SIBYL_TELEGRAM_CHAT_ID` the same way, without printing it.
+
+Slack, Discord and Telegram are recognised by their address. For any other address, such as a relay, set `report.channel` or `alerts.channel` to `wecom`, `slack`, `discord` or `telegram`. After any change, run `check-deploy.js` (its "Briefing push" line names every place), then send one test with `node scripts/sibyl.js --push`: its last lines say "Pushed: yes (Slack, Telegram)", or which place failed.
 
 ## Common requests
 

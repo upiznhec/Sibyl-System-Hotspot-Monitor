@@ -1,5 +1,6 @@
 // Terminal prompts for the scripts the person runs themselves (save-secret.js, instagram-token.js).
-// A hidden prompt shows nothing as the person types or pastes, so a key never appears on screen.
+// A hidden prompt never shows what the person types or pastes, so a key never appears on screen;
+// it shows only how many characters have arrived.
 
 const readline = require('readline');
 
@@ -25,10 +26,29 @@ function readLines(input = process.stdin) {
   });
 }
 
-// Nothing is echoed. Pasting works, Backspace deletes, Return finishes and Ctrl+C cancels.
-function readHidden(input = process.stdin, output = process.stdout) {
+// The line under a hidden question: how much has arrived, never what. In testing, a person took
+// a paste that showed nothing for one that had not worked, or reported a key saved before pressing
+// Return.
+function pasteCount(length) {
+  return length
+    ? `Received ${length} character${length === 1 ? '' : 's'}. Press Return to finish.`
+    : 'Nothing pasted yet.';
+}
+
+// The value is not echoed; a line under the question counts the characters received (options.status
+// sets its wording). Pasting works, Backspace deletes, Return finishes and Ctrl+C cancels. The
+// question should end with a line break, so that the count has a line of its own.
+function readHidden(input = process.stdin, output = process.stdout, options = {}) {
+  const status = options.status || pasteCount;
   return new Promise((resolve, reject) => {
     let value = '';
+    let shown = '';
+    const show = () => {
+      const line = `  ${status(value.length)}`;
+      // Writes over the old count; spaces cover the end of a longer old line.
+      output.write(`\r${line}${' '.repeat(Math.max(0, shown.length - line.length))}`);
+      shown = line;
+    };
     const finish = (error, result) => {
       input.removeListener('data', onData);
       input.setRawMode(false);
@@ -48,12 +68,14 @@ function readHidden(input = process.stdin, output = process.stdout) {
         }
         if (char >= ' ') value += char;
       }
+      show();
       return undefined;
     }
     input.setRawMode(true);
     input.setEncoding('utf8');
     input.on('data', onData);
     input.resume();
+    show();
   });
 }
 
@@ -69,6 +91,7 @@ function readVisible(question, input = process.stdin, output = process.stdout) {
 }
 
 module.exports = {
+  pasteCount,
   readHidden,
   readLine,
   readLines,

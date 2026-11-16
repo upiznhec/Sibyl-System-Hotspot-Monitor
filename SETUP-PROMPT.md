@@ -14,7 +14,7 @@ About me:
 - Country: [US]
 - Time zone: [America/New_York]
 - Hours to watch: [10:00 to 22:00]
-- Where to send briefings: [Slack / Discord / WeCom webhook / Telegram / none, save them as files]
+- Where to send briefings (one or more): [Slack / Discord / WeCom webhook / Telegram / none, save them as files]
 - Use AI to explain each trend in one line (optional, needs a paid API key): [no / yes, I have an API key]
 
 Sources to watch:

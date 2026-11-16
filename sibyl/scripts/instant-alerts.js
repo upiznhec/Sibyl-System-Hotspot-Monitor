@@ -23,7 +23,7 @@ const {
 } = require('./lib/source-registry');
 const { loadTopicSettings } = require('./lib/topic-settings');
 const { evidenceItems, evidenceText } = require('./lib/news-evidence');
-const { alertTarget, sendMessage } = require('./lib/webhook');
+const { alertTargets, channelLabel, sendMessage } = require('./lib/webhook');
 const { saveAlert } = require('./lib/briefing-archive');
 const { loadEnvFile } = require('./lib/env-file');
 const {
@@ -365,11 +365,11 @@ async function main() {
     args,
     snapshotToSignals(snapshot)
   );
-  const { webhook, channel } = alertTarget(config);
+  const targets = alertTargets(config);
   // "pushWeCom" is the v1.3.20 name of the switch and still works.
   const pushEnabled = config.alerts?.push || config.alerts?.pushWeCom;
   const dryRun = args.includes('--no-push');
-  const shouldPush = (pushEnabled || args.includes('--push')) && !dryRun && webhook;
+  const shouldPush = (pushEnabled || args.includes('--push')) && !dryRun && targets.length > 0;
   // No push target, or push switched off: alerts go to alerts/<date>.md for the agent to show.
   const saveToFile = !dryRun && !shouldPush;
   const archiveOptions = { dataDir: getDataDir(), capturedAt: snapshot.capturedAt, keepDays: config.archive?.keepDays };
@@ -406,10 +406,15 @@ async function main() {
     };
     saveState(state);
 
-    const sent = await sendMessage(webhook, message, { channel });
-    if (sent) {
+    // Every place that is set; an alert that reached at least one place is not sent again.
+    const failed = [];
+    for (const target of targets) {
+      if (!await sendMessage(target.webhook, message, { channel: target.channel })) failed.push(channelLabel(target));
+    }
+    if (failed.length < targets.length) {
       sentCount++;
       saveAlert(message, archiveOptions);
+      if (failed.length) console.warn(`⚠️ Alert not delivered to ${failed.join(', ')}: ${alert.signal.title}`);
     } else {
       delete state.reported[alert.key];
       saveState(state);

@@ -9,7 +9,7 @@ Adapted for the Social Media AI Workflow Library, a non-commercial project. The 
 - Sources: Google Trends (RSS feed; Trending Now by category and Explore rising searches, read daily by the user's agent into `pages.json`), TikTok Creative Center hashtags (read by the agent), Wikipedia's most-read pages, YouTube channel feeds and website feeds; X trends and YouTube search as options with the user's own key. Weibo, Douyin, Tieba and Hupu were removed after the last comparison with v1.3.20.
 - Topics are set by the user with their agent (`topics`, with keywords, `requireAny`, `exclude` and `briefingExclude`), and the pages to read each day are listed in `dailyPages`.
 - English briefings and alerts, the user's time zone, K/M/B counts; English titles grouped by event words, with hashtags matched to the words they join.
-- Push to Slack, Discord, WeCom or Telegram; without a push target, briefings and alerts are saved for 7 days and shown with `show-briefing.js` when the user asks.
+- Push to Slack, Discord, WeCom and Telegram, to every place set up (alerts optionally to a separate one); without a push target, briefings and alerts are saved for 7 days and shown with `show-briefing.js` when the user asks.
 - The optional AI model uses the user's own OpenAI-compatible key; summaries come from the news links saved with Google Trends items.
 - Removed the OpenClaw-specific parts, Weibo intelligent search and the Agent Reach retriever.
 - The deploy self-check covers topics, each source, the saved pages and their age, push targets, keys and the time zone, in English.

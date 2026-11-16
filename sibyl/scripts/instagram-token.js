@@ -104,9 +104,9 @@ async function main() {
     } else {
       console.log('Sibyl: Instagram token. Have Graph API Explorer open with your app chosen and a token made.');
       appId = (await readVisible('App ID (App settings, Basic, in your Meta app): ')).trim();
-      process.stdout.write('App secret (same page, Show). It will not show on screen: ');
+      console.log('App secret (same page, Show). It is not shown on screen.');
       appSecret = (await readHidden()).trim();
-      process.stdout.write("Graph API Explorer's access token (copy button next to it). It will not show on screen: ");
+      console.log("Graph API Explorer's access token (copy button next to it). It is not shown on screen.");
       shortToken = (await readHidden()).trim();
     }
   } catch (error) {

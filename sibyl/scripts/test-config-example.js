@@ -40,7 +40,8 @@ const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'sibyl-config-'));
 try {
   fs.copyFileSync(path.join(__dirname, 'config.example.json'), path.join(dataDir, 'config.json'));
   const env = { ...process.env, SIBYL_DATA_DIR: dataDir, SIBYL_CONFIG: '', SIBYL_SKIP_NETWORK_CHECK: '1' };
-  ['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK', 'SIBYL_TELEGRAM_BOT_TOKEN'].forEach(key => delete env[key]);
+  ['SIBYL_ALERT_WEBHOOK', 'SIBYL_REPORT_WEBHOOK', 'SIBYL_SLACK_WEBHOOK', 'SIBYL_DISCORD_WEBHOOK', 'WECOM_WEBHOOK',
+    'SIBYL_TELEGRAM_BOT_TOKEN', 'SIBYL_TELEGRAM_CHAT_ID', 'SIBYL_TELEGRAM_ALERT_CHAT_ID'].forEach(key => delete env[key]);
   const result = spawnSync(process.execPath, [path.join(__dirname, 'check-deploy.js'), '--strict'], { env, encoding: 'utf8' });
   assert.strictEqual(result.status, 0, result.stdout + result.stderr);
   assert.ok(result.stdout.includes('[OK] Main sources: Google Trends, TikTok'));
@@ -54,6 +55,22 @@ try {
     .forEach(text => assert.ok(!result.stdout.includes(text), `no line about ${text} with files only`));
   // The page reading line says which pages are late, each against its own interval.
   assert.ok(result.stdout.includes('[WARN] Page reading: late: TikTok: Beauty & Personal Care (once a day)'));
+
+  // Slack and Telegram saved: one line names every place, alerts go to the same places, and nothing
+  // is said about webhooks in the scheduled task, which reads data/.env itself (tested 2026-11-16).
+  const pushed = spawnSync(process.execPath, [path.join(__dirname, 'check-deploy.js')], {
+    env: {
+      ...env,
+      SIBYL_SLACK_WEBHOOK: 'https://hooks.slack.com/services/T0/B0/fake',
+      SIBYL_TELEGRAM_BOT_TOKEN: '123456:ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+      SIBYL_TELEGRAM_CHAT_ID: '42'
+    },
+    encoding: 'utf8'
+  }).stdout;
+  assert.ok(pushed.includes('[OK] Briefing push: Slack (hooks.slack.com); Telegram (bot and chat ID set)'), pushed);
+  assert.ok(pushed.includes('[OK] Alert push: the same places as briefings'));
+  ['in the scheduled task', 'Separate alert and briefing webhooks', 'Webhooks in scheduled tasks', 'fake', 'ABCDEFG']
+    .forEach(text => assert.ok(!pushed.includes(text), `no "${text}" with push targets saved`));
 } finally {
   fs.rmSync(dataDir, { recursive: true, force: true });
 }

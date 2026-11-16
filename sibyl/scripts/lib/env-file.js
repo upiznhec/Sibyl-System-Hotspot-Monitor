@@ -24,15 +24,19 @@ function parseEnvText(text) {
   return values;
 }
 
-// Sets NAME=value, replacing any earlier line for NAME (with or without "export") and keeping the rest.
-function setEnvValue(text, name, value) {
+// Removes every line for NAME (with or without "export") and keeps the rest.
+function unsetEnvValue(text, name) {
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(String(name))) throw new Error(`Not a variable name: ${name}`);
-  if (/[\r\n]/.test(String(value))) throw new Error('The value must be one line.');
   const earlier = new RegExp(`^\\s*(?:export\\s+)?${name}\\s*=`);
   const kept = String(text || '').split(/\r?\n/).filter(line => !earlier.test(line));
   while (kept.length && kept[kept.length - 1].trim() === '') kept.pop();
-  kept.push(`${name}=${value}`);
-  return `${kept.join('\n')}\n`;
+  return kept.length ? `${kept.join('\n')}\n` : '';
+}
+
+// Sets NAME=value, replacing any earlier line for NAME (with or without "export") and keeping the rest.
+function setEnvValue(text, name, value) {
+  if (/[\r\n]/.test(String(value))) throw new Error('The value must be one line.');
+  return `${unsetEnvValue(text, name)}${name}=${value}\n`;
 }
 
 function envFilePath(dataDir = getDataDir()) {
@@ -57,22 +61,42 @@ function loadEnvFile(dataDir = getDataDir()) {
   return { file, exists: true, loaded };
 }
 
-// Writes NAME=value into the .env file in one step (cron never reads half a file), readable only by
-// the owner. Used by save-secret.js, which the person runs so that a key never passes through a chat.
-function writeEnvValue(dataDir, name, value) {
+function readEnvText(dataDir = getDataDir()) {
+  try {
+    return fs.readFileSync(envFilePath(dataDir), 'utf8');
+  } catch (error) {
+    return '';
+  }
+}
+
+// The saved values, without touching process.env.
+function readEnvValues(dataDir = getDataDir()) {
+  return parseEnvText(readEnvText(dataDir));
+}
+
+// Writes the whole file in one step (cron never reads half a file), readable only by the owner.
+function writeEnvText(dataDir, text) {
   fs.mkdirSync(dataDir, { recursive: true });
   const file = envFilePath(dataDir);
-  let text = '';
-  try {
-    text = fs.readFileSync(file, 'utf8');
-  } catch (error) {
-    text = '';
-  }
   const temp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(temp, setEnvValue(text, name, value), { mode: 0o600 });
+  fs.writeFileSync(temp, text, { mode: 0o600 });
   fs.renameSync(temp, file);
   if (process.platform !== 'win32') fs.chmodSync(file, 0o600);
   return file;
+}
+
+// Writes NAME=value into the .env file. Used by save-secret.js, which the person runs so that a key
+// never passes through a chat.
+function writeEnvValue(dataDir, name, value) {
+  return writeEnvText(dataDir, setEnvValue(readEnvText(dataDir), name, value));
+}
+
+// Removes NAME from the .env file; false when it was not there.
+function removeEnvValue(dataDir, name) {
+  const text = readEnvText(dataDir);
+  if (!Object.prototype.hasOwnProperty.call(parseEnvText(text), name)) return false;
+  writeEnvText(dataDir, unsetEnvValue(text, name));
+  return true;
 }
 
 // True when only the owner can read the file (mode 600 or stricter), or when there is no file.
@@ -92,6 +116,9 @@ module.exports = {
   envFilePath,
   loadEnvFile,
   parseEnvText,
+  readEnvValues,
+  removeEnvValue,
   setEnvValue,
+  unsetEnvValue,
   writeEnvValue
 };
