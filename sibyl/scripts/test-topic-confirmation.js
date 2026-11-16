@@ -12,7 +12,7 @@ configureLocale({ language: 'en', timeZone: 'America/Los_Angeles' });
 const { generateReport, selectReportClusters } = require('./lib/report-generator');
 
 function signal(platform, title, extra = {}) {
-  const label = platform === 'google-trends' ? 'Google Trends' : 'TikTok';
+  const label = { 'google-trends': 'Google Trends', 'youtube-search': 'YouTube search' }[platform] || 'TikTok';
   return { title, platform, platformLabel: label, sourceType: 'daily_page', rank: 1, heat: 1000, ...extra };
 }
 
@@ -57,6 +57,23 @@ const all = [listOnly, keyword, twoSources, feedItem];
 // A keyword, a second source, or a list not read for the topic confirms it; a list item alone does not.
 assert.deepStrictEqual(selectReportClusters(all, config).map(item => item.canonicalTitle),
   ['mineral sunscreen recall', '#glasskin', 'Brand A recall']);
+
+// A supporting source does not confirm: in the Claude test, YouTube videos sharing one word made
+// Explore's "Brand" and TikTok's #routine lead. With a keyword on a main source, YouTube still adds.
+const lentKeyword = cluster('Brand', [
+  signal('google-trends', 'Brand', { topicHint: 'Beauty', matchedKeywords: [] }),
+  signal('youtube-search', 'My favourite makeup brand haul', { matchedKeywords: ['makeup'] })
+], 70, ['makeup']);
+const lentSource = cluster('#routine', [
+  signal('tiktok-creative-center', '#routine', { topicHint: 'Beauty', matchedKeywords: [] }),
+  signal('youtube-search', 'Dark Knees Try This Simple Skincare Routine', { matchedKeywords: ['skincare'] })
+], 71, ['skincare']);
+const mainKeyword = cluster('reef safe sunscreen', [
+  signal('google-trends', 'reef safe sunscreen', { topicHint: 'Beauty', matchedKeywords: ['sunscreen'] }),
+  signal('youtube-search', 'Reef safe sunscreen test', { matchedKeywords: ['sunscreen'] })
+], 58, ['sunscreen']);
+assert.deepStrictEqual(selectReportClusters([lentSource, lentKeyword, mainKeyword], config).map(item => item.canonicalTitle),
+  ['reef safe sunscreen']);
 
 const report = generateReport(all, { generatedAt }, config);
 assert.ok(report.includes('### 1. '), report);

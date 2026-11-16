@@ -2,7 +2,9 @@
 // account with prepaid credits and cost US$0.010 per request when checked (2026-11-10), so it
 // is off by default and requested at most every 30 minutes (minIntervalMinutes). The bearer
 // token comes from SIBYL_X_BEARER_TOKEN (preferred) or platforms["x-trends"].bearerToken.
-// Not tested against the live API yet: no token was available.
+// Tested live on 2026-11-15: this endpoint returns trend names only, with no post counts, even when
+// tweet_count is asked for. X items therefore rank by position, and their count stays unknown
+// (heat 0, shown as nothing) rather than a made-up 0 posts; a count is used if X ever sends one.
 
 const { requestJson } = require('../lib/http');
 const { makeSignal } = require('../lib/signals');
@@ -11,6 +13,16 @@ const { cached } = require('../lib/source-cache');
 const API = 'https://api.x.com/2/trends/by/woeid/';
 // WOEIDs listed in X's documentation. For other places set platforms["x-trends"].woeid.
 const WOEIDS = { WORLDWIDE: 1, US: 23424977, GB: 23424975, UK: 23424975, JP: 23424856 };
+
+// Trend names in X's order; posts is null when X gives no count.
+function trendItems(data) {
+  return (data?.data || [])
+    .map(trend => {
+      const posts = Number(trend?.tweet_count);
+      return { name: String(trend?.trend_name || '').trim(), posts: posts > 0 ? posts : null };
+    })
+    .filter(trend => trend.name);
+}
 
 function searchUrl(title) {
   return `https://x.com/search?q=${encodeURIComponent(title)}`;
@@ -34,9 +46,7 @@ async function fetchXTrendSignals(config = {}, context = {}) {
       retries: 0,
       timeout: 20000
     });
-    return (data?.data || [])
-      .map(trend => ({ name: String(trend?.trend_name || '').trim(), posts: Number(trend?.tweet_count) || 0 }))
-      .filter(trend => trend.name);
+    return trendItems(data);
   });
 
   return items.map((trend, index) => makeSignal({
@@ -75,5 +85,6 @@ const source = {
 module.exports = {
   WOEIDS,
   fetchXTrendSignals,
-  source
+  source,
+  trendItems
 };

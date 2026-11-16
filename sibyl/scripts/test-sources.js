@@ -155,6 +155,15 @@ async function main() {
   assert.ok(/\[Google Trends\]\(https:\/\/trends\.google\.com\/trends\/explore\?/.test(report));
   assert.ok(!/[\u4e00-\u9fa5]/.test(report), 'no Chinese text in the English briefing');
   if (process.argv.includes('--print')) console.log(report);
+  // A dry run leaves the history and the saved briefings alone; a real run keeps both.
+  assert.ok(!fs.existsSync(path.join(dataDir, 'state.json')), 'a test briefing does not change the history');
+  assert.ok(!fs.existsSync(path.join(dataDir, 'briefings')), 'a test briefing keeps no copy');
+  const real = spawnSync(process.execPath, [path.join(__dirname, 'sibyl.js'), '--no-ai', '--no-summary'], {
+    env: { ...process.env, SIBYL_DATA_DIR: dataDir, SIBYL_CONFIG: '' },
+    encoding: 'utf8'
+  });
+  assert.strictEqual(real.status, 0, real.stderr || real.stdout);
+  assert.ok(fs.existsSync(path.join(dataDir, 'state.json')), 'a real briefing updates the history');
 
   console.log('source tests passed');
 }

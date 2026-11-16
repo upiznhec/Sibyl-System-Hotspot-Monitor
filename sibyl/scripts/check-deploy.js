@@ -221,7 +221,7 @@ function checkSources(config, dataDir, recommended, optional) {
     if (id === 'youtube-search') {
       const hasKey = Boolean(process.env.SIBYL_YOUTUBE_API_KEY || settings.apiKey);
       checkLine(optional, 'optional', label, hasKey,
-        hasKey ? `API key set; searches at most every ${settings.minIntervalMinutes ?? 60} minutes` : 'on, but no API key',
+        hasKey ? `API key set; searches about every ${settings.minIntervalMinutes ?? 60} minutes` : 'on, but no API key',
         'Set SIBYL_YOUTUBE_API_KEY (a free YouTube Data API v3 key; about 100 searches a day).');
       return;
     }
@@ -229,7 +229,7 @@ function checkSources(config, dataDir, recommended, optional) {
       const hasToken = Boolean(process.env.SIBYL_X_BEARER_TOKEN || settings.bearerToken);
       checkLine(optional, 'optional', label, hasToken,
         hasToken
-          ? `bearer token set; requests at most every ${settings.minIntervalMinutes ?? 30} minutes (about US$0.01 each)`
+          ? `bearer token set; requests about every ${settings.minIntervalMinutes ?? 30} minutes (about US$0.01 each)`
           : 'on, but no bearer token',
         'Set SIBYL_X_BEARER_TOKEN. The X developer account needs prepaid credits and is charged per request.');
     }
@@ -238,6 +238,7 @@ function checkSources(config, dataDir, recommended, optional) {
     checkLine(recommended, 'recommended', 'Daily reading list', false, 'dailyPages is not set',
       'After mapping the topics, write the pages to read each day as config.dailyPages (see AGENTS.md, "Mapping topics").');
   }
+  const stalePages = [];
   dailyPages.forEach(page => {
     const view = page.source === 'google-trends' ? (page.view || 'trending') : null;
     const ages = pages.sections
@@ -245,6 +246,7 @@ function checkSources(config, dataDir, recommended, optional) {
       .filter(section => !view || (section.view || 'trending') === view)
       .filter(section => ['industry', 'category', 'keyword'].every(key => !page[key] || sameText(section[key], page[key])))
       .map(section => section.ageHours);
+    if (!fresh(ages)) stalePages.push(dailyPageName(page));
     checkLine(recommended, 'recommended', dailyPageName(page), fresh(ages), pagesDetail(ages),
       'Have your agent read this page and save it to pages.json (see AGENTS.md, "Reading the daily pages").');
   });
@@ -252,6 +254,7 @@ function checkSources(config, dataDir, recommended, optional) {
     .filter(problem => !/^no pages file/.test(problem))
     .forEach(problem => checkLine(recommended, 'recommended', 'pages.json', false, problem,
       'Have your agent read the pages again and save them in the format in lib/pages-file.js.'));
+  return { dailyPageCount: dailyPages.length, stalePages };
 }
 
 function statusIcon(item) {
@@ -357,38 +360,47 @@ async function main() {
   const taskHasReportWebhook = commandHasVariable(taskCommands, ['SIBYL_REPORT_WEBHOOK', 'WECOM_WEBHOOK']);
   const taskHint = 'Set a webhook (Slack, Discord or WeCom), or SIBYL_TELEGRAM_BOT_TOKEN and SIBYL_TELEGRAM_CHAT_ID for Telegram; with neither, briefings are saved as files. A webhook written only in the scheduled task command is not visible to this check: confirm it below or pass the command with --task-command.';
 
-  checkLine(recommended, 'recommended', 'Alert push target', maskStatus(alert.webhook),
-    maskStatus(alert.webhook) ? 'set in the environment or config' : 'not set', taskHint);
-  if (maskStatus(alert.webhook)) {
-    const target = describeTarget(alert);
-    checkLine(recommended, 'recommended', 'Alert channel', target.ok, target.detail,
-      'Slack, Discord and Telegram are recognised by their address; for any other address (a relay, for example), set alerts.channel to wecom, slack, discord or telegram.');
+  // No push target and no task command: briefings and alerts are saved as files, a supported
+  // setup, so one line says so instead of warnings about webhooks that are not meant to exist.
+  const noPush = !maskStatus(alert.webhook) && !maskStatus(report.webhook);
+  const keepDays = Number(config.archive?.keepDays) > 0 ? Number(config.archive.keepDays) : 7;
+  if (noPush && !taskCommands) {
+    checkLine(recommended, 'recommended', 'Push target', true,
+      `none: briefings and alerts are saved as files and kept ${keepDays} days`, taskHint);
+  } else {
+    checkLine(recommended, 'recommended', 'Alert push target', maskStatus(alert.webhook),
+      maskStatus(alert.webhook) ? 'set in the environment or config' : 'not set', taskHint);
+    if (maskStatus(alert.webhook)) {
+      const target = describeTarget(alert);
+      checkLine(recommended, 'recommended', 'Alert channel', target.ok, target.detail,
+        'Slack, Discord and Telegram are recognised by their address; for any other address (a relay, for example), set alerts.channel to wecom, slack, discord or telegram.');
+    }
+
+    checkLine(recommended, 'recommended', 'Briefing push target', maskStatus(report.webhook),
+      maskStatus(report.webhook) ? 'set in the environment or config' : 'not set', taskHint);
+    if (maskStatus(report.webhook)) {
+      const target = describeTarget(report);
+      checkLine(recommended, 'recommended', 'Briefing channel', target.ok, target.detail,
+        'Slack, Discord and Telegram are recognised by their address; for any other address (a relay, for example), set report.channel to wecom, slack, discord or telegram.');
+    }
+
+    checkLine(recommended, 'recommended', 'Alert webhook in the scheduled task', taskHasAlertWebhook,
+      taskHasAlertWebhook ? 'SIBYL_ALERT_WEBHOOK or WECOM_WEBHOOK found in the task command' : 'no task command given, so this cannot be checked',
+      'Run: node scripts/check-deploy.js --task-command="export SIBYL_ALERT_WEBHOOK=... && node scripts/instant-alerts.js --push"');
+
+    checkLine(recommended, 'recommended', 'Briefing webhook in the scheduled task', taskHasReportWebhook,
+      taskHasReportWebhook ? 'SIBYL_REPORT_WEBHOOK or WECOM_WEBHOOK found in the task command' : 'no task command given, so this cannot be checked',
+      'Run: node scripts/check-deploy.js --task-command="export SIBYL_REPORT_WEBHOOK=... && node scripts/sibyl.js --push"');
+
+    const splitInProcess = maskStatus(process.env.SIBYL_ALERT_WEBHOOK) && maskStatus(process.env.SIBYL_REPORT_WEBHOOK);
+    const splitInTask = commandHasVariable(taskCommands, ['SIBYL_ALERT_WEBHOOK']) &&
+      commandHasVariable(taskCommands, ['SIBYL_REPORT_WEBHOOK']);
+    checkLine(recommended, 'recommended', 'Separate alert and briefing webhooks', splitInProcess || splitInTask,
+      splitInProcess || splitInTask
+        ? 'alerts and briefings go to separate webhooks'
+        : 'separate SIBYL_ALERT_WEBHOOK and SIBYL_REPORT_WEBHOOK not both found',
+      'Set SIBYL_ALERT_WEBHOOK and SIBYL_REPORT_WEBHOOK separately; WECOM_WEBHOOK is only a shared fallback.');
   }
-
-  checkLine(recommended, 'recommended', 'Briefing push target', maskStatus(report.webhook),
-    maskStatus(report.webhook) ? 'set in the environment or config' : 'not set', taskHint);
-  if (maskStatus(report.webhook)) {
-    const target = describeTarget(report);
-    checkLine(recommended, 'recommended', 'Briefing channel', target.ok, target.detail,
-      'Slack, Discord and Telegram are recognised by their address; for any other address (a relay, for example), set report.channel to wecom, slack, discord or telegram.');
-  }
-
-  checkLine(recommended, 'recommended', 'Alert webhook in the scheduled task', taskHasAlertWebhook,
-    taskHasAlertWebhook ? 'SIBYL_ALERT_WEBHOOK or WECOM_WEBHOOK found in the task command' : 'no task command given, so this cannot be checked',
-    'Run: node scripts/check-deploy.js --task-command="export SIBYL_ALERT_WEBHOOK=... && node scripts/instant-alerts.js --push"');
-
-  checkLine(recommended, 'recommended', 'Briefing webhook in the scheduled task', taskHasReportWebhook,
-    taskHasReportWebhook ? 'SIBYL_REPORT_WEBHOOK or WECOM_WEBHOOK found in the task command' : 'no task command given, so this cannot be checked',
-    'Run: node scripts/check-deploy.js --task-command="export SIBYL_REPORT_WEBHOOK=... && node scripts/sibyl.js --push"');
-
-  const splitInProcess = maskStatus(process.env.SIBYL_ALERT_WEBHOOK) && maskStatus(process.env.SIBYL_REPORT_WEBHOOK);
-  const splitInTask = commandHasVariable(taskCommands, ['SIBYL_ALERT_WEBHOOK']) &&
-    commandHasVariable(taskCommands, ['SIBYL_REPORT_WEBHOOK']);
-  checkLine(recommended, 'recommended', 'Separate alert and briefing webhooks', splitInProcess || splitInTask,
-    splitInProcess || splitInTask
-      ? 'alerts and briefings go to separate webhooks'
-      : 'separate SIBYL_ALERT_WEBHOOK and SIBYL_REPORT_WEBHOOK not both found',
-    'Set SIBYL_ALERT_WEBHOOK and SIBYL_REPORT_WEBHOOK separately; WECOM_WEBHOOK is only a shared fallback.');
 
   const model = readModelSettings(config);
   const hasModelKey = maskStatus(model.apiKey);
@@ -415,7 +427,7 @@ async function main() {
       : `not set; using the example topic (${topicSettings.categoryNames.join(', ')})`,
     'Have your agent draft topics, keywords and exclude words from what you want to track; after you confirm them, it writes them to config.topics.');
 
-  checkSources(config, dataDir, recommended, optional);
+  const pageStatus = checkSources(config, dataDir, recommended, optional);
 
   // Briefing times use config.timeZone; cron runs on the computer's own zone.
   const timezone = readTimezone();
@@ -431,23 +443,30 @@ async function main() {
       ? `Scheduled tasks run on the computer's zone; convert the task times to ${configuredZone || systemZone}, or set timeZone to the computer's zone.`
       : 'Use an IANA zone name for timeZone, such as America/New_York, Europe/London or Asia/Singapore.');
 
-  checkLine(manual, 'manual', 'No double pushes', false,
-    'check in your scheduler',
-    'With --push the scripts call the webhook themselves; the scheduler should only run them on time, not send their output again.');
+  if (!noPush || taskCommands) {
+    checkLine(manual, 'manual', 'No double pushes', false,
+      'check in your scheduler',
+      'With --push the scripts call the webhook themselves; the scheduler should only run them on time, not send their output again.');
+  }
   const schedule = scheduleStatus();
   checkLine(manual, 'manual', 'Scheduled tasks', Boolean(schedule),
     schedule ? 'installed by scripts/schedule.js (crontab)' : 'no schedule from scripts/schedule.js found',
     'Install it with: node scripts/schedule.js --install --hours=10-22 (the person\'s hours). On Windows it prints the Task Scheduler settings.');
-  checkLine(manual, 'manual', 'Daily page reading', false,
-    'check that your agent reads the TikTok and Google Trends pages once a day',
-    'The agent reads the hashtag list, the category page and Explore, and writes pages.json; when it has not, the scripts use the last saved pages.');
-  checkLine(manual, 'manual', 'Webhooks in scheduled tasks', taskHasAlertWebhook && taskHasReportWebhook,
-    taskCommands ? 'checked against the task command given' : 'no task command given; if the webhooks are only in the scheduled task, rely on its settings',
-    'This check cannot read your scheduler\'s settings; pass the commands with --task-command or SIBYL_TASK_COMMANDS.');
+  if (pageStatus.dailyPageCount > 0) {
+    checkLine(manual, 'manual', 'Daily page reading', pageStatus.stalePages.length === 0,
+      pageStatus.stalePages.length === 0
+        ? `every page on the reading list was read in the last ${PAGES_STALE_HOURS} hours`
+        : `not read in the last ${PAGES_STALE_HOURS} hours: ${pageStatus.stalePages.join('; ')}`,
+      'Your agent reads these pages once a day, as a daily task or when you ask: "Read today\'s trend pages for Sibyl." Until then the scripts use the last saved pages.');
+  }
+  if (!noPush || taskCommands) {
+    checkLine(manual, 'manual', 'Webhooks in scheduled tasks', taskHasAlertWebhook && taskHasReportWebhook,
+      taskCommands ? 'checked against the task command given' : 'no task command given; if the webhooks are only in the scheduled task, rely on its settings',
+      'This check cannot read your scheduler\'s settings; pass the commands with --task-command or SIBYL_TASK_COMMANDS.');
+  }
 
   const tips = [];
-  if (!maskStatus(alert.webhook) && !maskStatus(report.webhook)) {
-    const keepDays = Number(config.archive?.keepDays) > 0 ? Number(config.archive.keepDays) : 7;
+  if (noPush) {
     tips.push(`No push is set: briefings and instant alerts are saved as files (${path.join(dataDir, 'briefings')}, ${path.join(dataDir, 'alerts')}, kept ${keepDays} days) and nothing is sent.`);
     tips.push(`To read them, ask your agent, for example: "${ASK_EXAMPLES.join('", "')}". The agent runs node scripts/show-briefing.js and shows a briefing only when you ask.`);
   }

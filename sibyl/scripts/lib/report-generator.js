@@ -256,13 +256,18 @@ function hasBroadcastSeed(cluster, config = {}) {
 // wider than the topic, and their items count for it without matching a keyword. Such an event leads
 // the briefing only when a keyword matches or a second source shows it; otherwise it goes to the watch
 // list. Found in testing: "sheltered inlets" rose in Explore for "sunscreen" and led a beauty briefing.
-function confirmedForTopic(cluster) {
+// Only main sources (report.seedPlatforms) count here. A supporting source such as YouTube search adds
+// weight to an event but cannot confirm it: in the Claude test, YouTube videos that shared one word
+// with "Brand", "Why Would You?" and #routine lent them a keyword and a second source, and they led.
+function confirmedForTopic(cluster, config = {}) {
   const signals = cluster.signals || [];
   if (signals.length === 0) return true;
-  if (signals.some(signal => !signal.topicHint)) return true;
-  if ((cluster.keywords || []).length > 0) return true;
-  if (signals.some(signal => (signal.matchedKeywords || []).length > 0)) return true;
-  return new Set(signals.map(signal => signal.platform)).size >= 2;
+  const seeds = new Set(seedPlatforms(config));
+  const main = signals.filter(signal => seeds.has(signal.platform));
+  const counted = main.length ? main : signals;
+  if (counted.some(signal => !signal.topicHint)) return true;
+  if (counted.some(signal => (signal.matchedKeywords || []).length > 0)) return true;
+  return new Set(counted.map(signal => signal.platform)).size >= 2;
 }
 
 function eligibleReportClusters(clusters, config = {}) {
@@ -286,7 +291,7 @@ function selectReportClusters(clusters, config = {}) {
   const minScore = config.minScore || 0;
   return eligibleReportClusters(clusters, config)
     .filter(cluster => cluster.score >= minScore)
-    .filter(cluster => config.requireTopicConfirmation === false || confirmedForTopic(cluster))
+    .filter(cluster => config.requireTopicConfirmation === false || confirmedForTopic(cluster, config))
     .slice(0, topN);
 }
 

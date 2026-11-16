@@ -39,7 +39,7 @@ Sibyl watches trend lists for the topics you choose. On a schedule it:
 | TikTok Creative Center | Top hashtags by country and industry, with posts and views over 7 days | Your agent, once a day | Nothing for the top 3; a free TikTok for Business login for more | On |
 | Wikipedia | The most-read pages in your country yesterday | Script | A web address or email, for Wikimedia | On |
 | YouTube search (optional) | The most-viewed new videos for your keywords | Script, at most once an hour | A free key from Google | Off |
-| X trends (optional) | What is trending on X in your country | Script, at most every 30 minutes | A paid X developer account | Off |
+| X trends (optional) | What is trending on X in your country | Script, about every 30 minutes | A paid X developer account | Off |
 
 You choose the sources in the setup request (section 4.1). When a source needs something from you, your agent asks at that point, one thing at a time, and tells you what it is, what it costs and where to get it. Google Trends and TikTok are the main sources: an event must appear on one of them, or on X if you turn it on, to enter the briefing. Wikipedia and YouTube search add weight to those events.
 
@@ -63,7 +63,7 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 - Your agent's usage when it reads the pages once a day, and when you ask it for briefings or changes.
 - Optional: an AI to explain each trend in one line and to group related trends. It needs an API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website. Nothing is spent without one.
 - Optional: YouTube search, free within Google's daily allowance.
-- Optional: X trends, about US$0.01 per request. Sibyl asks at most every 30 minutes, so 10:00 to 22:00 costs about US$0.26 a day (about US$8 a month).
+- Optional: X trends, about US$0.01 per request. Sibyl asks about every 30 minutes, so 10:00 to 22:00 costs about US$0.26 a day (about US$8 a month).
 - The cost of a typical day will be measured during testing and added here.
 
 ### 1.6 What the messages look like

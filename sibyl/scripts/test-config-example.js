@@ -47,6 +47,12 @@ try {
   assert.ok(result.stdout.includes('[WARN] TikTok: Beauty & Personal Care: not in pages.json yet'));
   assert.ok(result.stdout.includes('[WARN] Google Trends Explore: sunscreen: not in pages.json yet'));
   assert.ok(result.stdout.includes('## Reading briefings'));
+  // Files only is a supported setup: one OK line, no warnings about webhooks.
+  assert.ok(result.stdout.includes('[OK] Push target: none: briefings and alerts are saved as files'));
+  ['Alert push target', 'Briefing push target', 'Separate alert and briefing webhooks', 'No double pushes', 'Webhooks in scheduled tasks']
+    .forEach(text => assert.ok(!result.stdout.includes(text), `no line about ${text} with files only`));
+  // The daily reading line says which pages are out of date instead of always warning.
+  assert.ok(result.stdout.includes('[WARN] Daily page reading: not read in the last 30 hours: TikTok: Beauty & Personal Care'));
 } finally {
   fs.rmSync(dataDir, { recursive: true, force: true });
 }

@@ -284,7 +284,7 @@ function buildMessage(alert, capturedAt) {
     wording.heading(platformLabel(signal)),
     '━━━━━━━━━━━━━━',
     signal.title,
-    wording.rankHeat(signal.rank || '-', displayHeat(signal)),
+    wording.rankHeat(signal.rank || '-', signal.heat ? displayHeat(signal) : ''),
     wording.summary(alert.summary || text().noSummary),
     link ? `[${wording.viewDetails}](${link})` : '',
     '━━━━━━━━━━━━━━',

@@ -93,7 +93,7 @@ Then take them through the steps under "Sources", one at a time, and end with th
 
 **X trends**, when it is chosen. Work out the cost for their hours first (rule 5).
 
-> X trends costs money: US$0.01 each time Sibyl checks, at most every 30 minutes, so about US$[amount] a day for your hours. You need your X account, and you buy credit yourself at the X Developer Console (https://console.x.com). Do you want to go ahead?
+> X trends costs money: US$0.01 each time Sibyl checks, about every 30 minutes, so about US$[amount] a day for your hours. You need your X account, and you buy credit yourself at the X Developer Console (https://console.x.com). Do you want to go ahead?
 
 If yes: in their own browser they sign in, buy credit and create an app, then save its Bearer Token with the save-secret command for `x`.
 
@@ -127,6 +127,8 @@ Seen when Codex and Claude set Sibyl up on a Mac (November 2026); expect them in
 | Unrelated items led the briefing: "sheltered inlets" from Explore's rising searches for "sunscreen", and oral-care hashtags from TikTok's Beauty & Personal Care | The scripts now keep such items in the watch list unless a keyword or a second source confirms them. After the first briefing, point out anything unrelated that still leads and offer an exclude word. |
 | Wikipedia was switched off, because these instructions then named only Google Trends and TikTok as on by default | Wikipedia is on by default; keep it on unless the person says no. |
 | The agent asked the person to paste the YouTube key into the chat, as these instructions then said; the person stopped the setup | Rule 4 and "Keys and logins": give them the `save-secret.js` command. A secret never goes through the chat. |
+| A narrow browser window made Google serve its mobile layout, whose table held the unfiltered list of 660 trends, and the agent wrote its own checker before saving | Read pages in a window at least 1280 px wide, write each page to `data/daily-pages/`, and save with `scripts/save-pages.js`, which refuses such lists. |
+| YouTube videos that shared one word with Explore's "Brand" and TikTok's #routine made them lead | Fixed in the scripts: only main sources confirm an item from a list read for the topic. If something unrelated still leads, offer an exclude word. |
 | Signed in to TikTok and Google in their own browser, the person had to sign in to TikTok again in the agent's browser, and would not sign in to Google there | "Keys and logins": one-time account steps happen in their own browser; for pages you read daily, use their browser or bring the sign-in over before asking for a new one. |
 
 ## Where things are
@@ -154,7 +156,9 @@ Run them from the `sibyl` folder.
 | `node scripts/instant-alerts.js --push` | Checks for alerts; pushes them, or saves them to `alerts/` when no push target is set. |
 | `node scripts/instant-alerts.js --no-push` | The same check without sending or saving (a dry run). |
 | `node scripts/sibyl.js --push` | Writes the hourly briefing; pushes it, or saves it to `briefings/`. |
-| `node scripts/sibyl.js --print --no-push` | Writes a test briefing and prints it; sends and saves nothing else. |
+| `node scripts/sibyl.js --print --no-push` | Writes a test briefing and prints it. It sends nothing, keeps no copy and leaves the history alone, so the next real briefing compares with the last real one. |
+| `node scripts/save-pages.js` | Saves the pages you read today (files in `data/daily-pages/`) into `pages.json`, checking each; a page that fails keeps its last saved list (see "Reading the daily pages"). |
+| `node scripts/save-secret.js <name>` | For the person to run in their own terminal: saves a key, token or webhook address in `data/.env` (see "Keys and logins"). |
 | `node scripts/show-briefing.js` | Prints the latest saved briefing. `--list` lists them; `--file=2026-11-11_1000` prints one; `--alerts` prints today's alerts; `--alerts --date=2026-11-10` prints another day's. |
 
 `--no-ai` skips the AI model; `--no-summary` skips summaries.
@@ -248,13 +252,13 @@ YouTube channels and websites are not in the setup request: following particular
 
 That writes `SIBYL_YOUTUBE_API_KEY` to `sibyl/data/.env`. Check it with `check-deploy.js`, then set `enabled: true`. Leave `queries` empty to search the topic's first 6 keywords at once, or set up to 3 queries (words joined with `|` match any of them).
 
-**X trends.** First say what it costs and wait for the person's OK (rule 5): about US$0.01 per request, paid in advance as credit. Sibyl asks at most every 30 minutes (`minIntervalMinutes: 30`), about 2 requests an hour; for 10:00 to 22:00 that is about US$0.26 a day, or US$8 a month. Work out the figure for their hours. Then:
+**X trends.** First say what it costs and wait for the person's OK (rule 5): about US$0.01 per request, paid in advance as credit. Sibyl asks about every 30 minutes (`minIntervalMinutes: 30`), 2 requests an hour; for 10:00 to 22:00 that is about US$0.26 a day, or US$8 a month. Work out the figure for their hours. Then:
 
 1. Give them the X Developer Console, `https://console.x.com` (prices: `https://docs.x.com/x-api/getting-started/pricing`), to open in their own browser. They sign in with their X account and buy credit themselves; never enter payment details.
 2. They create an app, copy its Bearer Token and save it with `node scripts/save-secret.js x`.
 3. Check it with `check-deploy.js`, set `enabled: true`, and add `x-trends` to `report.seedPlatforms`.
 
-The US, the UK, Japan and worldwide are built in; for another country, set `platforms["x-trends"].woeid` from X's documentation. Items in the person's topics that reach X's top 5 or 50K posts also alert (`alerts.platforms["x-trends"]`).
+The US, the UK, Japan and worldwide are built in; for another country, set `platforms["x-trends"].woeid` from X's documentation. Items in the person's topics that reach X's top 5 also alert (`alerts.platforms["x-trends"]`). X's trends endpoint gives names only, with no post counts (tested 2026-11-15), so X items rank by position and the 50K-posts limit does not apply.
 
 ## AI explanations (summaries)
 
@@ -264,27 +268,43 @@ If they have a key, they save it with `node scripts/save-secret.js ai`; you add 
 
 ## Reading the daily pages
 
-Once a day (before the person's first hour, or when asked: "Read today's trend pages for Sibyl"), read every page in `dailyPages` in a browser and write `sibyl/data/pages.json`. The format is in the header of `sibyl/scripts/lib/pages-file.js`. Each section copies the page's `source`, `view`, `region`, `industry` / `category` / `keyword` and `topic` from `dailyPages`, adds `readAt` (the time you read it, with time zone) and `url`, and lists the items.
+Once a day (before the person's first hour, or when asked: "Read today's trend pages for Sibyl"), read every page in `dailyPages` in a browser. Write each page you read as one JSON file in `sibyl/data/daily-pages/` (any name ending in `.json`): a section in the format in the header of `sibyl/scripts/lib/pages-file.js`, with the page's `source`, `view`, `region` and `industry` / `category` / `keyword` copied from `dailyPages`, `readAt` (the time you read it, with time zone), `url` and the items. Then run `node scripts/save-pages.js`. It saves every page that passes its checks into `pages.json` in one step and keeps the last saved list for any page that does not. Never write `pages.json` yourself: the scheduled runs read it every 10 minutes and could catch it half written.
+
+Add these fields when you can, so that the checks can catch a bad read:
+
+- `shown`: the filter or keyword the page shows, such as the industry in TikTok's filter. A different one means a click picked the wrong item.
+- `total`: the row count the page shows, such as "1–6 of 6".
+- `checksum`: computed in the browser over the rows you read, with the function below, so that a row changed on its way to the file is caught.
+- `noData: true`, with no items, when Explore says there is not enough data.
+
+```js
+function rowsChecksum(items) { const t = JSON.stringify(items.map(i => [Number(i.rank), String(i.title)])); let h = 5381; for (let i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0; return h; }
+```
+
+Before reading, make the browser window at least 1280 px wide: in a narrow window Google switches to a mobile layout whose table holds the unfiltered list. Google's pages can take a minute or two to settle, so wait and look again instead of reading early.
 
 **TikTok Creative Center hashtags**
 
 - Open `https://ads.tiktok.com/creative/creativeCenter/trends/hashtag?region=US&period=7` (change `region`), and choose the industry in the page's industry filter.
 - For each row save `rank`, `title` (the hashtag), `posts` and `views` as shown (for example "43.7K" and "325.3M").
-- Without a login the page shows the top 3 and then "View more", which needs a login.
+- Without a login the page shows the top 3 and then "View more", which needs a login. After logging in, the site may open its home page: open the hashtag page again.
+- The industry menu opens with an animation: wait for it, and check that the filter shows the industry before reading.
+- The list loads as you scroll and keeps only about 14 rows in the page at a time, so collect the rows while scrolling.
 
 **Google Trends, Trending Now by category**
 
 - Open `https://trends.google.com/trending?geo=US&category=2&hours=24` (change `geo` and `category`).
 - The unfiltered list appears first and can stay for more than 5 seconds. Wait until the row count under the table ("1–6 of 6") matches the chosen category before reading.
 - For each row save `rank`, `title`, `searchVolume` (such as "2K+") and `rise` (such as "200%").
+- A category has fewer than 100 rows. Hundreds of rows mean the filter has not applied yet, or the window is too narrow.
 
 **Google Trends Explore, rising searches**
 
 - Open `https://trends.google.com/trends/explore?date=now%207-d&geo=US&q=sunscreen` (change `geo` and `q`).
-- Under "Related queries" and "Related topics", with "Rising" selected, save each row's `rank`, `title`, `rise` (such as "+350%" or "Breakout") and `kind` (`query` or `topic`). Topics show as "Reef Safe - Topic"; save the name only.
+- Under "Related queries" and "Related topics", with "Rising" selected, save each row's `rank`, `title`, `rise` (such as "+350%" or "Breakout") and `kind` (`query` or `topic`). Topics show with a type after a dash, such as "Reef Safe - Topic" or "Hilton - Brand"; save the name only. Each list shows 5 rows at a time, with a button for the next 5.
 - Google is replacing this classic page. If it is gone and the new Explore asks for a sign-in, ask the person to sign in.
 
-**If a page fails** (a login expired, the page changed, nothing loads after a minute): keep that page's section from the last `pages.json` as it was, with its old `readAt`, and tell the person which page failed and why. The scripts use the last saved items and report their age.
+**If a page fails** (a login expired, the page changed, nothing loads after a minute): write no file for it; `save-pages.js` keeps that page's last list with its old `readAt`. Tell the person which page failed and why. The scripts use the last saved items and report their age.
 
 ## Scheduling
 
@@ -302,7 +322,7 @@ node scripts/schedule.js --remove
 - **Windows:** it prints the two Task Scheduler tasks to create, with the paths filled in.
 - **No secrets:** keys come from `sibyl/data/.env`, so the schedule holds none.
 
-**The daily page reading** needs you and a browser, so it is not part of this schedule. If you can run tasks on a schedule yourself, schedule "Read today's trend pages for Sibyl" each morning. If you cannot, tell the person during setup, in plain words, and ask them to start each day with that request.
+**The daily page reading** needs you and a browser, so it is not part of this schedule. If you can run tasks on a schedule yourself, schedule "Read today's trend pages for Sibyl" each morning. Such a task usually runs as a new session that does not remember this one, so its instructions must hold everything: the pages, the steps under "Reading the daily pages" and `save-pages.js`. In the Claude app, a scheduled task runs only while the app is open and the computer is awake, may start a few minutes late, and keeps the permission mode of the session that made it; tell the person. If you cannot, tell the person during setup, in plain words, and ask them to start each day with that request.
 
 Nothing else should post the scripts' output: with `--push` they send briefings themselves, and a second post would duplicate them.
 
@@ -343,7 +363,7 @@ Slack, Discord and Telegram are recognised by their address. For any other addre
 | --- | --- | --- |
 | `language` | `en` | Wording of briefings and alerts (English only for now) |
 | `report.seedPlatforms` | Google Trends, TikTok | Main sources: an event must appear on one to enter the briefing. Add `x-trends` when X is on. |
-| `alerts.platforms` | Google Trends top 3 or 20K+ searches; X top 5 or 50K posts | Alert limits |
+| `alerts.platforms` | Google Trends top 3 or 20K+ searches; X top 5 (X gives no post counts) | Alert limits |
 | `pagesMaxAgeHours` | 168 | Saved pages older than this are not used |
 | `report.requireTopicConfirmation` | `true` | Items from lists read for a topic lead the briefing only with a keyword match or a second source; `false` lets them lead as before |
 | `http.userAgent` | empty | With Wikipedia on: `SibylHotspotMonitor (<contact>)`, as under "Sources". Sent to Wikimedia only; other sites get a generic name. |

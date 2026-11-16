@@ -210,7 +210,7 @@ module.exports = {
   },
   alert: {
     heading: label => `🔥 ${label} high-heat alert`,
-    rankHeat: (rank, heat) => `Rank: #${rank} | Heat: ${heat}`,
+    rankHeat: (rank, heat) => (heat ? `Rank: #${rank} | Heat: ${heat}` : `Rank: #${rank}`),
     summary: summary => `Summary: ${summary}`,
     viewDetails: 'View details',
     trigger: rule => `Trigger: ${rule}`,

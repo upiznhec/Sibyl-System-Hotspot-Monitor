@@ -371,9 +371,10 @@ async function main() {
   writeJson(SIGNALS_FILE, signals.map(compactSignal));
   writeJson(CLUSTERS_FILE, clusters.map(cluster => compactCluster(cluster, reportConfig)));
   fs.writeFileSync(REPORT_FILE, report);
-  writeJson(STATE_FILE, buildNextState(clusters));
-  // A dated copy stays for 7 days (briefings/), so the agent can show it when asked.
-  // --no-push is a dry run and leaves no copy.
+  // --no-push is a dry run: it leaves the history alone, so the next real briefing still compares
+  // with the last real one ("also in the previous briefing", rising or steady), and keeps no copy.
+  // Otherwise a dated copy stays for 7 days (briefings/), so the agent can show it when asked.
+  if (!args.includes('--no-push')) writeJson(STATE_FILE, buildNextState(clusters));
   const savedFile = args.includes('--no-push')
     ? null
     : saveBriefing(report, { dataDir: DATA_DIR, generatedAt, keepDays: config.archive?.keepDays });
