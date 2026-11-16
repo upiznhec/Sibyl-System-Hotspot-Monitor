@@ -26,7 +26,8 @@ Sources to watch:
 
 Before scheduling anything, show me the sources, topics, keywords, exclude words and the category you chose on each platform, and wait for my OK.
 When you need something from me, such as a login, a key or a link, stop and ask me in this chat. Tell me what it is, why it is needed, whether it costs money, and where to get it.
-Never type my passwords. If a page needs a login, open it and let me log in myself.
+Never ask me to paste a key or token into this chat. Give me a command that saves it on my computer.
+Never type my passwords. If a page needs a login, use a browser where I am already logged in if you can; otherwise open it and let me log in myself.
 When you are done, run the Sibyl check and a test briefing, and show me both.
 ```
 

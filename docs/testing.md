@@ -61,3 +61,21 @@ Setup request: beauty topic, US, America/Los_Angeles, 05:00 to 22:00, no push ta
 | Wikipedia was off. | AGENTS.md then named only Google Trends and TikTok as on by default. | Fixed in AGENTS.md (commit a64f34e). |
 
 Fixed from commit 696420e on. Not yet re-tested with Codex.
+
+### 2026-11-15: Claude (desktop app, Code tab), macOS
+
+Same setup request as the Codex test. The copy tested was commit fc6afc8. A first run with Fable 5.2 was stopped by the person at the YouTube key, which the agent asked them to paste into the chat; the full run used Sonnet 5.5. Both sessions ran in Auto mode, so approving each command was not tested.
+
+Result: installed, configured and scheduled in about 64 minutes, about 25 of them the person's own steps (TikTok login 4, YouTube key 14, X token 5). All four sources were read live (319 items), the self-check had no required item missing, and the test briefing had 15 events. Cron ran on its own from 15:20 and wrote the 16:00 briefing. A daily page-reading task in the Claude app, built afterwards, refreshed all six pages in a test run. X cost US$0.02 in tests and about US$0.27 to 0.36 a day after; YouTube was free. The setup session used about 0.9M new input tokens, 67M cached input tokens and 0.37M output tokens; each daily reading run uses about 1.7M input tokens, mostly cached.
+
+| What happened | Cause | Fix |
+| --- | --- | --- |
+| The agent asked the person to paste the YouTube key into the chat | AGENTS.md asked for keys, tokens and webhook addresses in the chat in nine places, and CLAUDE.md said to ask for keys in a chat message | `scripts/save-secret.js` (commit ca5e7c1): the person pastes at a hidden prompt in their own terminal. AGENTS.md "Keys and logins", CLAUDE.md, the guide and the setup request. |
+| Signed in to TikTok in Safari, the person had to sign in again in the agent's browser; they would not sign in to Google there, and the agent could only look at Safari | AGENTS.md had the agent open every login page in its own browser | AGENTS.md "Keys and logins": one-time account steps in the person's own browser; for daily pages, their browser or the sign-in brought over first. Task page: request, step 4, "If it goes wrong". |
+| X returned trend names only, so X counts are 0 and the 50K-posts alert cannot fire | The pay-per-use trends endpoint returns no post counts | Open |
+| Generic Explore topics ("Brand", "Why Would You?") and #routine led the briefing after sharing a word with a YouTube video | Topic confirmation and event merging count a supporting source as a second source | Open; exclude words for now |
+| Only 2 of 10 events in the first briefing were about sunscreen, the person's focus | Explore items are scored by percentage rise, and a keyword adds little | Open; needs a decision on weighting |
+| 11 of 15 events read "No reliable summary yet" without AI | Explore items carry no news links | Open |
+| The first scheduled briefing marked every event "also in the previous briefing" | `sibyl.js --print --no-push` updates the history | Open |
+| The agent wrote its own page extractor and a checker that writes `pages.json` safely and keeps yesterday's section when a page fails | "Reading the daily pages" has no tool and no failure path; in a narrow window Google serves a mobile layout whose table holds the unfiltered list | Open; ship a page-saving tool with the repo |
+| The self-check warned about push targets with files only, and always about the daily reading | `check-deploy.js` | Open |

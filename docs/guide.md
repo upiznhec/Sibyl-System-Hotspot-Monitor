@@ -53,7 +53,7 @@ Not included in this version: Instagram, Threads and Facebook have no trend list
 - Scores and counts are a guide. Google Trends gives ranges ("20K+"), and TikTok counts cover the last 7 days.
 - Each trend's summary, one line on what it is about, is taken from news headlines, or written by an AI model if you add one. Check the facts before you use them.
 - Pages read by the agent can fail: a page may change, need a login, or load slowly. Sibyl then uses the last saved pages and reports how old they are.
-- Google is replacing the classic Explore page; the new one asks you to sign in to a Google account. When that happens, you sign in yourself in your agent's browser. Your agent never types your passwords.
+- Google is replacing the classic Explore page; the new one asks you to sign in to a Google account. When that happens, you sign in yourself: in your own browser if your agent can use it or bring the sign-in over, otherwise once in your agent's browser. Your agent never types your passwords.
 - Sources can change their pages or terms at any time. If one stops working, the others keep running.
 - The alert limits, source weights and score levels are first settings, to be adjusted after a week of testing.
 
@@ -170,9 +170,9 @@ Copy the setup request in [SETUP-PROMPT.md](../SETUP-PROMPT.md), fill in the par
 
 1. Downloads the folder and checks Node.js.
 2. Asks what you want to track, and proposes topics, keywords and exclude words, plus the matching category on each platform. It waits for your OK before saving anything.
-3. Sets your country and time zone, switches on the sources you chose, and asks you for what they need (section 1.3).
+3. Sets your country and time zone, switches on the sources you chose, and asks you for what they need (section 1.3). You save keys on your computer with a command your agent gives you; you never paste them into the chat.
 4. Sets up where briefings go, or leaves them as files.
-5. Opens TikTok Creative Center (and Google Trends Explore if it needs a sign-in) so that you can log in yourself, if you want to track trends on TikTok: without a login it shows only the top 3 hashtags. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
+5. If you want to track trends on TikTok, gets you logged in to TikTok Creative Center once: through your own browser if it can use it or bring your login over, otherwise in its own browser. Without a login it shows only the top 3 hashtags. The same goes for Google Trends Explore if it asks for a sign-in. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
 6. Reads the pages for the first time, runs the self-check and a first briefing, and shows you the result.
 7. Schedules the work with Sibyl's own scheduling script: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose. It also arranges the daily page reading. On a Mac, the Sibyl folder must not be in Desktop, Documents or Downloads; your agent moves it if needed.
 
@@ -255,11 +255,11 @@ In Sibyl, keep items containing "[promo code]" out of the [Beauty] briefing.
 **Change where briefings go**
 
 ```text
-Send Sibyl's hourly briefing to this [Slack] webhook: [address]. Keep the alerts where they are now, then run the Sibyl check.
+Send Sibyl's hourly briefing to a [Slack] channel. Give me the command to save its webhook address on my computer, keep the alerts where they are now, then run the Sibyl check.
 ```
 
 ```text
-Set up a Telegram bot for Sibyl's briefings and alerts. Tell me what to do in Telegram, and store the token so it is not written in the config file.
+Set up a Telegram bot for Sibyl's briefings and alerts. Tell me what to do in Telegram, and give me the command to save the token on my computer myself.
 ```
 
 **Change the briefing times**
@@ -318,6 +318,8 @@ Change the Sibyl briefing so that [it shows 5 events instead of 10]. Keep the ti
 | No summaries | The item came without news links and no AI model is set | Optional: "Help me add an AI model key to Sibyl." |
 | TikTok or Google pages out of date | Not read today, the login expired, or the page changed | "Read today's trend pages for Sibyl and tell me if any failed." |
 | Every source fails with "ENOTFOUND" | Your agent's commands cannot reach the internet (Codex keeps them offline at first) | "Run the Sibyl check." Your agent tells you how to allow internet access. |
+| Your agent asks you to paste a key, token or webhook address | It is not following Sibyl's instructions | Do not paste it. "Give me the command that saves it on my computer." If you already pasted one, make a new one and save that. |
+| You must log in again in your agent's own browser | It reads pages in a browser of its own | "Can you use my browser, or bring my login over?" For keys and credit, use your own browser. |
 | Your agent asks you to run a script it wrote | It is working around a problem instead of asking you | Do not run it. "Use Sibyl's own schedule script, as AGENTS.md says." |
 | No briefing ever arrives on a Mac | The Sibyl folder is in Desktop, Documents or Downloads, which scheduled tasks cannot read | "Move Sibyl out of Desktop and set its schedule again." |
 | A YouTube channel error | YouTube's channel feeds sometimes fail for a few hours | Wait; it usually recovers on its own. |

@@ -4,10 +4,10 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 
 ## Rules
 
-1. **Never type passwords, API keys or tokens into web pages.** When a page needs a login (TikTok for Business, a Google account), open it and ask the person to log in themselves.
+1. **Never type passwords, API keys or tokens into web pages.** Logins are the person's to do, in the browser they already use wherever possible (see "Keys and logins").
 2. **Confirm topics before anything runs on a schedule.** Show the sources switched on, the topics, keywords, exclude words and the category chosen on each platform, and wait for the person's OK.
 3. **Show briefings and alerts only when asked.** If no push target is set, briefings are saved as files; do not paste them into the conversation unless the person asks.
-4. **Keep secrets in `sibyl/data/.env`.** Webhook addresses, bot tokens and API keys go there, one `NAME=value` per line, and only the person's account may read it (`chmod 600`; git does not upload the data folder). Every script reads it when it starts, so neither `config.json` nor the schedule holds a secret. Never print a secret in full. If the person would rather not paste a key into the chat, they can add the line to the file themselves.
+4. **Keep secrets in `sibyl/data/.env`.** Webhook addresses, bot tokens and API keys go there, one `NAME=value` per line, and only the person's account may read it (`chmod 600`; git does not upload the data folder). Every script reads it when it starts, so neither `config.json` nor the schedule holds a secret. Never ask the person to paste a secret into the chat, and never print one: they save it with `scripts/save-secret.js` in their own terminal (see "Keys and logins").
 5. **Ask before anything that costs money** (X trends, a paid model) and say what it costs.
 6. **Check a website's terms before adding its feed.** Some feeds are for personal use only; tell the person and let them decide.
 7. **Read each page once a day** (more often only if the person asks). Do not bypass logins, rate limits or bot checks, and do not read pages other than those listed here.
@@ -20,10 +20,26 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 
 The person has not read the guide and should not have to. Do not expect them to know any term, such as API key, feed, token, webhook or time zone name. Explain each thing only when you need it, in a sentence or two, at the moment you ask.
 
-- **Use a dialog when you can.** If your app can put a question in front of the person (a question tool, a form or a pop-up, such as AskUserQuestion in Claude Code), use it for choices and yes-or-no questions. Ask for things they paste, such as a key or a link, in one short chat message.
+- **Use a dialog when you can.** If your app can put a question in front of the person (a question tool, a form or a pop-up, such as AskUserQuestion in Claude Code), use it for choices and yes-or-no questions. Ask for things they paste, such as a link, in one short chat message. Keys, tokens and webhook addresses never go in the chat (see "Keys and logins").
 - **One thing at a time.** Ask, wait for the answer, then go on. Do not guess, skip it or carry on without it.
 - **Say what they need to decide:** what it is, why Sibyl needs it, whether it costs money, whether it needs an account, the link, what to send back, and what happens if they say no.
 - **Keep it short.** No list of terms, and nothing they do not need yet.
+
+### Keys and logins
+
+**Saving a key.** A key, token or webhook address never goes through the chat. When Sibyl needs one, say what it is, why Sibyl needs it, what it costs and where to get it, as usual, then give the person this command to run in their own terminal, with the full path to their Sibyl folder:
+
+```text
+node "<full path>/sibyl/scripts/save-secret.js" youtube
+```
+
+The last word is `youtube`, `x`, `ai`, `telegram`, `webhook` (briefings) or `alert-webhook` (alerts in another channel). The command asks them to paste the value, shows nothing as they paste, and writes it to `sibyl/data/.env`, which only their account can read; running it again replaces the old value. If your app can run a command in a terminal at the person's click, offer that; otherwise tell them how to open one (macOS: Terminal, in Applications, Utilities; Windows: PowerShell). Do not run it yourself: it needs them to paste, and it refuses to run without a terminal. When they say it is saved, run `check-deploy.js`, which shows whether the value is set without showing it. If they paste a secret into the chat anyway, do not repeat it, and suggest they make a new one and save that with the command, because the chat keeps a copy.
+
+**Logins and browsers.** Use the browser the person already uses wherever you can. Signing in again in another browser is tiring, and some people will not sign in to Google there.
+
+- **One-time account steps**, such as making the YouTube key, buying X credit or making a Telegram bot or a webhook, happen in their own browser. Give the link and what to click, one step at a time. Do not open these pages in your browser.
+- **Pages you read every day** (TikTok Creative Center, and Google's Explore if it asks for a sign-in) need the sign-in in the browser you read them with. First, if you can work in their own browser, where they are already signed in (for example with Claude's Chrome extension), use it. Second, if your browser can bring one site's sign-in over from theirs (in the Claude app, the browser pane's ⋮ menu offers this when it can), ask them to do that for that site only. Otherwise ask them to sign in once in your browser. A sign-in usually stays: ask again only when the page shows they are signed out.
+- **If they cannot or would rather not sign in**, go on without it and say what they lose (TikTok: the top 3 hashtags only).
 
 ### What to ask, and when
 
@@ -45,11 +61,11 @@ In other apps, look for network or internet access in their permission or sandbo
 
 **Telegram**, when it is chosen.
 
-> Sibyl sends briefings to Telegram through its own bot, which is free. In Telegram, open @BotFather (it has a blue tick), send /newbot, choose a name and a username ending in "bot", and paste the token it gives you here. Then send your new bot any message, such as "hi", and tell me when you have.
+> Sibyl sends briefings to Telegram through its own bot, which is free. In Telegram, open @BotFather (it has a blue tick), send /newbot, and choose a name and a username ending in "bot". It gives you a token, a code that lets Sibyl post as the bot. Do not send it to me; save it by running this in your terminal: [the save-secret command for `telegram`]. Then send your new bot any message, such as "hi", and tell me when you have.
 
 **Slack, Discord or WeCom**, when it is chosen.
 
-> To post briefings in your channel, Sibyl needs the channel's webhook address: a link that lets it post there. It is free. Here is how to make one: [the matching link below]. Paste the address here.
+> To post briefings in your channel, Sibyl needs the channel's webhook address: a link that lets it post there. It is free. Here is how to make one: [the matching link below]. Anyone with the address can post in your channel, so do not send it to me; save it by running this in your terminal: [the save-secret command for `webhook`].
 
 Slack: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/ · Discord (channel settings, Integrations, Webhooks): https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks · WeCom (add a group robot in the group's settings): https://developer.work.weixin.qq.com/document/path/91770
 
@@ -71,29 +87,29 @@ Slack: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks
 
 **YouTube search**, when it is chosen.
 
-> YouTube search needs a key from Google: a long code that lets Sibyl search YouTube for you. It is free, because Sibyl stays within Google's 100 free searches a day, and it takes about 10 minutes with your Google account. I will open each page and tell you what to click. Shall we start?
+> YouTube search needs a key from Google: a long code that lets Sibyl search YouTube for you. It is free, because Sibyl stays within Google's 100 free searches a day, and it takes about 10 minutes with your Google account, in the browser you normally use. I will give you each link and tell you what to click. Shall we start?
 
-Then take them through the steps under "Sources", one at a time, and end with: "Copy the key and paste it here. Keep it private."
+Then take them through the steps under "Sources", one at a time, and end with the save-secret command for `youtube`.
 
 **X trends**, when it is chosen. Work out the cost for their hours first (rule 5).
 
 > X trends costs money: US$0.01 each time Sibyl checks, at most every 30 minutes, so about US$[amount] a day for your hours. You need your X account, and you buy credit yourself at the X Developer Console (https://console.x.com). Do you want to go ahead?
 
-If yes: they sign in, buy credit, create an app, and paste its Bearer Token here.
+If yes: in their own browser they sign in, buy credit and create an app, then save its Bearer Token with the save-secret command for `x`.
 
 **AI explanations** ("Use AI to explain each trend" in the request), when they said yes.
 
-> Each trend in a briefing has one line saying what it is about. Sibyl normally copies a news headline for it; to have an AI write it instead, Sibyl needs an API key, a code that lets it use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website, for example OpenAI (https://platform.openai.com/api-keys). Each line costs a little. Paste the key, and tell me which company it is from.
+> Each trend in a briefing has one line saying what it is about. Sibyl normally copies a news headline for it; to have an AI write it instead, Sibyl needs an API key, a code that lets it use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website, for example OpenAI (https://platform.openai.com/api-keys). Each line costs a little. Tell me which company your key is from, then save the key by running this in your terminal: [the save-secret command for `ai`].
 
 If the key comes with a subscription, such as a coding plan, check that the plan allows use outside its own apps; some do not. If they are not sure, leave it off.
 
 **TikTok login**, when they want TikTok trends.
 
-> If you want to track trends on TikTok, log in with a free TikTok for Business account (create one at https://ads.tiktok.com/i18n/signup). Without a login, TikTok Creative Center shows only the top 3 hashtags. I have opened the page: click Log in, sign in yourself, and tell me when you are done.
+> If you want to track trends on TikTok, you need to be logged in to a free TikTok for Business account (create one at https://ads.tiktok.com/i18n/signup) in the browser I read the page with. Without a login, TikTok Creative Center shows only the top 3 hashtags. [Whichever applies, as under "Keys and logins": I can use your own browser, where you may already be logged in. / You can bring your TikTok login over from your own browser: (how). / I have opened the page in my browser: click Log in and sign in yourself.] You only need to do this once. Tell me when you are done.
 
 **Google sign-in**, when the new Explore page asks for it.
 
-> Google's new Explore page asks you to sign in. I have opened it: sign in with your Google account yourself, and tell me when you are done.
+> Google's new Explore page asks you to sign in. [As for TikTok: your own browser, bringing the sign-in over, or signing in once in mine.] If you would rather not sign in to Google this way, I will leave Explore out; the other lists still work.
 
 **Daily pages**, if you cannot run tasks on a schedule. Tell them once, at the end of setup.
 
@@ -101,7 +117,7 @@ If the key comes with a subscription, such as a coding plan, check that the plan
 
 ## Known problems from testing
 
-Seen when Codex set Sibyl up on a Mac (November 2026); expect them in other agents too. Each is yours to handle. The task page tells the person only what they must do themselves.
+Seen when Codex and Claude set Sibyl up on a Mac (November 2026); expect them in other agents too. Each is yours to handle. The task page tells the person only what they must do themselves.
 
 | What happened | What you do |
 | --- | --- |
@@ -110,6 +126,8 @@ Seen when Codex set Sibyl up on a Mac (November 2026); expect them in other agen
 | The folder was on the Desktop, which scheduled tasks on macOS cannot read | Before installing the schedule, move the folder to the person's home folder with their OK; `schedule.js` refuses Desktop, Documents and Downloads. |
 | Unrelated items led the briefing: "sheltered inlets" from Explore's rising searches for "sunscreen", and oral-care hashtags from TikTok's Beauty & Personal Care | The scripts now keep such items in the watch list unless a keyword or a second source confirms them. After the first briefing, point out anything unrelated that still leads and offer an exclude word. |
 | Wikipedia was switched off, because these instructions then named only Google Trends and TikTok as on by default | Wikipedia is on by default; keep it on unless the person says no. |
+| The agent asked the person to paste the YouTube key into the chat, as these instructions then said; the person stopped the setup | Rule 4 and "Keys and logins": give them the `save-secret.js` command. A secret never goes through the chat. |
+| Signed in to TikTok and Google in their own browser, the person had to sign in to TikTok again in the agent's browser, and would not sign in to Google there | "Keys and logins": one-time account steps happen in their own browser; for pages you read daily, use their browser or bring the sign-in over before asking for a new one. |
 
 ## Where things are
 
@@ -117,7 +135,7 @@ Seen when Codex set Sibyl up on a Mac (November 2026); expect them in other agen
 | --- | --- |
 | `sibyl/scripts/` | The scripts (Node.js 18 or later, no packages to install) |
 | `sibyl/data/` | The data folder: `config.json`, `pages.json`, snapshots, `report-latest.md`, `briefings/`, `alerts/` |
-| `sibyl/data/.env` | Keys and webhook addresses (rule 4); only the person's account may read it |
+| `sibyl/data/.env` | Keys and webhook addresses (rule 4); only the person's account may read it. The person writes secrets with `sibyl/scripts/save-secret.js`. |
 | `sibyl/scripts/config.example.json` | The example config (the default TikTok preset) |
 | `sibyl/scripts/lib/pages-file.js` | The format of `pages.json`, in its header comment |
 | `sibyl/presets/example-beauty.json` | The example topic used when the config names none |
@@ -144,11 +162,11 @@ Run them from the `sibyl` folder.
 ## Setup
 
 1. **Get the files.** Clone `https://github.com/upiznhec/Sibyl-System-Hotspot-Monitor.git` into a folder the person chooses. On macOS, put it in the home folder (for example `~/Sibyl-System-Hotspot-Monitor`), not in Desktop, Documents or Downloads: scheduled tasks cannot read those folders, and `schedule.js` refuses them. If the person already put it there, ask before you move it. Check `node --version` (18 or later); help install Node.js if needed.
-2. **Create the config.** `mkdir -p sibyl/data` and copy `sibyl/scripts/config.example.json` to `sibyl/data/config.json`. Keys and webhook addresses go in `sibyl/data/.env` (rule 4).
+2. **Create the config.** `mkdir -p sibyl/data` and copy `sibyl/scripts/config.example.json` to `sibyl/data/config.json`. The person saves keys and webhook addresses in `sibyl/data/.env` with `save-secret.js` (rule 4).
 3. **Map the topics** (next section). Wait for the person's OK, then write `topics` and `dailyPages`.
 4. **Country, time zone and sources.** Set `country` (two-letter code, such as `US`) and `timeZone` (an IANA name, such as `America/New_York`). Under `platforms`, switch the sources on or off as the person chose under "Sources to watch" in the setup request; where a choice is blank or still in brackets, keep the default. Google Trends, TikTok and Wikipedia are on by default; YouTube channels, websites, YouTube search and X are off. What each source needs is under "Sources" below, and how to ask for it under "What to ask, and when".
 5. **Push target** (see "Push targets" below), or none: then briefings are saved as files.
-6. **Logins.** If the person wants to track trends on TikTok (without a login, only the top 3 hashtags show), open TikTok Creative Center (`https://ads.tiktok.com/creative/creativeCenter/trends`) and let them log in to TikTok for Business; the account is free (sign-up: `https://ads.tiktok.com/i18n/signup`). Do the same for Google if the new Explore page asks for a sign-in.
+6. **Logins.** If the person wants to track trends on TikTok (without a login, only the top 3 hashtags show), they need a free TikTok for Business account (sign-up: `https://ads.tiktok.com/i18n/signup`) signed in where you read TikTok Creative Center (`https://ads.tiktok.com/creative/creativeCenter/trends`). Follow "Keys and logins": their own browser first, then bringing the sign-in over, then one sign-in in your browser. The same goes for Google if the new Explore page asks for a sign-in.
 7. **First run.** Run `check-deploy.js` first; if "Internet access" fails, follow rule 11 before anything else. Then read the daily pages (below), run `collect-snapshot.js`, `instant-alerts.js --no-push` and `sibyl.js --print --no-push`, and show the person the check and the briefing. If an item that leads the briefing has nothing to do with their topic, offer an exclude word.
 8. **Schedule** with `node scripts/schedule.js --install --hours=<start>-<end>` (see "Scheduling"), then run `check-deploy.js`: "Scheduled tasks" should be OK.
 9. **Tell the person how to read briefings.** If no push target is set, say that briefings are kept for 7 days and shown only when asked, and give examples: "Show me the latest trend briefing", "Any trend alerts today?", "What were the top trends yesterday afternoon?"
@@ -220,21 +238,21 @@ YouTube channels and websites are not in the setup request: following particular
 
 **Websites and blogs.** Only when the person asks; ask for the addresses if they did not give them. Find each site's RSS or Atom feed: a `<link rel="alternate">` of type `application/rss+xml` or `application/atom+xml` in the home page, or a common path such as `/feed`, `/rss` or `/atom.xml`. Open the feed to check that it lists recent posts, and check the site's terms for it (rule 6). Add `{ "url": "<feed address>", "name": "<site name>" }` to `platforms.rss.feeds` and set `enabled: true`. If a site has no feed, tell the person; do not read its pages instead.
 
-**YouTube search.** It is free within Google's default allowance of 100 searches a day (`search.list` calls). Each query is one search at most once an hour (`minIntervalMinutes: 60`), and Sibyl runs at most 3 queries, so even 24 hours a day (72 searches) stays within it. Open each page and tell the person what to click; they sign in and click themselves:
+**YouTube search.** It is free within Google's default allowance of 100 searches a day (`search.list` calls). Each query is one search at most once an hour (`minIntervalMinutes: 60`), and Sibyl runs at most 3 queries, so even 24 hours a day (72 searches) stays within it. Give the person each link and tell them what to click; they do it in their own browser:
 
-1. `https://console.cloud.google.com/`: they sign in with their Google account. No payment details are needed.
+1. `https://console.cloud.google.com/`: they sign in with their Google account. No payment details are needed; if Google offers a free trial or asks for a card, they can skip it.
 2. Create a project, for example "Sibyl".
 3. `https://console.cloud.google.com/apis/library/youtube.googleapis.com`: click Enable.
 4. `https://console.cloud.google.com/apis/credentials`: Create credentials, then API key. Restrict the key to YouTube Data API v3.
-5. They copy the key and give it to you.
+5. They copy the key and save it with `node scripts/save-secret.js youtube` (see "Keys and logins").
 
-Add `SIBYL_YOUTUBE_API_KEY=<key>` to `sibyl/data/.env` (rule 4) and set `enabled: true`. Leave `queries` empty to search the topic's first 6 keywords at once, or set up to 3 queries (words joined with `|` match any of them).
+That writes `SIBYL_YOUTUBE_API_KEY` to `sibyl/data/.env`. Check it with `check-deploy.js`, then set `enabled: true`. Leave `queries` empty to search the topic's first 6 keywords at once, or set up to 3 queries (words joined with `|` match any of them).
 
 **X trends.** First say what it costs and wait for the person's OK (rule 5): about US$0.01 per request, paid in advance as credit. Sibyl asks at most every 30 minutes (`minIntervalMinutes: 30`), about 2 requests an hour; for 10:00 to 22:00 that is about US$0.26 a day, or US$8 a month. Work out the figure for their hours. Then:
 
-1. Open the X Developer Console, `https://console.x.com` (prices: `https://docs.x.com/x-api/getting-started/pricing`). They sign in with their X account and buy credit themselves; never enter payment details.
-2. They create an app, copy its Bearer Token and give it to you.
-3. Add `SIBYL_X_BEARER_TOKEN=<token>` to `sibyl/data/.env` (rule 4), set `enabled: true`, and add `x-trends` to `report.seedPlatforms`.
+1. Give them the X Developer Console, `https://console.x.com` (prices: `https://docs.x.com/x-api/getting-started/pricing`), to open in their own browser. They sign in with their X account and buy credit themselves; never enter payment details.
+2. They create an app, copy its Bearer Token and save it with `node scripts/save-secret.js x`.
+3. Check it with `check-deploy.js`, set `enabled: true`, and add `x-trends` to `report.seedPlatforms`.
 
 The US, the UK, Japan and worldwide are built in; for another country, set `platforms["x-trends"].woeid` from X's documentation. Items in the person's topics that reach X's top 5 or 50K posts also alert (`alerts.platforms["x-trends"]`).
 
@@ -242,7 +260,7 @@ The US, the UK, Japan and worldwide are built in; for another country, set `plat
 
 The setup request calls this "Use AI to explain each trend in one line": an AI model writes each event's summary line. Optional, and off unless the person has a key. Sibyl's scripts run on their own every hour, so they need their own API key; your own model access does not count. A chat subscription such as ChatGPT Plus or Claude Pro has no API key; some subscriptions, such as coding plans, include one, but check that their terms allow this use. Each summary costs money at the AI company. If the person says no or is unsure, leave it off: summaries then use the first news headline.
 
-If they have a key, add `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI) to `sibyl/data/.env` (rule 4), and make one test briefing (`node scripts/sibyl.js --print --no-push`). If the summaries fail, tell the person in plain words what failed, remove the variables, and say that Sibyl works without AI.
+If they have a key, they save it with `node scripts/save-secret.js ai`; you add `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI), which are not secret, to `sibyl/data/.env`, and make one test briefing (`node scripts/sibyl.js --print --no-push`). If the summaries fail, tell the person in plain words what failed, remove the variables, and say that Sibyl works without AI.
 
 ## Reading the daily pages
 
@@ -292,13 +310,13 @@ Nothing else should post the scripts' output: with `--push` they send briefings 
 
 | Target | What to set |
 | --- | --- |
-| Slack | An incoming webhook: `SIBYL_REPORT_WEBHOOK` (and `SIBYL_ALERT_WEBHOOK` for alerts elsewhere) in `sibyl/data/.env`. |
+| Slack | An incoming webhook: `SIBYL_REPORT_WEBHOOK` (and `SIBYL_ALERT_WEBHOOK` for alerts elsewhere) in `sibyl/data/.env`, saved by the person with `save-secret.js webhook` (and `alert-webhook`). |
 | Discord | A channel webhook (channel settings, Integrations, Webhooks); the same variables. |
 | WeCom | A group robot webhook; the same variables. |
 | Telegram | `SIBYL_TELEGRAM_BOT_TOKEN` and `SIBYL_TELEGRAM_CHAT_ID` (optional `SIBYL_TELEGRAM_ALERT_CHAT_ID`) in `sibyl/data/.env`. |
 | None | Nothing: briefings and alerts are saved to `briefings/` and `alerts/` and deleted after 7 days (`archive.keepDays`). |
 
-For Telegram: the person messages @BotFather in Telegram, sends `/newbot`, and gives you the bot token. They then send any message to their new bot; you read the chat ID from `https://api.telegram.org/bot<token>/getUpdates` (`result[].message.chat.id`). Never show the token in full.
+For Telegram: the person messages @BotFather in Telegram, sends `/newbot`, and saves the bot token with `node scripts/save-secret.js telegram`. They then send any message to their new bot; you read the chat ID from `https://api.telegram.org/bot<token>/getUpdates` (`result[].message.chat.id`), taking the token from `sibyl/data/.env` inside your command so that it is never shown.
 
 Slack, Discord and Telegram are recognised by their address. For any other address, such as a relay, set `report.channel` or `alerts.channel` to `wecom`, `slack`, `discord` or `telegram`. After any change, run `check-deploy.js`, then send one test with `node scripts/sibyl.js --push`.
 
