@@ -29,6 +29,19 @@ node sibyl/scripts/try-instagram-business-discovery.js <a business or creator ac
 
 If it prints the account's followers and recent posts, Business Discovery can become an optional source; if Meta returns a permission error, it stays out of this version and the task page says how to get access.
 
+Result (2026-11-15, in Graph API Explorer, with the person's own app in development mode and no App Review). The app used the "Manage messaging & content on Instagram" use case with the Facebook login setup, the permissions `instagram_basic`, `instagram_manage_insights`, `pages_show_list`, `pages_read_engagement` and `business_management`, and the Instagram Public Content Access feature, all marked "Ready for testing". The token was approved for the person's Facebook Page and its linked Instagram professional account.
+
+| Request | Result |
+| --- | --- |
+| `me/accounts?fields=name,instagram_business_account` | Empty until the Page was chosen in the approval pop-up; then the Page and its Instagram account ID. |
+| `<ig-user-id>?fields=business_discovery.username(nba){followers_count,media_count,media.limit(5){caption,like_count,comments_count,view_count,timestamp,permalink}}` | Works: 87,915,984 followers, 109,055 posts, and the latest posts with caption, likes, comments, time and link (in 0.7 s). |
+| `ig_hashtag_search?user_id=<ig-user-id>&q=sunscreen` | Works: the hashtag's ID. Each account may look up 30 different hashtags in 7 days. |
+| `<hashtag-id>/top_media?user_id=<ig-user-id>&fields=caption,like_count,comments_count,media_type,permalink,timestamp` | Works: the hashtag's top posts with caption, counts, type and link (in 3.8 s). |
+
+So both Business Discovery and hashtag search work for the app's own users without App Review. Not yet checked: `view_count` on a Reel, `recent_media`, and a long-lived token for scheduled runs (the Explorer's token lasts about an hour).
+
+When the agent created the app and changed its permissions in its own browser, Facebook logged the person out of that browser, then of Chrome and their phone, until a known device approved the login. The person then did every Meta step in their own Chrome. Have the person do Meta steps in the browser they normally use.
+
 ## Stage 3: calibration (7 days)
 
 Run the default schedule for 7 days (collection every 10 minutes, a briefing every hour) for two requests written as a user would: "NBA trends" and "beauty trends". Each day, review one morning and one afternoon briefing (28 in all) and every alert: is each item on topic, and worth following up that day? List up to 5 events expected each day and count how many the briefing caught. Record failed sources, whether pushes arrived, and the agent's and model's cost.
