@@ -235,6 +235,7 @@ After you set up a chat app, ask: "Send one Sibyl briefing now as a test."
   - "Any trend alerts today?"
   - "What were the top trends yesterday afternoon?"
 - **Pages:** your agent reads Google's category list every hour and the TikTok and Explore pages once a day. Each reading uses some of your agent's usage. If it can do this on its own, it sets up a scheduled task; ask to see it: "Show me the task that reads the Sibyl pages every hour." If it cannot, it tells you during setup; then start each day with: "Read today's trend pages for Sibyl."
+- **After a restart or a network drop:** after you restart the computer, open your agent's app again. The schedule starts again by itself; runs missed while the computer was off or asleep are not made up. If your agent reads pages in a browser of its own, it opens it again at its next reading. After a network drop there is nothing to fix: the next run reads the sources again. Briefings made while nothing could be sent are kept on your computer for 7 days; to see them: "Show me the Sibyl briefings I missed."
 
 ## 7. Common changes
 
@@ -351,6 +352,7 @@ Stop Sibyl: remove its schedule and the page-reading task. Keep my settings, so 
 | Facebook logs you out during the Instagram setup | Your agent opened Meta's developer pages in its own browser | Log in again on your phone, then do the Meta steps in your own browser while your agent tells you what to click. |
 | Your agent cannot find your Instagram account | The Page and Instagram account were not chosen in the token's pop-up, or the account is not a professional account linked to the Page | "Tell me how to make a new Instagram token with my Page and account chosen." |
 | Briefings arrive at the wrong times | The time zone or the hours are wrong | "Check Sibyl's time zone and hours: I am in [city], and I want [10:00 to 22:00]." |
+| No briefing for a while after a restart or a network drop | Nothing runs while the computer is off or asleep; while it was offline, nothing could be sent | Open your agent's app again. "Run the Sibyl check and read the pages that are due." Then: "Show me the Sibyl briefings I missed." |
 | With DeepSeek Harness, Sibyl ends up in Documents | Its default workspace is in Documents, and it can write only in its workspace | Before you send the setup request, make a new folder in your home folder and open it as the workspace. |
 | With DeepSeek, your agent's reply stops with "refusal" | DeepSeek's content filter cut the reply; in testing, when it named China's leaders | "Leave those names out of your replies and go on." |
 | The same trend in every briefing | It is still trending; its mark shows whether it is rising, steady or cooling | Nothing to fix. To leave it out: "Add an exclude word for [trend] in Sibyl." |

@@ -17,6 +17,8 @@
 //   rows of each list, and left "total" out when the check above refused the page;
 // - Trending Now by category has at most 100 rows: in a narrow window Google served a mobile layout
 //   whose table held the unfiltered list of hundreds;
+// - Trending Now must give "total" too: its table shows 25 rows a page, and an agent saved only the
+//   first page of a 42-row category;
 // - TikTok with 3 rows or fewer, when the last saved list had more, means the login expired;
 // - "checksum", if given, equals rowsChecksum(items) computed in the browser: a row mistyped on the
 //   way from the page to the file fails it.
@@ -131,6 +133,9 @@ function problemWith(page, section, previous, now) {
   if (page.source === 'google-trends' && viewOf(page) === 'trending' && page.category &&
       Math.max(items.length, Number(section.total) || 0) > MAX_CATEGORY_ROWS) {
     return `${Math.max(items.length, Number(section.total) || 0)} rows: this looks like the unfiltered list; widen the window to at least 1280 px and wait for the category`;
+  }
+  if (page.source === 'google-trends' && viewOf(page) === 'trending' && items.length && section.total === undefined) {
+    return 'no "total": the table shows 25 rows a page ("1–25 of 42"); read every page and give the count it shows';
   }
   const previousAgeMs = now - Date.parse(previous?.readAt || 0);
   if (page.source === 'tiktok-creative-center' && items.length <= 3 && (previous?.items?.length || 0) > 3 &&

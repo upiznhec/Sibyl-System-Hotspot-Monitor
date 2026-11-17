@@ -82,6 +82,12 @@ try {
   stage('explore.json', { ...EXPLORE, readAt: hoursAgo(0.5), items: [...rows(5, 'query'), ...rows(5, 'topic')] });
   assert.match(savePages({ dataDir: dir, now }).results[2].reason, /no "total"/);
 
+  // Trending Now: the first page of 25 rows, without "total" or with the page's count of 42.
+  stage('trending.json', { ...TRENDING, readAt: hoursAgo(0.5), items: rows(25, 'trend') });
+  assert.match(savePages({ dataDir: dir, now }).results[1].reason, /no "total": the table shows 25 rows a page/);
+  stage('trending.json', { ...TRENDING, readAt: hoursAgo(0.5), total: 42, items: rows(25, 'trend') });
+  assert.match(savePages({ dataDir: dir, now }).results[1].reason, /25 rows saved but the page showed 42/);
+
   // Everything right: every page is refreshed and the command exits 0.
   stage('tiktok.json', { ...TIKTOK, readAt: new Date().toISOString(), shown: 'Beauty & Personal Care', items: tiktok, checksum: rowsChecksum(tiktok) });
   stage('trending.json', { ...TRENDING, readAt: new Date().toISOString(), total: 2, items: rows(2, 'trend') });
@@ -93,7 +99,7 @@ try {
   assert.match(run.stdout, /3 page\(s\) refreshed, 0 kept/);
   pages = saved();
   assert.strictEqual(find(pages, TIKTOK).items[0].title, '#tag new 1');
-  assert.strictEqual(fs.readFileSync(path.join(dir, 'daily-pages.log'), 'utf8').trim().split('\n').length, 5);
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'daily-pages.log'), 'utf8').trim().split('\n').length, 7);
 
   // Each page has its own interval: Trending Now is due again after an hour, the others after a day.
   // A run that reads nothing before then keeps every page without a warning.
