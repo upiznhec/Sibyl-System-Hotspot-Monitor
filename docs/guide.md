@@ -128,7 +128,7 @@ Alerts come only from lists the script reads every 10 minutes: Google Trends' to
 | Google Trends | It is in the top 3, or has at least 20,000 searches ("20K+") |
 | X (optional) | It is in the top 5, or has at least 50,000 posts |
 
-Each item alerts at most once a day. TikTok and the other pages your agent reads never alert; they appear in the hourly briefing.
+Each item alerts at most once a day, and an item with one of the topic's exclude words does not alert. TikTok and the other pages your agent reads never alert; they appear in the hourly briefing.
 
 ### 2.2 The hourly briefing
 
@@ -190,7 +190,7 @@ What the agent's proposal looks like, for "beauty trends in the US":
 | Keywords | skincare, makeup, sunscreen, SPF (only next to "sunscreen", "skin" or "UV") | You can add or remove words |
 | Exclude words | promo code, coupon | Items with these words stay out of the briefing |
 
-An exclude word keeps a whole trend out when any one post in it contains the word, so ask for specific words: "national football team", not "vs". Your agent's test briefing lists what the exclude words kept out.
+An exclude word keeps a whole trend out of the briefing and the alerts when any one post in it contains the word, so ask for specific words: "national football team", not "vs". Your agent's test briefing lists what the exclude words kept out. A word such as "vs" can instead be tied to one keyword: in a news topic, country names also name sports teams, and "vs" tied to "japan" keeps "japan vs paraguay" out without touching other news about Japan.
 
 ### 4.2 Doing it yourself
 
@@ -356,6 +356,9 @@ Stop Sibyl: remove its schedule and the page-reading task. Keep my settings, so 
 | With DeepSeek Harness, Sibyl ends up in Documents | Its default workspace is in Documents, and it can write only in its workspace | Before you send the setup request, make a new folder in your home folder and open it as the workspace. |
 | With DeepSeek, your agent's reply stops with "refusal" | DeepSeek's content filter cut the reply; in testing, when it named China's leaders | "Leave those names out of your replies and go on." |
 | The same trend in every briefing | It is still trending; its mark shows whether it is rising, steady or cooling | Nothing to fix. To leave it out: "Add an exclude word for [trend] in Sibyl." |
+| Alerts about sports matches in a news topic | Country names in your keywords also name national teams | "Tie the exclude word 'vs' to the country keywords in Sibyl, not to the whole topic." |
+| Your agent says a page is broken and suggests dropping it, but the page works in your browser | Its own way of reading the page may be wrong | "Compare what the page shows with what your reader expects before dropping it." |
+| Your agent stopped Sibyl, or part of it, before you asked | It acted when your hours ended | "Do not stop anything until I ask. When I do, stop the schedule and the page reading together." |
 
 ## 9. Before you rely on it
 

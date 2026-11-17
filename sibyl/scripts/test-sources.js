@@ -135,6 +135,12 @@ async function main() {
     ['mineral sunscreen recall', 'trending_rss', 'Beauty'],
     ['state college football schedule', 'trending_rss', 'Football']
   ]);
+  // A topic's exclude words keep an item out of the alerts as well as the briefing (24-hour tests,
+  // 17 November: the briefing's words did not reach the alerts).
+  const withExclude = compileTopicSettings({ topics: [TOPIC_LIST[0], { ...TOPIC_LIST[1], briefingExclude: ['schedule'] }] }, __dirname);
+  assert.deepStrictEqual(selectAlerts(snapshot, {
+    alerts: { platforms: { 'google-trends': { enabled: true, rankMax: 3, hotMin: 20000 } } }
+  }, { reported: {} }, ['google-trends', 'tiktok-creative-center'], withExclude).map(a => a.signal.title), ['mineral sunscreen recall']);
 
   // English briefing from this snapshot, through the whole pipeline.
   fs.writeFileSync(path.join(dataDir, 'config.json'), JSON.stringify({

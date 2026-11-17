@@ -4,6 +4,7 @@ const path = require('path');
 
 const { collectSnapshot } = require('./collect-snapshot');
 const { classifySignal } = require('./lib/category-classifier');
+const { keywordMatchesTitle } = require('./lib/keyword-matcher');
 const { displayHeat, normalizeForCompare } = require('./lib/signals');
 const {
   configureLocale,
@@ -313,6 +314,10 @@ function selectAlerts(snapshot, config, state, platforms, topicSettings = loadTo
 
     const classification = classifySignal(signal, topicSettings);
     if (!classification.category || !allowedCategories.has(classification.category)) continue;
+    // The topic's exclude words keep an item out of the alerts as they keep it out of the briefing.
+    const excludeWords = (topicSettings.categories || [])
+      .find(topic => topic.name === classification.category)?.briefingExclude || [];
+    if (excludeWords.some(word => keywordMatchesTitle(signal.title, word))) continue;
 
     const key = dedupeKey(signal.platform, signal.title, dateKey);
     if (state.reported[key]) {

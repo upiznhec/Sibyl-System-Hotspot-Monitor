@@ -9,6 +9,7 @@ const { configureLocale } = require('./lib/locale');
 configureLocale({ language: 'en', timeZone: 'America/Los_Angeles' });
 
 const { clusterSignals } = require('./lib/clusterer');
+const english = require('./lib/english-words');
 const { makeSignal, normalizeForCompare, normalizeTitle } = require('./lib/signals');
 const { buildEventFingerprint, buildPrompt, cleanTitle, strongFingerprintMatch } = require('./lib/event-threader');
 const { applyTopicExcludeWords, excludedEventLines } = require('./lib/event-relevance');
@@ -90,5 +91,41 @@ assert.deepStrictEqual(excludedEventLines(keptOut), [
   'iran attacks bahrain: "vs" (3 sources)',
   'norway vs wales: "vs" (1 source)'
 ]);
+
+// A one-word title that is a common word joins only the same title (24-hour tests, 17 November:
+// "them" from Google's Politics list had taken in posts that only used the word).
+const post = (platform, title, rank, heat, matchedKeywords = []) =>
+  ({ ...makeSignal({ platform, sourceType: platform === 'instagram' ? 'hashtag_top' : 'search', title, rank, heat }), matchedKeywords, category: 'Test' });
+assert.ok(english.isCommonWordTitle('them') && english.isCommonWordTitle('Found') && english.isCommonWordTitle('the'));
+assert.ok(!english.isCommonWordTitle('celtics') && !english.isCommonWordTitle('heat') && !english.isCommonWordTitle('them again'));
+const commonGroups = clusterSignals([
+  item('google-trends', 'them', [], 2, 5000),
+  post('instagram', "India is no longer just buying weapons from the world. It's increasingly selling them too. 🇮🇳", 37, 9000, ['india']),
+  item('google-trends', 'them', [], 8, 2000),
+  item('google-trends', 'jokic', [], 3, 20000),
+  post('instagram', 'Jokic with another triple-double 🃏', 12, 40000)
+], {}, {});
+const commonByTitle = Object.fromEntries(commonGroups.map(cluster => [cluster.canonicalTitle, cluster.signals.length]));
+assert.strictEqual(commonByTitle.them, 2, 'the same common word from two lists is one event');
+assert.ok(commonGroups.some(cluster => cluster.signals.length === 1 && cluster.mainSignal.platform === 'instagram' && /selling them/.test(cluster.mainSignal.title)),
+  'a post that only uses the word stays apart');
+assert.strictEqual(commonByTitle.jokic, 2, 'a one-word name still groups with posts about it');
+
+// Event names: a search term when the event has one; otherwise the strongest title in words, with a
+// post's emoji, links and closing hashtags removed and long captions cut at a word.
+assert.strictEqual(english.shortTitle('Thank you so much merab.dvalishvili sabaalazishvili 🥋🔥'), 'Thank you so much merab.dvalishvili sabaalazishvili');
+assert.strictEqual(english.shortTitle('What did the buff do bro 😭#ufc #ufcfightnight #ufcnews'), 'What did the buff do bro');
+assert.strictEqual(english.shortTitle('#foryou #merabdvalishvili #ufc'), 'foryou merabdvalishvili ufc');
+assert.strictEqual(english.shortTitle('Watch @espn live https://example.test/x #nfl'), 'Watch espn live');
+const longCaption = english.shortTitle('The #Vikings are playing Higher by Creed in Kirk Cousins’ final home game and every fan in the stadium is singing along');
+assert.ok(longCaption.length <= 80 && longCaption.endsWith('…') && longCaption.startsWith('The Vikings are playing'), longCaption);
+const named = clusterSignals([
+  post('youtube-search', 'Phillies land All-Star closer Jhoan Duran ahead of MLB trade deadline', 5, 2000000, ['mlb']),
+  item('google-trends', 'jhoan duran', [], 20, 2000),
+  item('tiktok-creative-center', '#merab', [], 8, 24000000),
+  post('instagram', 'Thank you so much merab.dvalishvili sabaalazishvili 🥋🔥 #ufc #mma', 21, 30000)
+], {}, {});
+const namedTitles = named.map(cluster => cluster.canonicalTitle).sort();
+assert.deepStrictEqual(namedTitles, ['Thank you so much merab.dvalishvili sabaalazishvili', 'jhoan duran']);
 
 console.log('English grouping tests passed');

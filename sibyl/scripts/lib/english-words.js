@@ -32,6 +32,35 @@ function isHashtag(title) {
   return /^#\S+$/.test(String(title || '').trim());
 }
 
+// A title of one common word, such as "them" or "found", names no event. Such a title joins only
+// items with the same title (lib/clusterer.js), so a post that merely uses the word cannot confirm it.
+function isCommonWordTitle(title) {
+  const words = lowerWords(title);
+  if (words.length !== 1) return false;
+  return isStopWord(words[0]) || text().commonWords?.has(words[0]) === true;
+}
+
+// A post's caption made short enough to name an event: links, emoji and the run of hashtags at the
+// end removed, "#" and "@" dropped inside the text, and cut at a word before `max` characters.
+// In testing, captions such as "Thank you so much merab.dvalishvili sabaalazishvili 🥋🔥" named events.
+function shortTitle(title = '', max = 80) {
+  const original = String(title).trim();
+  const tidy = value => value
+    .replace(/[\p{Extended_Pictographic}\u{1F1E6}-\u{1F1FF}\u{FE0F}\u{200D}\u{20E3}]/gu, ' ')
+    .replace(/[#@]([\p{L}\p{N}_.]+)/gu, '$1')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[\s\-–—:|,.;]+|[\s\-–—:|,;]+$/g, '');
+  const withoutLinks = original.replace(/https?:\/\/\S+/g, ' ');
+  let short = tidy(withoutLinks.replace(/(?:\s*#[\p{L}\p{N}_]+)+[\s\p{Extended_Pictographic}\u{FE0F}.!]*$/u, ' '));
+  if (short.length < 3) short = tidy(withoutLinks);
+  if (!short) return original;
+  if (short.length <= max) return short;
+  const cut = short.slice(0, max - 1);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > max * 0.6 ? cut.slice(0, space) : cut).replace(/[\s,;:.\-–—]+$/, '')}…`;
+}
+
 // A hashtag joins words: #sunscreenrecall is "sunscreen" + "recall". True when the hashtag is
 // two or more consecutive words of the other title, at least one of them not a topic keyword.
 function hashtagJoinsWords(hashtagTitle, otherTitle, genericWords = new Set()) {
@@ -54,7 +83,9 @@ function hashtagJoinsWords(hashtagTitle, otherTitle, genericWords = new Set()) {
 module.exports = {
   contentWords,
   hashtagJoinsWords,
+  isCommonWordTitle,
   isHashtag,
   keywordWords,
-  lowerWords
+  lowerWords,
+  shortTitle
 };

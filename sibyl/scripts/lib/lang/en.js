@@ -82,6 +82,49 @@ const STOP_WORDS = new Set([
   'foryoupage', 'viral', 'trending', 'trend', 'trends'
 ]);
 
+// Common words that name no event when a title is that word alone. In testing, Google's Politics list
+// had "them" and its Sports list "found", and each took in posts that only used the word. Team and
+// place names (heat, magic, jets, turkey) are left out on purpose.
+const COMMON_WORDS = new Set([
+  'i', 'him', 'us', 'them', 'mine', 'yours', 'ours', 'theirs', 'myself', 'yourself', 'himself', 'herself',
+  'itself', 'ourselves', 'themselves', 'whom', 'whose', 'whatever', 'whoever', 'everyone', 'everybody',
+  'everything', 'someone', 'somebody', 'something', 'anyone', 'anybody', 'anything', 'nobody', 'nothing',
+  'none', 'all', 'any', 'some', 'each', 'every', 'both', 'either', 'neither', 'few', 'many', 'much', 'more',
+  'most', 'less', 'least', 'other', 'others', 'another', 'such', 'same', 'own', 'several', 'enough',
+  'am', 'being', 'could', 'would', 'should', 'shall', 'may', 'might', 'must', 'done', 'doing', 'having',
+  'get', 'gets', 'getting', 'got', 'gotten', 'go', 'goes', 'going', 'went', 'gone', 'come', 'comes',
+  'coming', 'came', 'make', 'makes', 'making', 'made', 'take', 'takes', 'taking', 'took', 'taken', 'give',
+  'gives', 'giving', 'gave', 'given', 'see', 'sees', 'seeing', 'saw', 'seen', 'know', 'knows', 'knew',
+  'known', 'think', 'thinks', 'thought', 'say', 'says', 'saying', 'said', 'tell', 'tells', 'told', 'find',
+  'finds', 'finding', 'found', 'look', 'looks', 'looking', 'looked', 'want', 'wants', 'wanted', 'need',
+  'needs', 'needed', 'use', 'used', 'using', 'try', 'tried', 'trying', 'ask', 'asked', 'feel', 'felt',
+  'keep', 'kept', 'let', 'lets', 'put', 'mean', 'means', 'meant', 'seem', 'seems', 'seemed', 'leave',
+  'leaves', 'left', 'call', 'calls', 'called', 'show', 'shows', 'showed', 'shown', 'hear', 'heard',
+  'turn', 'turned', 'start', 'started', 'begin', 'began', 'begun', 'help', 'helped', 'talk', 'talked',
+  'bring', 'brought', 'happen', 'happens', 'happened', 'become', 'became', 'believe', 'hold', 'held',
+  'stand', 'stood', 'sit', 'sat', 'lose', 'lost', 'pay', 'paid', 'meet', 'met', 'set', 'read', 'run',
+  'ran', 'move', 'moved', 'like', 'liked', 'love', 'loved', 'wait', 'stay', 'fall', 'fell', 'reach',
+  'remain', 'change', 'changed', 'follow', 'followed', 'stop', 'stopped', 'add', 'added', 'buy',
+  'bought', 'sell', 'sold', 'send', 'sent', 'build', 'built', 'spend', 'spent', 'allow', 'offer',
+  'remember', 'appear', 'expect', 'decide', 'return', 'explain', 'hope', 'wish', 'agree', 'check',
+  'share', 'shared', 'post', 'posted', 'again', 'ago', 'almost', 'already', 'also', 'always', 'anyway',
+  'around', 'away', 'back', 'because', 'below', 'between', 'beyond', 'during', 'else', 'even', 'ever',
+  'finally', 'here', 'however', 'just', 'later', 'maybe', 'never', 'often', 'once', 'only', 'out',
+  'perhaps', 'quite', 'rather', 'really', 'since', 'so', 'soon', 'still', 'than', 'then', 'there',
+  'though', 'through', 'together', 'too', 'under', 'until', 'up', 'down', 'off', 'very', 'well', 'while',
+  'without', 'within', 'yet', 'if', 'unless', 'whether', 'although', 'against', 'along', 'among',
+  'behind', 'beside', 'besides', 'despite', 'inside', 'outside', 'toward', 'towards', 'upon', 'per',
+  'via', 'onto', 'throughout', 'thing', 'things', 'people', 'person', 'man', 'men', 'woman', 'women',
+  'guy', 'guys', 'kid', 'kids', 'time', 'times', 'day', 'days', 'week', 'weeks', 'month', 'months',
+  'year', 'years', 'way', 'ways', 'life', 'lives', 'part', 'place', 'case', 'point', 'fact', 'number',
+  'group', 'problem', 'hand', 'home', 'work', 'word', 'words', 'end', 'kind', 'side', 'lot', 'lots',
+  'good', 'great', 'little', 'big', 'small', 'long', 'old', 'young', 'high', 'low', 'bad', 'better',
+  'right', 'wrong', 'real', 'true', 'sure', 'whole', 'able', 'last', 'next', 'first', 'second', 'early',
+  'late', 'different', 'important', 'possible', 'certain', 'free', 'open', 'okay', 'ok', 'hello', 'hi',
+  'hey', 'thanks', 'thank', 'please', 'sorry', 'lol', 'omg', 'wow', 'yeah', 'oh', 'ah', 'story',
+  'stories', 'moment', 'moments'
+]);
+
 // Kinds of event, as in v1.3.20's 14 patterns: two titles about the same people but different
 // kinds of event (a trade and an injury) are kept apart.
 const EVENT_CONCEPTS = [
@@ -141,6 +184,7 @@ module.exports = {
   normalizeTitle,
   normalizeForCompare,
   stopWords: STOP_WORDS,
+  commonWords: COMMON_WORDS,
   eventConcepts: EVENT_CONCEPTS,
   // Grouping threshold for word-based similarity; to be set in calibration.
   similarityThreshold: 0.5,

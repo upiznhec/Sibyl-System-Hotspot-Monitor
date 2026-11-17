@@ -67,6 +67,9 @@ function jaccard(a, b) {
 // title, else the share of the shorter title's event words found in the other.
 function titleOverlap(signal, existing, topicWords) {
   if (signal.normalizedTitle && signal.normalizedTitle === existing.normalizedTitle) return 1;
+  // A one-word title that is a common word joins only the same title: in testing, "them" from
+  // Google's Politics list took in captions such as "...selling them too", which then confirmed it.
+  if (english.isCommonWordTitle(signal.title) || english.isCommonWordTitle(existing.title)) return 0;
   if (english.hashtagJoinsWords(signal.title, existing.title, topicWords) ||
       english.hashtagJoinsWords(existing.title, signal.title, topicWords)) {
     return 0.9;
@@ -243,9 +246,20 @@ function findPreviousCluster(cluster, previousByKey, candidateKey) {
   return best;
 }
 
-// The strongest title written in words, rather than a hashtag, names the event.
+// Sources whose titles are search terms or names, and sources whose titles are posts people wrote.
+const SEARCH_TERM_PLATFORMS = new Set(['google-trends', 'x-trends', 'wikipedia']);
+const POST_PLATFORMS = new Set(['instagram', 'youtube-search', 'youtube-channels']);
+
+// The event's name: the strongest search term (Google Trends, X, Wikipedia) written in words; if the
+// event has none, the strongest title in words, shortened when it is a post's caption. Hashtags and
+// one-word common titles name it only when nothing else does. In testing, captions with emoji and
+// strings of hashtags named sports events while TikTok's hashtag led them.
 function readableTitle(signals) {
-  return (signals.find(signal => !english.isHashtag(signal.title)) || signals[0]).title;
+  const worded = signals.filter(signal => !english.isHashtag(signal.title) && !english.isCommonWordTitle(signal.title));
+  const searchTerm = worded.find(signal => SEARCH_TERM_PLATFORMS.has(signal.platform));
+  if (searchTerm) return searchTerm.title;
+  const best = worded[0] || signals.find(signal => !english.isHashtag(signal.title)) || signals[0];
+  return POST_PLATFORMS.has(best.platform) ? english.shortTitle(best.title) : best.title;
 }
 
 function finalizeCluster(cluster, previousByKey, options = {}) {
