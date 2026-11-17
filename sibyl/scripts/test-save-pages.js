@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 // save-pages.js: a page that fails a check keeps its last saved list; pages.json is replaced in one
-// step. Each case below is a failure seen when Claude set Sibyl up (2026-11-15).
+// step. Each case below is a failure seen when Claude (2026-11-15) or DeepSeek (2026-11-16) set
+// Sibyl up.
 
 const assert = require('assert');
 const fs = require('fs');
@@ -45,7 +46,7 @@ try {
   stage('tiktok.json', { ...TIKTOK, readAt: hoursAgo(0.5), items: rows(3, '#top') });
   stage('trending.json', { ...TRENDING, readAt: hoursAgo(0.5), items: rows(660, 'any trend') });
   const explore = rows(8, 'new query');
-  stage('explore-sunscreen.json', { ...EXPLORE, readAt: hoursAgo(0.2), shown: 'sunscreen', items: explore, checksum: rowsChecksum(explore) });
+  stage('explore-sunscreen.json', { ...EXPLORE, readAt: hoursAgo(0.2), shown: 'sunscreen', total: 8, items: explore, checksum: rowsChecksum(explore) });
   stage('broken.json', '{"source": ');
   const first = savePages({ dataDir: dir, now });
   assert.strictEqual(first.refreshed, 1);
@@ -57,7 +58,7 @@ try {
   assert.strictEqual(find(pages, TIKTOK).readAt, hoursAgo(24), 'the kept list keeps its old time');
   assert.strictEqual(find(pages, EXPLORE).items[0].title, 'new query 1');
   assert.strictEqual(find(pages, EXPLORE).topic, 'Beauty');
-  ['shown', 'checksum'].forEach(field => assert.ok(!(field in find(pages, EXPLORE)), `${field} is not saved`));
+  ['shown', 'total', 'checksum'].forEach(field => assert.ok(!(field in find(pages, EXPLORE)), `${field} is not saved`));
   assert.ok(pages.some(s => s.keyword === 'retired keyword'), 'sections not on the list are left alone');
   assert.ok(!fs.existsSync(path.join(dir, 'pages.json.new')));
   assert.deepStrictEqual(fs.readdirSync(staging), [], 'staged files are cleared');
@@ -67,7 +68,7 @@ try {
   const tiktok = rows(100, '#tag new');
   stage('tiktok.json', { ...TIKTOK, readAt: hoursAgo(0.5), shown: 'Tech & Electronics', items: tiktok });
   const typed = rows(8, 'query');
-  stage('explore.json', { ...EXPLORE, readAt: hoursAgo(0.5), items: [...typed.slice(0, 7), { rank: 8, title: 'qeury 8' }], checksum: rowsChecksum(typed) });
+  stage('explore.json', { ...EXPLORE, readAt: hoursAgo(0.5), total: 8, items: [...typed.slice(0, 7), { rank: 8, title: 'qeury 8' }], checksum: rowsChecksum(typed) });
   stage('trending.json', { ...TRENDING, readAt: hoursAgo(5), total: 2, items: rows(2, 'trend') });
   const second = savePages({ dataDir: dir, now });
   assert.strictEqual(second.refreshed, 0);
@@ -76,6 +77,10 @@ try {
   assert.match(second.results[2].reason, /checksum does not match/);
   stage('trending.json', { ...TRENDING, readAt: hoursAgo(0.5), total: 2, items: rows(1, 'trend') });
   assert.match(savePages({ dataDir: dir, now }).results[1].reason, /1 rows saved but the page showed 2/);
+
+  // Explore without "total": an agent read the first 5 rows of each list and left "total" out.
+  stage('explore.json', { ...EXPLORE, readAt: hoursAgo(0.5), items: [...rows(5, 'query'), ...rows(5, 'topic')] });
+  assert.match(savePages({ dataDir: dir, now }).results[2].reason, /no "total"/);
 
   // Everything right: every page is refreshed and the command exits 0.
   stage('tiktok.json', { ...TIKTOK, readAt: new Date().toISOString(), shown: 'Beauty & Personal Care', items: tiktok, checksum: rowsChecksum(tiktok) });
@@ -88,7 +93,7 @@ try {
   assert.match(run.stdout, /3 page\(s\) refreshed, 0 kept/);
   pages = saved();
   assert.strictEqual(find(pages, TIKTOK).items[0].title, '#tag new 1');
-  assert.strictEqual(fs.readFileSync(path.join(dir, 'daily-pages.log'), 'utf8').trim().split('\n').length, 4);
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'daily-pages.log'), 'utf8').trim().split('\n').length, 5);
 
   // Each page has its own interval: Trending Now is due again after an hour, the others after a day.
   // A run that reads nothing before then keeps every page without a warning.

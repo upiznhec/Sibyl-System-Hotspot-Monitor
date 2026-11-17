@@ -13,6 +13,8 @@
 // - "shown", if given (the filter or keyword the page showed), matches the page's industry,
 //   category or keyword: a click had picked the wrong TikTok industry;
 // - "total", if given (the row count the page showed), equals the number of items: a partial read;
+// - Explore must give "total" (both lists' counts added together): an agent read only the first 5
+//   rows of each list, and left "total" out when the check above refused the page;
 // - Trending Now by category has at most 100 rows: in a narrow window Google served a mobile layout
 //   whose table held the unfiltered list of hundreds;
 // - TikTok with 3 rows or fewer, when the last saved list had more, means the login expired;
@@ -119,6 +121,9 @@ function problemWith(page, section, previous, now) {
   const wanted = page.industry || page.category || page.keyword;
   if (section.shown && wanted && !String(section.shown).toLowerCase().includes(String(wanted).toLowerCase())) {
     return `the page showed "${section.shown}", not "${wanted}"`;
+  }
+  if (page.source === 'google-trends' && viewOf(page) === 'explore' && items.length && section.total === undefined) {
+    return 'no "total": Explore shows how many rows each list has; read every page of both lists and give the two counts added together';
   }
   if (section.total !== undefined && Number(section.total) !== items.length) {
     return `${items.length} rows saved but the page showed ${section.total}`;

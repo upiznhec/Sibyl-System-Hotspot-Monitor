@@ -11,7 +11,7 @@ configureLocale({ language: 'en', timeZone: 'America/Los_Angeles' });
 const { clusterSignals } = require('./lib/clusterer');
 const { makeSignal, normalizeForCompare, normalizeTitle } = require('./lib/signals');
 const { buildEventFingerprint, buildPrompt, cleanTitle, strongFingerprintMatch } = require('./lib/event-threader');
-const { applyTopicExcludeWords } = require('./lib/event-relevance');
+const { applyTopicExcludeWords, excludedEventLines } = require('./lib/event-relevance');
 const { compileTopicSettings } = require('./lib/topic-settings');
 
 function item(platform, title, matchedKeywords = [], rank = 1, heat = 1000) {
@@ -75,5 +75,20 @@ const [routine, news] = applyTopicExcludeWords([
 ], settings);
 assert.strictEqual(routine.broadcastFiltered, true);
 assert.ok(!news.broadcastFiltered);
+assert.strictEqual(routine.relevance.excludeWord, 'patch notes');
+
+// One post's title is enough to keep a whole event out ("vs" in testing), so the test briefing
+// lists the events kept out, highest score first.
+const worldSettings = compileTopicSettings({ topics: [{ name: 'World', keywords: ['iran'], briefingExclude: ['vs'] }] }, __dirname);
+const keptOut = applyTopicExcludeWords([
+  { category: 'World', canonicalTitle: 'norway vs wales', aliases: [], signals: [], score: 64, platformCount: 1 },
+  { category: 'World', canonicalTitle: 'iran attacks bahrain', aliases: [], score: 211, platformCount: 3,
+    signals: [{ title: 'iran attacks bahrain' }, { title: '#middleeast Bahrain Vs Iran #war update' }] },
+  { category: 'World', canonicalTitle: 'crimea bridge damage', aliases: [], signals: [], score: 150, platformCount: 2 }
+], worldSettings);
+assert.deepStrictEqual(excludedEventLines(keptOut), [
+  'iran attacks bahrain: "vs" (3 sources)',
+  'norway vs wales: "vs" (1 source)'
+]);
 
 console.log('English grouping tests passed');

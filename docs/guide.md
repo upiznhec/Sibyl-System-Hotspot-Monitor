@@ -67,7 +67,7 @@ Not included in this version: Threads and Facebook (reading other Pages needs Me
 - Optional: an AI to explain each trend in one line and to group related trends. It needs an API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, you buy credit on the AI company's website. Nothing is spent without one.
 - Optional: YouTube search, free within Google's daily allowance.
 - Optional: Instagram is free; Meta limits it to 30 hashtags a week and about 200 requests an hour.
-- Optional: X trends, about US$0.01 per request. Sibyl asks every 10 minutes, so 10:00 to 22:00 costs about US$0.78 a day (about US$23 a month).
+- Optional: X trends, about US$0.01 per request, paid from credit you buy at the X Developer Console (check your balance first: you may already have enough). Sibyl asks every 10 minutes, so 10:00 to 22:00 costs about US$0.78 a day (about US$23 a month).
 - The cost of a typical day will be measured during testing and added here.
 
 ### 1.6 What the messages look like
@@ -163,7 +163,7 @@ An event enters the briefing when:
 | An AI agent | Yes | It must run commands with internet access, edit files and use a web browser. One that can also run on a schedule is best. |
 | Places to send briefings | Optional | Slack, Discord or WeCom webhooks, or a Telegram bot; briefings go to every one you set up. Without any, briefings are saved as files. |
 | AI to explain each trend | Optional | An API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, buy credit on the AI company's website. Without it, each trend's line is copied from a news headline. |
-| Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free; use a personal Google account, since a school or work account may not open Google Cloud); an X developer account for X trends (paid); for Instagram, a professional account linked to a Facebook Page and a free Meta app. See section 1.3. |
+| Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free; any Google account, unless a school or work account sends you to its own sign-in page, as one did in testing); an X developer account for X trends (paid); for Instagram, a professional account linked to a Facebook Page and a free Meta app. See section 1.3. |
 | A contact for Wikipedia | If Wikipedia is on | Your own web address or email, which Sibyl sends to Wikimedia and to no other site. See section 1.3. |
 
 ## 4. Setup
@@ -173,9 +173,9 @@ An event enters the briefing when:
 Copy the setup request in [SETUP-PROMPT.md](../SETUP-PROMPT.md), fill in the parts in brackets, and send it to your agent. The agent then:
 
 1. Downloads the folder and checks Node.js.
-2. Asks what you want to track, and proposes topics, keywords and exclude words, plus the matching category on each platform. It waits for your OK before saving anything.
+2. Asks what you want to track, and proposes topics, keywords and exclude words, plus the matching category on each platform. It waits for your OK before saving anything. The setting on each platform decides what that platform sends, and the keywords decide which of those trends count for your topic, on every platform. For a broad topic, such as world news, ask for more keywords and categories.
 3. Sets your country and time zone, switches on the sources you chose, and asks you for what they need (section 1.3). If it can use your browser and apps, it does the account steps there and asks you only to log in. Keys for YouTube search and X are yours to make, copy and save, with steps and a command your agent gives you, and you do every step on Meta's pages yourself, because Meta may lock an account that a program clicks for. You never paste a key into the chat.
-4. Sets up where briefings go, or leaves them as files. For Telegram, Slack and Discord, it makes the bot or webhook for you if it can use your browser or app, after checking that it is the account you use, and saves it without showing it.
+4. Sets up where briefings go, or leaves them as files. For Telegram, Slack and Discord, it makes the bot or webhook for you if it can use your browser or app, after checking that it is the account you use, and saves it without showing it. Then it sends a test message to each: tell it where you see it, in the app you read (a new Telegram bot shows nothing until then). If it worked in a browser of its own, ask it afterwards to sign out of the sites it no longer needs.
 5. If you want to track trends on TikTok, gets you logged in to TikTok Creative Center once: through your own browser if it can use it or bring your login over, otherwise in its own browser. Without a login it shows only the top 3 hashtags. The same goes for Google Trends Explore if it asks for a sign-in. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
 6. Reads the pages for the first time, runs the self-check and a first briefing, and shows you the result.
 7. Schedules the work with Sibyl's own scheduling script: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose. It also arranges the page reading: Google's category list every hour, TikTok and Explore once a day. On a Mac, the Sibyl folder must not be in Desktop, Documents or Downloads; your agent moves it if needed.
@@ -189,6 +189,8 @@ What the agent's proposal looks like, for "beauty trends in the US":
 | Google Trends | Category: Beauty and Fashion, past 24 hours; Explore for "skincare", "makeup", "sunscreen" | The category had only a few trends when checked |
 | Keywords | skincare, makeup, sunscreen, SPF (only next to "sunscreen", "skin" or "UV") | You can add or remove words |
 | Exclude words | promo code, coupon | Items with these words stay out of the briefing |
+
+An exclude word keeps a whole trend out when any one post in it contains the word, so ask for specific words: "national football team", not "vs". Your agent's test briefing lists what the exclude words kept out.
 
 ### 4.2 Doing it yourself
 
@@ -232,7 +234,7 @@ After you set up a chat app, ask: "Send one Sibyl briefing now as a test."
   - "Show me the latest trend briefing."
   - "Any trend alerts today?"
   - "What were the top trends yesterday afternoon?"
-- **Pages:** your agent reads Google's category list every hour and the TikTok and Explore pages once a day. Each reading uses some of your agent's usage. If it cannot do this on its own, it tells you during setup; then start each day with: "Read today's trend pages for Sibyl."
+- **Pages:** your agent reads Google's category list every hour and the TikTok and Explore pages once a day. Each reading uses some of your agent's usage. If it can do this on its own, it sets up a scheduled task; ask to see it: "Show me the task that reads the Sibyl pages every hour." If it cannot, it tells you during setup; then start each day with: "Read today's trend pages for Sibyl."
 
 ## 7. Common changes
 
@@ -349,6 +351,8 @@ Stop Sibyl: remove its schedule and the page-reading task. Keep my settings, so 
 | Facebook logs you out during the Instagram setup | Your agent opened Meta's developer pages in its own browser | Log in again on your phone, then do the Meta steps in your own browser while your agent tells you what to click. |
 | Your agent cannot find your Instagram account | The Page and Instagram account were not chosen in the token's pop-up, or the account is not a professional account linked to the Page | "Tell me how to make a new Instagram token with my Page and account chosen." |
 | Briefings arrive at the wrong times | The time zone or the hours are wrong | "Check Sibyl's time zone and hours: I am in [city], and I want [10:00 to 22:00]." |
+| With DeepSeek Harness, Sibyl ends up in Documents | Its default workspace is in Documents, and it can write only in its workspace | Before you send the setup request, make a new folder in your home folder and open it as the workspace. |
+| With DeepSeek, your agent's reply stops with "refusal" | DeepSeek's content filter cut the reply; in testing, when it named China's leaders | "Leave those names out of your replies and go on." |
 | The same trend in every briefing | It is still trending; its mark shows whether it is rising, steady or cooling | Nothing to fix. To leave it out: "Add an exclude word for [trend] in Sibyl." |
 
 ## 9. Before you rely on it

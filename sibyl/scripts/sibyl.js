@@ -18,7 +18,7 @@ const {
   applySemanticEventMerge,
   selectPreSummaryCandidates
 } = require('./lib/event-threader');
-const { applyEventRelevanceFilter } = require('./lib/event-relevance');
+const { applyEventRelevanceFilter, excludedEventLines } = require('./lib/event-relevance');
 const { applyEventSummaries } = require('./lib/event-summary');
 const { normalizeForCompare } = require('./lib/signals');
 const {
@@ -390,6 +390,13 @@ async function main() {
   const pushed = await maybePushReport(report, config, args);
   if (args.includes('--print')) {
     console.log('\n' + report);
+    // Printed only, never pushed: what the exclude words kept out (see lib/event-relevance.js).
+    const keptOut = excludedEventLines(clusters);
+    if (keptOut.length) {
+      console.log('Kept out of the briefing by exclude words (check that none is a real event):');
+      keptOut.forEach(line => console.log(`   ${line}`));
+      console.log('');
+    }
   }
 
   console.log('✅ Sibyl briefing done');
