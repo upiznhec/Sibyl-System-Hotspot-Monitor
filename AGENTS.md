@@ -14,7 +14,7 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 8. Keep the credit to Misaka Studio in the README and the guide.
 9. **Ask for what you need when you need it**, one thing at a time and in plain words, as described under "Talking to the person".
 10. **Schedule only with `scripts/schedule.js`.** Do not write your own scheduler, wrapper scripts or jobs around the commands, and never stop a run because one source failed: the scripts record that source's error and read the others. Never ask the person to run a setup script you wrote.
-11. **If your commands cannot reach the internet, stop and ask.** `getaddrinfo ENOTFOUND`, `EAI_AGAIN` or `Operation not permitted` on every source, or a failed "Internet access" line in the self-check, mean your app keeps your commands offline. Ask the person to allow network access ("What to ask, and when"). Until `collect-snapshot.js` reads the live sources, schedule nothing, and do not hand them scripts to run instead.
+11. **If your commands cannot reach the internet, do not work around it.** `getaddrinfo ENOTFOUND`, `EAI_AGAIN` or `Operation not permitted` on every source, or a failed "Internet access" line in the self-check, mean your app keeps your commands offline. If your app can run a command outside its sandbox once that is approved (Codex can), request it for each command that needs the internet; otherwise ask the person to allow network access ("What to ask, and when"). Until `collect-snapshot.js` reads the live sources, schedule nothing, and do not hand them scripts to run instead.
 12. **Keep to the plan the person approved.** After their OK, do not propose new scoring, extra scheduled jobs or AI explanations unless something does not work or they ask. Report what you see, with the options when there is something to decide; which trends matter, and why, is for the person to judge.
 
 ## Talking to the person
@@ -85,11 +85,7 @@ Adapt the wording; keep the facts.
 
 > My commands cannot reach the internet: the app I run in keeps them offline unless you allow it. Sibyl needs the internet to read Google Trends and its other sources. Could you allow it? [The steps for their app.] Tell me when you have, and I will check again.
 
-In Codex the steps are: paste this line into Terminal, then quit and reopen Codex. It adds the setting only if the file does not have that section yet; if it does, add `network_access = true` under the `[sandbox_workspace_write]` line by hand.
-
-```text
-grep -q '^\[sandbox_workspace_write\]' ~/.codex/config.toml 2>/dev/null || printf '\n[sandbox_workspace_write]\nnetwork_access = true\n' >> ~/.codex/config.toml
-```
+**In Codex (the ChatGPT desktop app)** the person changes no setting. Your commands run in a sandbox without the internet; when one needs it, run it again and ask to run it outside the sandbox, with a one-line reason ("Sibyl reads Google Trends and its other sources from the internet"). Before the first such request, tell the person in one sentence what they will see, and that a command run outside the sandbox can do whatever they could do in their own terminal, so they should approve only Sibyl's own commands. Ask only for those: downloading Sibyl, `node scripts/...` in the Sibyl folder, and installing or removing the schedule; never for a command that deletes or changes files outside the Sibyl folder. In the permissions menu under the message box, "Ask for approval" shows them each request to approve; "Approve for me" has Codex's automatic review decide and asks them only about requests it judges risky. Do not ask them to choose "Full access", which also opens every file on the computer, or to edit Codex's config file (it applies only in the "Custom (config.toml)" mode). In testing, an earlier Codex wrote scripts for the person to run instead; do not.
 
 In other apps, look for network or internet access in their permission or sandbox settings, or ask the person to approve network access when the app asks.
 
@@ -173,7 +169,7 @@ Seen when Codex, Claude and DeepSeek set Sibyl up on a Mac, and when Claude and 
 
 | What happened | What you do |
 | --- | --- |
-| The commands had no internet (Codex's default), so every source failed with `getaddrinfo ENOTFOUND`, and the agent wrote scripts for the person to run instead | Rule 11: stop, ask the person to allow network access (the Codex steps are under "What to ask, and when"), then run the self-check again. |
+| The commands had no internet (Codex's default), so every source failed with `getaddrinfo ENOTFOUND`, and the agent wrote scripts for the person to run instead | Rule 11: in Codex, ask to run each command that needs the internet outside the sandbox (the person or Codex's review approves it); in other apps, ask the person to allow network access ("What to ask, and when"). Then run the self-check again. |
 | The agent wrote its own schedule script, which skipped a whole run when one source failed, and asked the person to run it | Rule 10: install the schedule with `scripts/schedule.js`. Never ask the person to run a script you wrote. |
 | The folder was on the Desktop, which scheduled tasks on macOS cannot read | Before installing the schedule, move the folder to the person's home folder with their OK; `schedule.js` refuses Desktop, Documents and Downloads. |
 | Unrelated items led the briefing: "sheltered inlets" from Explore's rising searches for "sunscreen", and oral-care hashtags from TikTok's Beauty & Personal Care | The scripts now keep such items in the watch list unless a keyword or a second source confirms them. After the first briefing, point out anything unrelated that still leads and offer an exclude word. |
