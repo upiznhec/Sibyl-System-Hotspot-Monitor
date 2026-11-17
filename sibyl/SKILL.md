@@ -10,14 +10,15 @@ license: MIT
 Follow the full instructions in [AGENTS.md](../AGENTS.md) at the repository root. The most important points:
 
 - Never type passwords, API keys or tokens into web pages; the person logs in, in the browser they already use wherever possible (AGENTS.md, "Keys and logins").
+- Where you can work in the person's signed-in browser or apps, do the account steps yourself: all of them for Telegram, Slack and Discord; for YouTube and X, the clicks before the key, which the person makes, copies and saves. On Meta's sites the person does every click (AGENTS.md, "Who does what").
 - The person may know none of the terms. Ask for what you need only when you need it, one thing at a time, in plain words with the cost and the link; use a question dialog if your app has one. See "Talking to the person" in AGENTS.md.
-- Before scheduling anything, show the person the sources, topics, keywords, exclude words and the category chosen on each platform (`dailyPages`), and wait for their OK.
+- Before scheduling anything, show the person the sources, topics, keywords, exclude words and the category chosen on each platform (`dailyPages`), and wait for their OK. After it, keep to that plan: no new scoring, extra jobs or AI explanations unless something does not work or they ask (rule 12).
 - Read the pages in `dailyPages` when they are due (`node scripts/save-pages.js --due`: Google's Trending Now every hour, the others once a day).
 - Show saved briefings and alerts only when the person asks: `node scripts/show-briefing.js` (`--list`, `--alerts`).
-- Keys and webhook addresses go in `sibyl/data/.env`, readable only by the person; the scripts read it. The person saves them with `node scripts/save-secret.js <name>` in their own terminal, never in the chat.
+- Keys and webhook addresses go in `sibyl/data/.env`, readable only by the person; the scripts read it. The person saves the ones they make with `node scripts/save-secret.js <name>` in their own terminal; a Telegram token or a Slack or Discord address that you copied for them, you pipe from the clipboard into the same command with `--from-stdin`, without showing it ("Saving a key"). Never in the chat.
 - Schedule only with `node scripts/schedule.js --install --hours=<start>-<end>`; no wrappers of your own.
 - Save the pages you read with `node scripts/save-pages.js` (one file per page in `data/daily-pages/`); never write `pages.json` yourself.
-- Instagram (optional) is read through the person's own Meta app: they do every step on Meta's sites in their own browser, and save the token with `node scripts/instagram-token.js` (AGENTS.md, "Instagram").
+- Instagram (optional) is read through the person's own Meta app: tell them first that Meta is strict about automated activity; they do every step on Meta's sites in their own browser, and save the token with `node scripts/instagram-token.js` (AGENTS.md, "Instagram").
 - If your commands cannot reach the internet, stop and ask the person to allow it (AGENTS.md, rule 11).
 - After any change, run `node scripts/check-deploy.js`.
 

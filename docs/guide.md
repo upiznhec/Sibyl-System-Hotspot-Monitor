@@ -11,6 +11,8 @@ Sibyl watches trend lists for the topics you choose. On a schedule it:
 3. Sends an alert, a short message that arrives straight away, when an item in your topics is near the top of Google Trends.
 4. Every hour, writes a briefing: the strongest trends, grouped into events, each with a score and a short summary. The briefing goes to your chat app, or is saved as a file.
 
+Sibyl finds and ranks the trends; you decide which ones to post about, and why.
+
 ### 1.1 At a glance
 
 | When | Who | What |
@@ -37,7 +39,7 @@ Sibyl watches trend lists for the topics you choose. On a schedule it:
 | Google Trends | The top searches right now, about 10 per country, each with news links | Script, every 10 minutes | Nothing | On |
 | Google Trends | Trending searches in your categories, and rising searches for your keywords (Explore) | Your agent: the categories every hour, Explore once a day | Nothing for now (see section 1.4) | On |
 | TikTok Creative Center | Top hashtags by country and industry, with posts and views over 7 days | Your agent, once a day | Nothing for the top 3; a free TikTok for Business login for more | On |
-| Wikipedia | The most-read pages in your country yesterday | Script | A web address or email, for Wikimedia | On |
+| Wikipedia | The most-read pages in your country yesterday | Script | Your own web address or email, for Wikimedia | On |
 | YouTube search (optional) | The most-viewed new videos for your keywords | Script, at most once an hour | A free key from Google | Off |
 | X trends (optional) | What is trending on X in your country | Script, every 10 minutes | A paid X developer account | Off |
 | Instagram (optional) | Top and newest posts under your hashtags (at most 30), and posts taking off on accounts you choose | Script, every hour | An Instagram professional account linked to a Facebook Page, and your own free Meta app | Off |
@@ -161,8 +163,8 @@ An event enters the briefing when:
 | An AI agent | Yes | It must run commands with internet access, edit files and use a web browser. One that can also run on a schedule is best. |
 | Places to send briefings | Optional | Slack, Discord or WeCom webhooks, or a Telegram bot; briefings go to every one you set up. Without any, briefings are saved as files. |
 | AI to explain each trend | Optional | An API key, a code that lets Sibyl use the AI. Some AI subscriptions include one; if yours does not, buy credit on the AI company's website. Without it, each trend's line is copied from a news headline. |
-| Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free); an X developer account for X trends (paid); for Instagram, a professional account linked to a Facebook Page and a free Meta app. See section 1.3. |
-| A contact for Wikipedia | If Wikipedia is on | A web address or email that Sibyl sends to Wikimedia and to no other site. See section 1.3. |
+| Accounts | Optional | TikTok for Business (free) to see more than 3 hashtags; a Google account for the new Explore page; a key from Google for YouTube search (free; use a personal Google account, since a school or work account may not open Google Cloud); an X developer account for X trends (paid); for Instagram, a professional account linked to a Facebook Page and a free Meta app. See section 1.3. |
+| A contact for Wikipedia | If Wikipedia is on | Your own web address or email, which Sibyl sends to Wikimedia and to no other site. See section 1.3. |
 
 ## 4. Setup
 
@@ -172,8 +174,8 @@ Copy the setup request in [SETUP-PROMPT.md](../SETUP-PROMPT.md), fill in the par
 
 1. Downloads the folder and checks Node.js.
 2. Asks what you want to track, and proposes topics, keywords and exclude words, plus the matching category on each platform. It waits for your OK before saving anything.
-3. Sets your country and time zone, switches on the sources you chose, and asks you for what they need (section 1.3). You save keys on your computer with a command your agent gives you; you never paste them into the chat.
-4. Sets up where briefings go, or leaves them as files.
+3. Sets your country and time zone, switches on the sources you chose, and asks you for what they need (section 1.3). If it can use your browser and apps, it does the account steps there and asks you only to log in. Keys for YouTube search and X are yours to make, copy and save, with steps and a command your agent gives you, and you do every step on Meta's pages yourself, because Meta may lock an account that a program clicks for. You never paste a key into the chat.
+4. Sets up where briefings go, or leaves them as files. For Telegram, Slack and Discord, it makes the bot or webhook for you if it can use your browser or app, after checking that it is the account you use, and saves it without showing it.
 5. If you want to track trends on TikTok, gets you logged in to TikTok Creative Center once: through your own browser if it can use it or bring your login over, otherwise in its own browser. Without a login it shows only the top 3 hashtags. The same goes for Google Trends Explore if it asks for a sign-in. The TikTok for Business account is free ([create one](https://ads.tiktok.com/i18n/signup)).
 6. Reads the pages for the first time, runs the self-check and a first briefing, and shows you the result.
 7. Schedules the work with Sibyl's own scheduling script: collection and alerts every 10 minutes and a briefing every hour, during the hours you choose. It also arranges the page reading: Google's category list every hour, TikTok and Explore once a day. On a Mac, the Sibyl folder must not be in Desktop, Documents or Downloads; your agent moves it if needed.
@@ -329,6 +331,7 @@ Stop Sibyl: remove its schedule and the page-reading task. Keep my settings, so 
 | Problem | Likely cause | Ask your agent |
 | --- | --- | --- |
 | No briefing in your chat | Push not set; webhook or Telegram details wrong; the scheduled task lacks `--push` | "Run the Sibyl check and fix the push settings." |
+| The check says briefings were sent, but you see none | Your agent set the place up under another account signed in to its browser (in testing, a second Discord account with a server of the same name) | "I use the [Discord] account [name]. Set it up there." Or show your agent your app. |
 | Alerts show 0 candidates | Nothing in your topics is near the top right now, or the alert limits are too strict | Usually nothing to fix. "Show me today's Google Trends top searches." |
 | The briefing is empty | Topics or keywords too narrow, or the trend pages were not read | "Find out why the Sibyl briefing is empty and suggest a fix." |
 | Unrelated items | A keyword is too broad, or the item came from a list read for your topic (such items normally go to the watch list) | "Add an exclude word for [word] in Sibyl." |
@@ -341,7 +344,7 @@ Stop Sibyl: remove its schedule and the page-reading task. Keep my settings, so 
 | Your agent asks you to run a script it wrote | It is working around a problem instead of asking you | Do not run it. "Use Sibyl's own schedule script, as AGENTS.md says." |
 | No briefing ever arrives on a Mac | The Sibyl folder is in Desktop, Documents or Downloads, which scheduled tasks cannot read | "Move Sibyl out of Desktop and set its schedule again." |
 | A YouTube channel error | YouTube's channel feeds sometimes fail for a few hours | Wait; it usually recovers on its own. |
-| Your agent says a key you pasted is not saved | Return was not pressed at the save prompt, or nothing arrived | Go back to the terminal: the line under the question counts the characters received. Press Return there, or paste again. |
+| Your agent says a key you pasted is not saved | Return was not pressed at the save prompt, nothing arrived, or the command still waits for a later question (the Instagram one asks 3, numbered) | Go back to the terminal: the line under the question counts the characters received. Press Return there, or paste again. |
 | Your agent cannot find your Telegram chat | No message was sent to the bot (pressing Start was not enough in testing) | Send your bot a message such as "hi", then tell your agent. |
 | Facebook logs you out during the Instagram setup | Your agent opened Meta's developer pages in its own browser | Log in again on your phone, then do the Meta steps in your own browser while your agent tells you what to click. |
 | Your agent cannot find your Instagram account | The Page and Instagram account were not chosen in the token's pop-up, or the account is not a professional account linked to the Page | "Tell me how to make a new Instagram token with my Page and account chosen." |

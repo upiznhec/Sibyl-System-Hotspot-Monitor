@@ -11,6 +11,7 @@ const {
   buildCronBlock,
   installedBlock,
   mergeCrontab,
+  otherFolders,
   parseEvery,
   parseHours,
   protectedMacFolder,
@@ -50,18 +51,35 @@ const otherData = buildCronBlock({ sibylDir: '/s', nodePath: '/n', dataDir: '/d'
 assert.ok(otherData.includes("SIBYL_DATA_DIR='/d' '/n' scripts/sibyl.js"));
 assert.ok(otherData.includes("'/d/briefing.log'"));
 
-// Other entries stay; reinstalling replaces the block instead of adding a second one.
+// Other entries stay; reinstalling replaces the folder's block instead of adding a second one.
+const dir = '/Users/a b/Sibyl/sibyl';
 const existing = '# my jobs\n0 7 * * * echo morning\n';
 const merged = mergeCrontab(existing, block);
 assert.ok(merged.startsWith(`# my jobs\n0 7 * * * echo morning\n${BEGIN}`));
-assert.strictEqual(installedBlock(merged), block);
-const reinstalled = mergeCrontab(merged, hourly);
+assert.strictEqual(installedBlock(merged, dir), block);
+const sameFolder = buildCronBlock({ sibylDir: dir, nodePath: '/n', hours: { start: 9, end: 17 }, every: 60 });
+const reinstalled = mergeCrontab(merged, sameFolder);
 assert.strictEqual(reinstalled.split(BEGIN).length - 1, 1);
-assert.strictEqual(installedBlock(reinstalled), hourly);
-assert.strictEqual(stripBlock(reinstalled), '# my jobs\n0 7 * * * echo morning');
-assert.strictEqual(installedBlock(existing), null);
+assert.strictEqual(installedBlock(reinstalled, dir), sameFolder);
+assert.strictEqual(stripBlock(reinstalled, dir), '# my jobs\n0 7 * * * echo morning');
+assert.strictEqual(installedBlock(existing, dir), null);
 assert.strictEqual(mergeCrontab('', block), `${block}\n`);
-assert.throws(() => installedBlock(`${BEGIN}\n* * * * * x\n`), /no end line/);
+assert.throws(() => installedBlock(`${BEGIN}\n* * * * * x\n`, dir), /no end line/);
+
+// A second Sibyl folder (for example a second test on the same computer) keeps its own block:
+// installing or removing one folder's schedule leaves the other's alone.
+const both = mergeCrontab(reinstalled, hourly);
+assert.strictEqual(both.split(BEGIN).length - 1, 2);
+assert.strictEqual(installedBlock(both, dir), sameFolder);
+assert.strictEqual(installedBlock(both, '/s'), hourly);
+assert.deepStrictEqual(otherFolders(both, '/s'), [dir]);
+assert.strictEqual(stripBlock(both, '/s'), `# my jobs\n0 7 * * * echo morning\n${sameFolder}`);
+const replacedOne = mergeCrontab(both, otherData);
+assert.strictEqual(replacedOne.split(BEGIN).length - 1, 2);
+assert.strictEqual(installedBlock(replacedOne, '/s'), otherData);
+assert.strictEqual(installedBlock(replacedOne, dir), sameFolder);
+const quoted = buildCronBlock({ sibylDir: "/Users/o'neil/sibyl", nodePath: '/n', hours: { start: 9, end: 17 } });
+assert.strictEqual(installedBlock(mergeCrontab(both, quoted), "/Users/o'neil/sibyl"), quoted);
 
 // macOS folders a scheduled task cannot read.
 const home = '/Users/someone';

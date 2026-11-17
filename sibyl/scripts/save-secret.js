@@ -18,8 +18,10 @@
 //   SIBYL_...      any other Sibyl variable
 // Briefings go to every place that is saved; alerts go there too unless alert-webhook is saved.
 // --remove deletes a saved value, for example to stop sending to a place. It asks for nothing, so an
-// agent may run it. Saving needs a terminal, so an agent cannot run it in the person's place; for
-// scripts and tests, --from-stdin reads the first line of standard input instead.
+// agent may run it. Saving needs a terminal, so an agent cannot answer the prompt in the person's
+// place. --from-stdin reads the first line of standard input instead: for tests, and for an agent
+// that set up Telegram, Slack or Discord for the person and pipes the copied token or address from
+// the clipboard without showing it (AGENTS.md, "Saving a key").
 
 const { envFilePath, readEnvValues, removeEnvValue, writeEnvValue } = require('./lib/env-file');
 const { readHidden, readLine, readVisible } = require('./lib/prompt');

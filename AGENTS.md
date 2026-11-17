@@ -7,7 +7,7 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 1. **Never type passwords, API keys or tokens into web pages.** Logins are the person's to do, in the browser they already use wherever possible (see "Keys and logins").
 2. **Confirm topics before anything runs on a schedule.** Show the sources switched on, the topics, keywords, exclude words and the category chosen on each platform, and wait for the person's OK.
 3. **Show briefings and alerts only when asked.** If no push target is set, briefings are saved as files; do not paste them into the conversation unless the person asks.
-4. **Keep secrets in `sibyl/data/.env`.** Webhook addresses, bot tokens and API keys go there, one `NAME=value` per line, and only the person's account may read it (`chmod 600`; git does not upload the data folder). Every script reads it when it starts, so neither `config.json` nor the schedule holds a secret. Never ask the person to paste a secret into the chat, and never print one: they save it with `scripts/save-secret.js` in their own terminal (see "Keys and logins").
+4. **Keep secrets in `sibyl/data/.env`.** Webhook addresses, bot tokens and API keys go there, one `NAME=value` per line, and only the person's account may read it (`chmod 600`; git does not upload the data folder). Every script reads it when it starts, so neither `config.json` nor the schedule holds a secret. Never ask the person to paste a secret into the chat, and never print one. It is saved with `scripts/save-secret.js`: by the person in their own terminal, or by you from the clipboard for the chat apps you set up for them (see "Keys and logins").
 5. **Ask before anything that costs money** (X trends, a paid model) and say what it costs.
 6. **Check a website's terms before adding its feed.** Some feeds are for personal use only; tell the person and let them decide.
 7. **Read each page at its interval** (`everyHours` in `dailyPages`: Google's Trending Now every hour, the others once a day), not more often unless the person asks. Do not bypass logins, rate limits or bot checks, and do not read pages other than those listed here.
@@ -15,6 +15,7 @@ You are helping a person run Sibyl, a trend monitor. The person may not be techn
 9. **Ask for what you need when you need it**, one thing at a time and in plain words, as described under "Talking to the person".
 10. **Schedule only with `scripts/schedule.js`.** Do not write your own scheduler, wrapper scripts or jobs around the commands, and never stop a run because one source failed: the scripts record that source's error and read the others. Never ask the person to run a setup script you wrote.
 11. **If your commands cannot reach the internet, stop and ask.** `getaddrinfo ENOTFOUND`, `EAI_AGAIN` or `Operation not permitted` on every source, or a failed "Internet access" line in the self-check, mean your app keeps your commands offline. Ask the person to allow network access ("What to ask, and when"). Until `collect-snapshot.js` reads the live sources, schedule nothing, and do not hand them scripts to run instead.
+12. **Keep to the plan the person approved.** After their OK, do not propose new scoring, extra scheduled jobs or AI explanations unless something does not work or they ask. Report what you see, with the options when there is something to decide; which trends matter, and why, is for the person to judge.
 
 ## Talking to the person
 
@@ -24,20 +25,48 @@ The person has not read the guide and should not have to. Do not expect them to 
 - **One thing at a time.** Ask, wait for the answer, then go on. Do not guess, skip it or carry on without it.
 - **Say what they need to decide:** what it is, why Sibyl needs it, whether it costs money, whether it needs an account, the link, what to send back, and what happens if they say no.
 - **Keep it short.** No list of terms, and nothing they do not need yet.
+- **Say what you are handing over.** When the person takes over a step you prepared, such as copying an address or a key, first say in a sentence or two what it is, on which page and under which button it is, and what they will see when they copy it (Discord's Copy Webhook URL shows nothing on screen).
+- **Write their steps for someone who has never seen the page.** One action per step, in order. Name each button as the page shows it, in the page's language, with a translation if that is not the person's language. Say what they should see when a step worked, which buttons to leave alone (payment, top-up or regenerate buttons), and what to do if a screen looks different.
 
 ### Keys and logins
 
-**Saving a key.** A key, token or webhook address never goes through the chat. When Sibyl needs one, say what it is, why Sibyl needs it, what it costs and where to get it, as usual, then give the person this command to run in their own terminal, with the full path to their Sibyl folder:
+**Who does what.** One-time account steps, such as making a Telegram bot, a Slack or Discord webhook or the YouTube key, or buying X credit, happen in the person's own browser or app, where they are already signed in, never in a browser of yours.
+
+- **If you can work there** (for example in their Chrome with Claude's Chrome extension, or in their apps with computer use), do the steps yourself, and ask the person only to open the app or page and to log in. Passwords, payments and accepting terms stay theirs.
+  - **Telegram, Slack and Discord:** you do every step, including saving the token or webhook address (see "Saving a key").
+  - **YouTube search and X trends:** you open the pages and do the clicks that come before the key, such as making the Google Cloud project and turning on the API. Making the key or token, copying it and saving it is the person's: hand it over with steps written as under "Talking to the person", and the save command.
+  - **Meta's sites** (Facebook, Instagram, Meta for Developers): the person does every click, and you do not open these pages (see "Instagram").
+- **Check the account first.** Before you make a bot, channel, webhook or key, check that the browser or app is signed in to the account the person uses: compare the username and the servers or workspaces with theirs, or ask. In testing, Chrome was signed in to a second Discord account with a server of the same name, and the briefings went to a channel the person could not see. After the test briefing, ask them to check that it arrived in the app they read.
+- **If you cannot work in their browser or apps**, give them the link and what to click, one step at a time.
+
+**Saving a key.** A key, token or webhook address never goes through the chat, and you never print one. When Sibyl needs one, say what it is, why Sibyl needs it, what it costs and where to get it, as usual. It is then saved in one of two ways.
+
+*What the person makes or copies* they save themselves: give them this command to run in their own terminal, with the full path to their Sibyl folder:
 
 ```text
 node "<full path>/sibyl/scripts/save-secret.js" youtube
 ```
 
-The last word is `youtube`, `x`, `ai`, `slack`, `discord`, `telegram`, `webhook` (WeCom, or any other address) or `alert-webhook` (alerts in a separate place). The command asks them to paste the value and press Return. It never shows the value, only a line counting the characters received, and writes it to `sibyl/data/.env`, which only their account can read. Running it again replaces the old value, except that a value which does not look right does not replace one that does unless they confirm. Give the command each time a value is to be saved, even if an earlier one may still be waiting in their terminal. If your app can run a command in a terminal at the person's click, offer that; otherwise tell them how to open one (macOS: Terminal, in Applications, Utilities; Windows: PowerShell). Do not run it yourself: it needs them to paste, and it refuses to run without a terminal. When they say it is saved, run `check-deploy.js`, which shows whether the value is set without showing it. To delete a saved value, for example to stop sending to a place, run the same command with `--remove` at the end; you may run that yourself, since it asks for nothing. If they paste a secret into the chat anyway, do not repeat it, and suggest they make a new one and save that with the command, because the chat keeps a copy.
+The last word is `youtube`, `x`, `ai`, `slack`, `discord`, `telegram`, `webhook` (WeCom, or any other address) or `alert-webhook` (alerts in a separate place). The command asks them to paste the value and press Return. It never shows the value, only a line counting the characters received, and writes it to `sibyl/data/.env`, which only their account can read. Running it again replaces the old value, except that a value which does not look right does not replace one that does unless they confirm. Give the command each time a value is to be saved, even if an earlier one may still be waiting in their terminal. If your app can run a command in a terminal at the person's click, offer that; otherwise tell them how to open one (macOS: Terminal, in Applications, Utilities; Windows: PowerShell). Do not run this form yourself: it needs them to paste, and it refuses to run without a terminal.
+
+*What you copy yourself* (Telegram, Slack and Discord, when you set them up for the person) you save without anyone seeing it:
+
+1. Put a harmless word on the clipboard, so that an old value cannot be taken for the new one.
+2. Click the page's own copy control: Copy next to the new Slack webhook, Copy Webhook URL in Discord, or the token in BotFather's reply, which Telegram copies when it is clicked. Do not read the page's text or take a screenshot while the value is on screen; if a script has to find the button, have it return only the button's label.
+3. In one command, read the clipboard, check that it has the right shape (the patterns are under `SECRETS` in `save-secret.js`), print only yes or no and its length, and pipe it into the save command with `--from-stdin`. Then put the harmless word back on the clipboard.
+
+On macOS, for Slack:
+
+```text
+v="$(pbpaste)"; if printf '%s' "$v" | grep -Eq '^https://hooks\.slack\.com/[^[:space:]]+$'; then echo "Slack address: yes, ${#v} characters"; printf '%s\n' "$v" | node "<full path>/sibyl/scripts/save-secret.js" slack --from-stdin; else echo "Slack address: no"; fi; printf 'sibyl' | pbcopy
+```
+
+On Windows, PowerShell's `Get-Clipboard` and `Set-Clipboard` do the same.
+
+Either way, when it is saved, run `check-deploy.js`, which shows whether the value is set without showing it. To delete a saved value, for example to stop sending to a place, run the save command with `--remove` at the end; you may run that yourself, since it asks for nothing. If the person pastes a secret into the chat anyway, do not repeat it, and suggest they make a new one and save that with the command, because the chat keeps a copy.
 
 **Logins and browsers.** Use the browser the person already uses wherever you can. Signing in again in another browser is tiring, and some people will not sign in to Google there.
 
-- **One-time account steps**, such as making the YouTube key, buying X credit or making a Telegram bot or a webhook, happen in their own browser (for Telegram and Discord, in their own app). Give the link and what to click, one step at a time. Do not open these pages in your browser.
 - **Pages you read every day** (TikTok Creative Center, and Google's Explore if it asks for a sign-in) need the sign-in in the browser you read them with. First, if you can work in their own browser, where they are already signed in (for example with Claude's Chrome extension), use it. Second, if your browser can bring one site's sign-in over from theirs (in the Claude app, the browser pane's ⋮ menu offers this when it can), ask them to do that for that site only. Otherwise ask them to sign in once in your browser. A sign-in usually stays: ask again only when the page shows they are signed out.
 - **If they cannot or would rather not sign in**, go on without it and say what they lose (TikTok: the top 3 hashtags only).
 
@@ -59,19 +88,29 @@ grep -q '^\[sandbox_workspace_write\]' ~/.codex/config.toml 2>/dev/null || print
 
 In other apps, look for network or internet access in their permission or sandbox settings, or ask the person to approve network access when the app asks.
 
-**Telegram**, when it is chosen.
+**Telegram**, when it is chosen. If you can work in their Telegram ("Who does what"):
+
+> Sibyl sends briefings to Telegram through its own bot, which is free, and I can make the bot for you. Please open Telegram [on the web in your browser / in the app], log in if you are not already, and tell me when. The bot's token, a code that lets Sibyl post as the bot, goes straight into a private file on your computer: I do not see it, and it never goes into this chat.
+
+Otherwise:
 
 > Sibyl sends briefings to Telegram through its own bot, which is free. In Telegram, open @BotFather (it has a blue tick), send /newbot, and choose a name and a username ending in "bot". It gives you a token, a code that lets Sibyl post as the bot. Do not send it to me; save it by running this in your terminal: [the save-secret command for `telegram`]. Then send your new bot any message, such as "hi", and tell me when you have.
 
-**Slack, Discord or WeCom**, when it is chosen. Ask about each place the person named, one at a time; briefings go to all of them.
+**Slack, Discord or WeCom**, when it is chosen. Ask about each place the person named, one at a time; briefings go to all of them. For Slack and Discord, if you can work in their browser or app ("Who does what"):
+
+> To post briefings in your channel, Sibyl needs the channel's webhook address, a private link that lets it post there. It is free, and I can make it for you. Please open [Slack in your browser / Discord], log in if you are not already, and tell me when. I will then ask which channel should get the briefings; I can make a new private one. The address goes straight into a private file on your computer, and I do not see it.
+
+Otherwise, and for WeCom:
 
 > To post briefings in your channel, Sibyl needs the channel's webhook address: a link that lets it post there. It is free. Here is how to make one: [the matching steps below]. Anyone with the address can post in your channel, so do not send it to me; save it by running this in your terminal: [the save-secret command for `slack`, `discord` or, for WeCom, `webhook`].
 
-Slack: a webhook needs a Slack app, made on api.slack.com in a browser (the Slack app cannot make one): Create an App, from scratch (in 2026: "Pick features"), with only the `incoming-webhook` scope; then, on the app's Incoming Webhooks page, Add New Webhook, choose the channel, Allow, and Copy next to the new address. In testing, "Create and Install" on the last step of making the app did not finish; Add New Webhook did. Guide: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/ · Discord, in the app: the channel's settings (gear icon), Integrations, Webhooks, Create Webhook, then Copy Webhook URL (the address is not shown): https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks · WeCom (add a group robot in the group's settings): https://developer.work.weixin.qq.com/document/path/91770
+Slack: a webhook needs a Slack app, made on api.slack.com in a browser (the Slack app cannot make one): Create an App, from scratch (in 2026: "Pick features"), with only the `incoming-webhook` scope; then, on the app's Incoming Webhooks page, Add New Webhook, choose the channel, Allow, and Copy next to the new address. In testing, "Create and Install" on the last step of making the app did not finish; Add New Webhook did. Guide: https://docs.slack.dev/messaging/sending-messages-using-incoming-webhooks/ · Discord, in the app or at discord.com/app: the channel's settings (gear icon), Integrations, Webhooks, Create Webhook, then Copy Webhook URL (the address is not shown): https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks · WeCom (add a group robot in the group's settings): https://developer.work.weixin.qq.com/document/path/91770
 
 **Wikipedia**, when it is on.
 
 > Wikimedia, which runs Wikipedia, asks programs that read its statistics for a way to contact the person running them. Can you give me a web address, such as your website or a social media profile, or an email? Only Wikimedia sees it. If you would rather not, I will switch Wikipedia off; the other sources still work.
+
+The contact must be the person's own. Do not offer Sibyl's GitHub page or the address it was downloaded from: Wikimedia would then contact that repository's owner, not the person running Sibyl.
 
 **YouTube channels**, when the person asks to follow one, or when a link does not work.
 
@@ -87,21 +126,21 @@ Slack: a webhook needs a Slack app, made on api.slack.com in a browser (the Slac
 
 **YouTube search**, when it is chosen.
 
-> YouTube search needs a key from Google: a long code that lets Sibyl search YouTube for you. It is free, because Sibyl stays within Google's 100 free searches a day, and it takes about 10 minutes with your Google account, in the browser you normally use. I will give you each link and tell you what to click. Shall we start?
+> YouTube search needs a key from Google: a long code that lets Sibyl search YouTube for you. It is free, because Sibyl stays within Google's 100 free searches a day, and it takes about 10 minutes with your Google account, in the browser you normally use. I will open the pages and get everything ready; then you make the key, copy it and save it, with steps from me. Shall we start?
 
-Then take them through the steps under "Sources", one at a time, and end with the save-secret command for `youtube`.
+If you cannot work in their browser, say instead that you will give them each link and tell them what to click. Then follow the steps under "Sources", and end with the save-secret command for `youtube`.
 
 **X trends**, when it is chosen. Work out the cost for their hours first (rule 5).
 
 > X trends costs money: US$0.01 each time Sibyl checks, every 10 minutes, so about US$[amount] a day for your hours. You need your X account, and you buy credit yourself at the X Developer Console (https://console.x.com). Do you want to go ahead?
 
-If yes: in their own browser they sign in, buy credit and create an app, then save its Bearer Token with the save-secret command for `x`.
+If yes: open the X Developer Console in their browser, or give them the link. They sign in if it asks and buy credit themselves. Then they create an app, which shows its Bearer Token, copy the token and save it with the save-secret command for `x` (steps under "Sources").
 
 **Instagram**, when it is chosen.
 
-> Instagram is free to read, through a small app of your own at Meta, and it takes about 10 minutes. You need an Instagram professional account (business or creator) linked to a Facebook Page you manage. You do the clicks on Meta's site in the browser you always use, because Meta may lock an account that a program clicks for; I tell you each step. Shall we start?
+> First, a warning: Meta is strict about automated activity, and it may lock an account, log it out or ask for ID when a program clicks on its pages. So on Meta's sites you do every click yourself, in the browser you always use and at your normal pace, and I tell you each step. Instagram is free to read, through a small app of your own at Meta, and it takes about 10 minutes. You need an Instagram professional account (business or creator) linked to a Facebook Page you manage. Shall we start?
 
-Then take them through the steps under "Instagram" in "Sources", one at a time.
+Then take them through the steps under "Instagram" in "Sources", one at a time. Start every message about a Meta step with the same warning, before the steps.
 
 **AI explanations** ("Use AI to explain each trend" in the request), when they said yes.
 
@@ -139,6 +178,15 @@ Seen when Codex and Claude set Sibyl up on a Mac (November 2026); expect them in
 | A narrow browser window made Google serve its mobile layout, whose table held the unfiltered list of 660 trends, and the agent wrote its own checker before saving | Read pages in a window at least 1280 px wide, write each page to `data/daily-pages/`, and save with `scripts/save-pages.js`, which refuses such lists. |
 | YouTube videos that shared one word with Explore's "Brand" and TikTok's #routine made them lead | Fixed in the scripts: only main sources confirm an item from a list read for the topic. If something unrelated still leads, offer an exclude word. |
 | Signed in to TikTok and Google in their own browser, the person had to sign in to TikTok again in the agent's browser, and would not sign in to Google there | "Keys and logins": one-time account steps happen in their own browser; for pages you read daily, use their browser or bring the sign-in over before asking for a new one. |
+| The agent gave the person the Telegram, Slack and Discord steps, although it could work in their signed-in Chrome; the person asked it to do those, and the clicks before each key on the other sites | "Keys and logins", "Who does what". |
+| After making a Discord webhook and copying it, the agent only said the address was on the clipboard; the person asked what a webhook address was and where to get it | "Talking to the person": say what you are handing over, where it comes from and what copying it shows. |
+| Chrome was signed in to a second Discord account with a server of the same name, so the briefings went to a channel the person could not see | "Who does what": check the account first, and check that the test briefing arrived in the app they read. |
+| After the person approved the plan, the agent proposed new scoring, extra scheduled jobs and AI explanations; the person wanted it left as approved, and the judging of trends left to them | Rule 12. |
+| The agent mentioned Meta's lock-out risk in the middle of a long message | "Instagram": the warning comes first, in every message about a Meta step. |
+| Meta's form had no option to skip the business portfolio by that name | "Instagram", step 1: "I don't want to connect a business portfolio yet". |
+| The agent offered the address Sibyl was downloaded from as the Wikipedia contact, which would point Wikimedia to that repository's owner | "Wikipedia": the contact must be the person's own. |
+| Chrome's default Google account was a school account, and Google Cloud sent it to the school's sign-in page | "YouTube search": ask which account, and suggest a personal one. |
+| The person said the Instagram token was saved while `instagram-token.js` still waited for its third answer | Fixed: it numbers its questions (1 of 3 to 3 of 3) and says when it is checking with Meta. |
 
 ## Where things are
 
@@ -176,7 +224,7 @@ Run them from the `sibyl` folder.
 ## Setup
 
 1. **Get the files.** Clone `https://github.com/upiznhec/Sibyl-System-Hotspot-Monitor.git` into a folder the person chooses. On macOS, put it in the home folder (for example `~/Sibyl-System-Hotspot-Monitor`), not in Desktop, Documents or Downloads: scheduled tasks cannot read those folders, and `schedule.js` refuses them. If the person already put it there, ask before you move it. Check `node --version` (18 or later); help install Node.js if needed.
-2. **Create the config.** `mkdir -p sibyl/data` and copy `sibyl/scripts/config.example.json` to `sibyl/data/config.json`. The person saves keys and webhook addresses in `sibyl/data/.env` with `save-secret.js` (rule 4).
+2. **Create the config.** `mkdir -p sibyl/data` and copy `sibyl/scripts/config.example.json` to `sibyl/data/config.json`. Keys and webhook addresses are saved in `sibyl/data/.env` with `save-secret.js` (rule 4).
 3. **Map the topics** (next section). Wait for the person's OK, then write `topics` and `dailyPages`.
 4. **Country, time zone and sources.** Set `country` (two-letter code, such as `US`) and `timeZone` (an IANA name, such as `America/New_York`). Under `platforms`, switch the sources on or off as the person chose under "Sources to watch" in the setup request; where a choice is blank or still in brackets, keep the default. Google Trends, TikTok and Wikipedia are on by default; YouTube channels, websites, YouTube search and X are off. What each source needs is under "Sources" below, and how to ask for it under "What to ask, and when".
 5. **Push target** (see "Push targets" below), or none: then briefings are saved as files.
@@ -247,38 +295,37 @@ YouTube channels and websites are not in the setup request: following particular
 
 **Main sources.** An event must appear on a source in `report.seedPlatforms` to enter the briefing. Keep the list to the main sources that are on: Google Trends, TikTok, and X when the person turns it on. If they say no to all three, explain that the briefing would stay empty, and ask them to keep at least one.
 
-**Wikipedia.** Ask for a contact (see "What to ask, and when") and set `http.userAgent` to `SibylHotspotMonitor (<contact>)`. Sibyl sends it only with its requests to Wikimedia; every other site gets a plain name without it. If they would rather not give one, switch Wikipedia off.
+**Wikipedia.** Ask for the person's own contact (see "What to ask, and when") and set `http.userAgent` to `SibylHotspotMonitor (<contact>)`. Sibyl sends it only with its requests to Wikimedia; every other site gets a plain name without it. If they would rather not give one, switch Wikipedia off.
 
 **YouTube channels.** Only when the person asks; ask for the links if they did not give them. Open each channel page and find its ID, which starts with `UC`: it is in the page's RSS link (`channel_id=`) and in the page source (`"externalId"`). Add `{ "id": "UC…", "name": "<channel name>" }` to `platforms["youtube-channels"].channels`, set `enabled: true`, and check that `https://www.youtube.com/feeds/videos.xml?channel_id=<id>` lists videos.
 
 **Websites and blogs.** Only when the person asks; ask for the addresses if they did not give them. Find each site's RSS or Atom feed: a `<link rel="alternate">` of type `application/rss+xml` or `application/atom+xml` in the home page, or a common path such as `/feed`, `/rss` or `/atom.xml`. Open the feed to check that it lists recent posts, and check the site's terms for it (rule 6). Add `{ "url": "<feed address>", "name": "<site name>" }` to `platforms.rss.feeds` and set `enabled: true`. If a site has no feed, tell the person; do not read its pages instead.
 
-**YouTube search.** It is free within Google's default allowance of 100 searches a day (`search.list` calls). Each query is one search at most once an hour (`minIntervalMinutes: 60`), and Sibyl runs at most 3 queries, so even 24 hours a day (72 searches) stays within it. Give the person each link and tell them what to click; they do it in their own browser:
+**YouTube search.** It is free within Google's default allowance of 100 searches a day (`search.list` calls). Each query is one search at most once an hour (`minIntervalMinutes: 60`), and Sibyl runs at most 3 queries, so even 24 hours a day (72 searches) stays within it. In the person's signed-in browser, do steps 1 to 3 yourself and stop before step 4, which is theirs ("Who does what"); if you cannot use their browser, they do every step while you say what to click.
 
-1. `https://console.cloud.google.com/`: they sign in with their Google account. No payment details are needed; if Google offers a free trial or asks for a card, they can skip it.
+1. `https://console.cloud.google.com/`, with the Google account that should own the key. If the browser has more than one, ask which one to use, and suggest a personal account: in testing, a school account sent Google Cloud to the school's own sign-in page. No payment details are needed; if Google offers a free trial or asks for a card, skip it.
 2. Create a project, for example "Sibyl".
 3. `https://console.cloud.google.com/apis/library/youtube.googleapis.com`: click Enable.
-4. `https://console.cloud.google.com/apis/credentials`: Create credentials, then API key. Restrict the key to YouTube Data API v3.
-5. They copy the key and save it with `node scripts/save-secret.js youtube` (see "Keys and logins").
+4. `https://console.cloud.google.com/apis/credentials`: the person clicks Create credentials, then API key, and restricts the key to YouTube Data API v3 if the form offers it. They copy the key and save it with `node scripts/save-secret.js youtube` (see "Keys and logins").
 
 That writes `SIBYL_YOUTUBE_API_KEY` to `sibyl/data/.env`. Check it with `check-deploy.js`, then set `enabled: true`. Leave `queries` empty to search the topic's first 6 keywords at once, or set up to 3 queries (words joined with `|` match any of them).
 
 **X trends.** First say what it costs and wait for the person's OK (rule 5): about US$0.01 per request, paid in advance as credit. Sibyl asks every 10 minutes, on each scheduled run (`minIntervalMinutes: 10`), 6 requests an hour; for 10:00 to 22:00 (the last run is at 22:50) that is 78 requests, about US$0.78 a day or US$23 a month. Work out the figure for their hours. If that is too much for them, offer `minIntervalMinutes: 30`, about a third of the cost. Then:
 
-1. Give them the X Developer Console, `https://console.x.com` (prices: `https://docs.x.com/x-api/getting-started/pricing`), to open in their own browser. They sign in with their X account and buy credit themselves; never enter payment details.
-2. They create an app, copy its Bearer Token and save it with `node scripts/save-secret.js x`.
+1. Open the X Developer Console, `https://console.x.com` (prices: `https://docs.x.com/x-api/getting-started/pricing`), in their signed-in browser, or give them the link. They sign in with their X account and buy credit themselves; never enter payment details.
+2. They create an app, which shows its Bearer Token, copy the token and save it with `node scripts/save-secret.js x`. Tell them not to regenerate the keys of apps they already have, which would stop whatever uses them, and not to turn on automatic top-ups.
 3. Check it with `check-deploy.js`, set `enabled: true`, and add `x-trends` to `report.seedPlatforms`.
 
 The US, the UK, Japan and worldwide are built in; for another country, set `platforms["x-trends"].woeid` from X's documentation. Items in the person's topics that reach X's top 5 also alert (`alerts.platforms["x-trends"]`). X's trends endpoint gives names only, with no post counts (tested 2026-11-15), so X items rank by position and the 50K-posts limit does not apply.
 
 **Instagram.** Free, through the person's own Meta app, which stays in development mode: no App Review is needed while only they use it (tested 2026-11-15). About once an hour Sibyl reads the top posts and the newest posts (last 24 hours) under the hashtags in `platforms.instagram.hashtags`, and the recent posts of the public business or creator accounts in `platforms.instagram.accounts`; an account post counts when it has at least twice that account's usual likes and comments. Limits: Meta allows 30 different hashtags per Instagram account in any 7 days, and reading a hashtag's posts uses one; about 200 requests an hour for one person, 2 per hashtag and 1 per account each run. Pick a few broad, steady hashtags from the topic's keywords (for sports, for example `nba`, `nfl`, `premierleague`), and put teams, players and media in `accounts`; changing hashtags often uses up the 30.
 
-They need an Instagram professional account (business or creator) linked to a Facebook Page they manage. The person does every step on Meta's sites in the browser they normally use; you give the link and say what to click, one step at a time. Never open Facebook, Instagram or Meta for Developers in your own browser and never click there for them: in testing, Meta took an agent's clicks for a stolen account and logged the person out on every device until a known device approved the login. Never try to get past a Meta security check.
+They need an Instagram professional account (business or creator) linked to a Facebook Page they manage. The person does every step on Meta's sites in the browser they normally use; you give the link and say what to click, one step at a time. Never open Facebook, Instagram or Meta for Developers with your tools, in your browser or in theirs, and never click there for them: in testing, Meta took an agent's clicks for a stolen account and logged the person out on every device until a known device approved the login. Start every message about a Meta step with that risk, before the steps: they click at a normal pace, and if Meta logs them out, asks for ID or mentions restrictions, they stop and tell you. Never try to get past a Meta security check.
 
-1. `https://developers.facebook.com/apps`: Create app. Name it (for example "Sibyl"), choose the use case "Manage messaging & content on Instagram", do not connect a business portfolio, and create it; creating it means accepting Meta's terms, which is theirs to do.
+1. `https://developers.facebook.com/apps`: Create app. Name it (for example "Sibyl") and choose the use case "Manage messaging & content on Instagram". When it asks about a business portfolio, choose "I don't want to connect a business portfolio yet" (the other options connect an existing portfolio or create one). Then create the app. Meta may ask for their Facebook password again, and creating the app means accepting Meta's terms; both are theirs to do.
 2. In the app: Use cases, Customize, then "Permissions and features". Add `instagram_basic`, `instagram_manage_insights`, `pages_show_list`, `pages_read_engagement` and `business_management`, and the feature "Instagram Public Content Access" (for hashtags). Each should read "Ready for testing". Leave the app in development mode and do not submit it for review.
 3. `https://developers.facebook.com/tools/explorer`: choose their app under Meta App, add the five permissions, and click Generate Access Token. In the pop-up they choose their Page and their Instagram account. If `me/accounts` later comes back empty, the Page was not chosen: generate the token again and choose it.
-4. In their own terminal: `node "<full path>/sibyl/scripts/instagram-token.js"`. It asks for the app ID (App settings, Basic), the app secret (same page, Show; Meta may ask for their password) and the Explorer's token (the copy button next to it), and shows neither the secret nor the token. It saves the token and the Instagram account ID in `sibyl/data/.env`. The token does not expire when Instagram accepts the Page's token; otherwise it lasts about 60 days, the self-check warns a week ahead, and they run the script again.
+4. In their own terminal: `node "<full path>/sibyl/scripts/instagram-token.js"`. It asks three numbered questions: the app ID (App settings, Basic), the app secret (same page, Show; Meta may ask for their password) and the Explorer's token (the copy button next to it), and shows neither the secret nor the token. It is done when it says "Saved in"; until then, it is still waiting for an answer. It saves the token and the Instagram account ID in `sibyl/data/.env`. The token does not expire when Instagram accepts the Page's token; otherwise it lasts about 60 days, the self-check warns a week ahead, and they run the script again.
 5. Set `enabled: true`, the `hashtags` and `accounts` (each may be `{ "tag": "nba", "topic": "Sports" }` or `{ "username": "espn", "topic": "Sports" }`), and add `instagram` to `report.seedPlatforms`. Run `check-deploy.js`: the Instagram line shows the token, the lists and the requests an hour.
 
 Facebook is not a source: reading other Pages needs Meta's App Review (Page Public Content Access), and Facebook has no hashtag search.
@@ -339,7 +386,7 @@ node scripts/schedule.js --status
 node scripts/schedule.js --remove
 ```
 
-- **macOS and Linux:** it writes one marked block into the person's crontab, with the full path of `node`, and leaves their other entries alone. `--every=30` collects every 30 minutes; `--dry-run` prints the block without writing it.
+- **macOS and Linux:** it writes one marked block for this Sibyl folder into the person's crontab, with the full path of `node`, and leaves their other entries alone, including the block of another Sibyl folder on the same computer (`--status` lists them). `--every=30` collects every 30 minutes; `--dry-run` prints the block without writing it.
 - **macOS folders:** it refuses to install from Desktop, Documents or Downloads, because scheduled tasks cannot read them. Move the whole folder first, for example to `~/Sibyl-System-Hotspot-Monitor`, and tell the person why in one sentence.
 - **Time zone:** the hours follow the computer's clock. If `timeZone` differs from the computer's, it says so; give the hours in the computer's time.
 - **Windows:** it prints the two Task Scheduler tasks to create, with the paths filled in.
@@ -353,7 +400,7 @@ Nothing else should post the scripts' output: with `--push` they send briefings 
 
 | Target | What to set |
 | --- | --- |
-| Slack | An incoming webhook: `SIBYL_SLACK_WEBHOOK` in `sibyl/data/.env`, saved by the person with `save-secret.js slack`. |
+| Slack | An incoming webhook: `SIBYL_SLACK_WEBHOOK` in `sibyl/data/.env`, saved with `save-secret.js slack` (see "Saving a key"). |
 | Discord | A channel webhook: `SIBYL_DISCORD_WEBHOOK`, saved with `save-secret.js discord`. |
 | WeCom | A group robot webhook, or any other address: `SIBYL_REPORT_WEBHOOK`, saved with `save-secret.js webhook`. |
 | Telegram | `SIBYL_TELEGRAM_BOT_TOKEN` (saved with `save-secret.js telegram`) and `SIBYL_TELEGRAM_CHAT_ID` (optional `SIBYL_TELEGRAM_ALERT_CHAT_ID`) in `sibyl/data/.env`. |
@@ -361,7 +408,7 @@ Nothing else should post the scripts' output: with `--push` they send briefings 
 
 Briefings go to every place that is saved. Alerts go to the same places, unless the person saves a separate place for them with `save-secret.js alert-webhook` (`SIBYL_ALERT_WEBHOOK`). To stop sending to a place, run its save command with `--remove`.
 
-For Telegram: the person messages @BotFather in Telegram, sends `/newbot`, and saves the bot token with `node scripts/save-secret.js telegram`. They then send any message to their new bot, such as "hi" (in testing, the /start sent by the bot's Start button was not returned); you read the chat ID from `https://api.telegram.org/bot<token>/getUpdates` (`result[].message.chat.id`), taking the token from `sibyl/data/.env` inside your command so that it is never shown, and save it as `SIBYL_TELEGRAM_CHAT_ID` the same way, without printing it.
+For Telegram: in Telegram, or Telegram Web in the person's signed-in browser, message @BotFather, send `/newbot`, and choose a name and a username ending in "bot". Save the bot token as under "Saving a key": you copy it by clicking it in BotFather's reply, or the person saves it with `node scripts/save-secret.js telegram`. Then send any message to the new bot, such as "hi" (in testing, the /start sent by the bot's Start button was not returned); you read the chat ID from `https://api.telegram.org/bot<token>/getUpdates` (`result[].message.chat.id`), taking the token from `sibyl/data/.env` inside your command so that it is never shown, and save it as `SIBYL_TELEGRAM_CHAT_ID` the same way, without printing it.
 
 Slack, Discord and Telegram are recognised by their address. For any other address, such as a relay, set `report.channel` or `alerts.channel` to `wecom`, `slack`, `discord` or `telegram`. After any change, run `check-deploy.js` (its "Briefing push" line names every place), then send one test with `node scripts/sibyl.js --push`: its last lines say "Pushed: yes (Slack, Telegram)", or which place failed.
 
@@ -382,7 +429,7 @@ Slack, Discord and Telegram are recognised by their address. For any other addre
 | Another country or time zone | `country`, `timeZone`, the `region` in `dailyPages`, and the schedule (`schedule.js --install`). |
 | An AI model for summaries | As under "AI explanations (summaries)": `SIBYL_AI_API_KEY` and `SIBYL_AI_MODEL` (and `SIBYL_AI_BASE_URL` for an API other than OpenAI). Without both, the first news headline is used. |
 | Update Sibyl | In the Sibyl folder, `git pull` (if it was downloaded as a ZIP, download the new one and copy `sibyl/data/` across). Settings and keys in `sibyl/data/` are kept. Then run `check-deploy.js` and a test briefing. |
-| Stop Sibyl | `node scripts/schedule.js --remove`, and remove the page-reading task you scheduled. Keep `sibyl/data/`, so that `schedule.js --install` turns it on again. |
+| Stop Sibyl | `node scripts/schedule.js --remove` in this Sibyl folder (it removes this folder's schedule only), and remove the page-reading task you scheduled. Keep `sibyl/data/`, so that `schedule.js --install` turns it on again. |
 
 ## Other settings
 

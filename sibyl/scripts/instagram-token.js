@@ -2,7 +2,8 @@
 
 // Saves Sibyl's Instagram token, so that no token passes through a chat. The person runs this in
 // their own terminal after approving their Meta app in Graph API Explorer (AGENTS.md, "Instagram"):
-// 1. It asks for the app ID (shown), the app secret and the Explorer's token (neither shown).
+// 1. It asks for the app ID (shown), the app secret and the Explorer's token (neither shown), as
+//    questions numbered 1 of 3 to 3 of 3, so that the person can see when all three are answered.
 // 2. It exchanges the token for a long-lived one (about 60 days), finds the Facebook Page linked to
 //    an Instagram professional account, and tries that Page's token, which does not expire, on
 //    Instagram. If Instagram does not accept it, the long-lived token is kept instead.
@@ -16,6 +17,13 @@ const { envFilePath, writeEnvValue } = require('./lib/env-file');
 const { requestJson } = require('./lib/http');
 const { readHidden, readLines, readVisible } = require('./lib/prompt');
 const { getDataDir } = require('./lib/snapshot-store');
+
+// In testing, a person said the token was saved while the script still waited for the third answer.
+const QUESTIONS = {
+  appId: '1 of 3. App ID (App settings, Basic, in your Meta app): ',
+  appSecret: '2 of 3. App secret (same page, Show). It is not shown on screen.',
+  token: "3 of 3. Graph API Explorer's access token (copy button next to it). It is not shown on screen."
+};
 
 function graphBase(version) {
   const base = String(process.env.SIBYL_GRAPH_BASE || 'https://graph.facebook.com').replace(/\/+$/, '');
@@ -102,12 +110,13 @@ async function main() {
     if (fromStdin) {
       [appId, appSecret, shortToken] = (await readLines(process.stdin)).map(line => String(line || '').trim());
     } else {
-      console.log('Sibyl: Instagram token. Have Graph API Explorer open with your app chosen and a token made.');
-      appId = (await readVisible('App ID (App settings, Basic, in your Meta app): ')).trim();
-      console.log('App secret (same page, Show). It is not shown on screen.');
+      console.log('Sibyl: Instagram token. It asks 3 questions. Have Graph API Explorer open with your app chosen and a token made.');
+      appId = (await readVisible(QUESTIONS.appId)).trim();
+      console.log(QUESTIONS.appSecret);
       appSecret = (await readHidden()).trim();
-      console.log("Graph API Explorer's access token (copy button next to it). It is not shown on screen.");
+      console.log(QUESTIONS.token);
       shortToken = (await readHidden()).trim();
+      console.log('All 3 answered. Checking with Meta; this takes a few seconds.');
     }
   } catch (error) {
     console.log('Cancelled. Nothing was saved.');
@@ -144,4 +153,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { pickPage, setUpToken };
+module.exports = { QUESTIONS, pickPage, setUpToken };

@@ -2,9 +2,10 @@
 
 // Installs, shows or removes Sibyl's schedule (v1.3.20's): collection and alerts every 10 minutes
 // and a briefing every hour, during the person's hours. On macOS and Linux it writes one marked block
-// into the person's crontab and leaves every other entry alone. On Windows it prints what to set up
-// in Task Scheduler. Keys come from data/.env, so the schedule holds no secrets. Agents use this
-// instead of writing their own scheduler or wrapper scripts.
+// for this Sibyl folder into the person's crontab and leaves every other entry alone, including the
+// block of another Sibyl folder (a block belongs to the folder its commands change into). On Windows
+// it prints what to set up in Task Scheduler. Keys come from data/.env, so the schedule holds no
+// secrets. Agents use this instead of writing their own scheduler or wrapper scripts.
 //
 //   node scripts/schedule.js --install --hours=10-22   install or replace (also --every=10, --dry-run)
 //   node scripts/schedule.js --status                  show what is installed (the default)
@@ -61,29 +62,45 @@ function buildCronBlock({ sibylDir = SIBYL_DIR, nodePath = process.execPath, dat
   ].join('\n');
 }
 
-function blockBounds(lines) {
-  const start = lines.findIndex(line => line.trim() === BEGIN);
-  if (start < 0) return null;
-  const end = lines.findIndex((line, index) => index > start && line.trim() === END);
-  if (end < 0) throw new Error('the Sibyl block in the crontab has no end line; fix it by hand (crontab -e) first');
-  return { start, end };
+// Every Sibyl block in the crontab, each with the folder its commands change into. Two Sibyl folders
+// (for example two tests on one computer) each keep their own block.
+function sibylBlocks(lines) {
+  const blocks = [];
+  for (let start = 0; start < lines.length; start += 1) {
+    if (lines[start].trim() !== BEGIN) continue;
+    const end = lines.findIndex((line, index) => index > start && line.trim() === END);
+    if (end < 0) throw new Error('the Sibyl block in the crontab has no end line; fix it by hand (crontab -e) first');
+    const cd = lines.slice(start + 1, end).map(line => line.match(/\bcd ('(?:[^']|'\\'')*')/)).find(Boolean);
+    blocks.push({ start, end, folder: cd ? cd[1].slice(1, -1).replace(/'\\''/g, "'") : null });
+    start = end;
+  }
+  return blocks;
 }
 
-function installedBlock(crontab) {
+function installedBlock(crontab, sibylDir = SIBYL_DIR) {
   const lines = String(crontab || '').split('\n');
-  const bounds = blockBounds(lines);
-  return bounds ? lines.slice(bounds.start, bounds.end + 1).join('\n') : null;
+  const block = sibylBlocks(lines).find(item => item.folder === sibylDir);
+  return block ? lines.slice(block.start, block.end + 1).join('\n') : null;
 }
 
-function stripBlock(crontab) {
+// The folders of the other Sibyl blocks, which this folder's install and remove leave alone.
+function otherFolders(crontab, sibylDir = SIBYL_DIR) {
+  return sibylBlocks(String(crontab || '').split('\n')).map(item => item.folder || '(unknown folder)').filter(folder => folder !== sibylDir);
+}
+
+function stripBlock(crontab, sibylDir = SIBYL_DIR) {
   const lines = String(crontab || '').split('\n');
-  const bounds = blockBounds(lines);
-  const kept = bounds ? [...lines.slice(0, bounds.start), ...lines.slice(bounds.end + 1)] : lines;
-  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+  const drop = new Set();
+  sibylBlocks(lines).filter(item => item.folder === sibylDir).forEach(item => {
+    for (let index = item.start; index <= item.end; index += 1) drop.add(index);
+  });
+  return lines.filter((line, index) => !drop.has(index)).join('\n').replace(/\n{3,}/g, '\n\n').trim();
 }
 
+// Adds the block, replacing the earlier block of the same folder only.
 function mergeCrontab(crontab, block) {
-  const rest = stripBlock(crontab);
+  const folder = sibylBlocks(String(block).split('\n'))[0].folder;
+  const rest = stripBlock(crontab, folder);
   return `${rest ? `${rest}\n` : ''}${block}\n`;
 }
 
@@ -163,15 +180,22 @@ function main(argv = process.argv.slice(2)) {
     return 0;
   }
 
+  const others = crontab => {
+    const folders = otherFolders(crontab);
+    return folders.length ? `The schedule of another Sibyl folder was left as it is: ${folders.join(', ')}.` : null;
+  };
+
   if (argv.includes('--remove')) {
     const current = readCrontab();
     if (!installedBlock(current)) {
-      console.log('No Sibyl schedule is installed.');
+      console.log(`No Sibyl schedule is installed for this folder (${SIBYL_DIR}).`);
+      if (others(current)) console.log(others(current));
       return 0;
     }
     const rest = stripBlock(current);
     writeCrontab(rest ? `${rest}\n` : '');
     console.log('Sibyl schedule removed. Other crontab entries were left as they were.');
+    if (others(current)) console.log(others(current));
     return 0;
   }
 
@@ -194,21 +218,26 @@ function main(argv = process.argv.slice(2)) {
       return 0;
     }
     writeCrontab(mergeCrontab(readCrontab(), block));
-    if (installedBlock(readCrontab()) !== block) {
+    const written = readCrontab();
+    if (installedBlock(written) !== block) {
       console.error('STOPPED: the schedule did not read back as written. Check it with: crontab -l');
       return 1;
     }
     console.log(`Sibyl schedule installed: collection and alerts every ${every} minutes, and a briefing every hour, ` +
       `from ${hours.start}:00 through hour ${hours.end} (this computer's clock).`);
+    if (others(written)) console.log(others(written));
     if (note) console.log(note);
     console.log('Page reading is not part of this schedule: the agent does it (AGENTS.md, "Reading the trend pages").');
     return 0;
   }
 
-  const block = installedBlock(readCrontab());
+  const current = readCrontab();
+  const block = installedBlock(current);
   console.log(block
     ? `Installed:\n${block}`
-    : 'No Sibyl schedule is installed. Install it with: node scripts/schedule.js --install --hours=10-22');
+    : 'No Sibyl schedule is installed for this folder. Install it with: node scripts/schedule.js --install --hours=10-22');
+  const folders = otherFolders(current);
+  if (folders.length) console.log(`Another Sibyl folder has its own schedule, which this folder leaves alone: ${folders.join(', ')}.`);
   if (note) console.log(note);
   return 0;
 }
@@ -228,6 +257,7 @@ module.exports = {
   buildCronBlock,
   installedBlock,
   mergeCrontab,
+  otherFolders,
   parseEvery,
   parseHours,
   protectedMacFolder,

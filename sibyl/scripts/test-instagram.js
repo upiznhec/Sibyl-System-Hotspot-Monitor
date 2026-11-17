@@ -11,7 +11,7 @@ const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 
 const ig = require('./adapters/instagram-adapter');
-const { setUpToken } = require('./instagram-token');
+const { QUESTIONS, setUpToken } = require('./instagram-token');
 const { parseEnvText } = require('./lib/env-file');
 
 const now = Date.now();
@@ -112,6 +112,9 @@ async function main() {
     assert.deepStrictEqual([result.kind, result.token], ['user', 'LONGTOKEN']);
     assert.strictEqual(result.expires.slice(0, 10), new Date(now + 5184000 * 1000).toISOString().slice(0, 10));
     server.rejectToken = null;
+
+    // The questions are numbered, so that the person can see when all three are answered.
+    assert.deepStrictEqual(Object.values(QUESTIONS).map(question => question.slice(0, 7)), ['1 of 3.', '2 of 3.', '3 of 3.']);
 
     // The command saves to .env, prints no token, and refuses to run without a terminal.
     const env = { ...process.env, SIBYL_DATA_DIR: dataDir, SIBYL_GRAPH_BASE: base };

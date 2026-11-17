@@ -29,6 +29,7 @@ Before scheduling anything, show me the sources, topics, keywords, exclude words
 When you need something from me, such as a login, a key or a link, stop and ask me in this chat. Tell me what it is, why it is needed, whether it costs money, and where to get it.
 Never ask me to paste a key or token into this chat. Give me a command that saves it on my computer.
 Never type my passwords. If a page needs a login, use a browser where I am already logged in if you can; otherwise open it and let me log in myself.
+If you can work in my browser and apps, do the setup steps there yourself and ask me only to log in. Keys for YouTube and X are mine to make, copy and save, and I do every step on Facebook and Instagram pages myself; give me simple steps for those.
 When you are done, run the Sibyl check and a test briefing, and show me both.
 ```
 
