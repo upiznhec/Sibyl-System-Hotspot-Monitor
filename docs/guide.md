@@ -341,7 +341,8 @@ Stop Sibyl: remove its schedule and the page-reading task. Keep my settings, so 
 | The same alert twice | Two scheduled tasks are running | "Check Sibyl's scheduled tasks for duplicates." |
 | No summaries | The item came without news links and no AI model is set | Optional: "Help me add an AI model key to Sibyl." |
 | TikTok or Google pages out of date | Not read today, the login expired, or the page changed | "Read today's trend pages for Sibyl and tell me if any failed." |
-| Every source fails with "ENOTFOUND" | Your agent's commands cannot reach the internet (Codex keeps them offline at first) | "Run the Sibyl check." Your agent tells you how to allow internet access. |
+| Every source fails with "ENOTFOUND", or Codex cannot download Sibyl | Your agent's commands cannot reach the internet. Codex asks to run such commands outside its sandbox, but a chat in the ChatGPT app's ChatGPT mode cannot | In Codex: start a new chat in Codex mode (the top of the sidebar says Codex) and send the request again. Otherwise: "Run the Sibyl check." Your agent tells you how to allow internet access. |
+| Codex stops with "You've hit your usage limit" | Your plan's 5-hour limit is used up; Codex first spends any credits you have bought | Wait until the time Codex gives, then type "continue". Your usage is at chatgpt.com/settings/usage. |
 | Your agent asks you to paste a key, token or webhook address | It is not following Sibyl's instructions | Do not paste it. "Give me the command that saves it on my computer." If you already pasted one, make a new one and save that. |
 | You must log in again in your agent's own browser | It reads pages in a browser of its own | "Can you use my browser, or bring my login over?" For keys and credit, use your own browser. |
 | Your agent asks you to run a script it wrote | It is working around a problem instead of asking you | Do not run it. "Use Sibyl's own schedule script, as AGENTS.md says." |

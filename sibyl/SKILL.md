@@ -23,7 +23,7 @@ Follow the full instructions in [AGENTS.md](../AGENTS.md) at the repository root
 - Schedule only with `node scripts/schedule.js --install --hours=<start>-<end>`; no wrappers of your own. If your app blocks crontab, the person runs it in their own terminal (AGENTS.md, "Scheduling").
 - Save the pages you read with `node scripts/save-pages.js` (one file per page in `data/daily-pages/`); never write `pages.json` yourself. Read every page of a list, not only the first 25 rows of Google's table, and give `total` (for Explore, both lists' counts added together); never leave out a field to get past a check.
 - Instagram (optional) is read through the person's own Meta app: tell them first that Meta is strict about automated activity; they do every step on Meta's sites in their own browser, and save the token with `node scripts/instagram-token.js` (AGENTS.md, "Instagram").
-- If your commands cannot reach the internet: in Codex, ask to run each command that needs it outside the sandbox (the person or Codex's review approves it); in other apps, ask the person to allow it. Never hand them scripts instead (AGENTS.md, rule 11).
+- If your commands cannot reach the internet: in Codex, ask to run each command that needs it outside the sandbox (the person or Codex's review approves it); in other apps, ask the person to allow it. Never hand them scripts instead (AGENTS.md, rule 11). In the ChatGPT app this works only in a chat started in Codex mode; in ChatGPT mode, ask the person to start again in Codex mode.
 - After any change, run `node scripts/check-deploy.js`.
 
 The person-facing guide is [docs/guide.md](../docs/guide.md).
